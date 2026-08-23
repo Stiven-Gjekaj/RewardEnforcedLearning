@@ -116,12 +116,17 @@ recorded here at the time was wrong, and the way it was wrong is worth keeping:
 it said standardising removes the signal when every step is equally bad, and
 the measurement says the signal was large and pointed backwards.
 
-What is left is seed 3, and it is a different question. That agent never
-reaches the goal once in four hundred episodes, before the fix or after it, so
-there is no return that reached the goal for any rule to share out. The entropy
-bonus is what holds the policy wide enough to find the goal, and the default of
-0.01 is not enough on this seed. Whether a larger one fixes it, or only slows
-every other seed down, is not swept.
+What was left was seed 3, and that was a different question. That agent never
+reached the goal once in four hundred episodes, before the fix or after it, so
+there was no return that reached the goal for any rule to share out. The
+entropy bonus is what holds the policy wide enough to find the goal, and it is
+swept now: at 0.01 that seed first reaches the goal at episode 1088 of 1200,
+and at 0.05 it reaches it at episode 173 and finds the optimal -13. The
+registry default is 0.05 and [algorithms.md](algorithms.md) has both tables.
+
+One seed of twelve still never reaches the goal, and the trade is written down
+rather than tuned away: 0.05 loses one seed where 0.01 loses three, and the
+policies it does find are 0.7 blunter.
 
 **Is the actor critic here wrong, or only untuned?** Measured, and the answer
 is neither on its own. The entropy bonus was swept on five seeds and six

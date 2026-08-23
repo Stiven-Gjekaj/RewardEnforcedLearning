@@ -308,21 +308,25 @@ that rocks the car gets out at all.
 | agent | mean | each seed |
 | --- | ---: | --- |
 | random | 18.3 | 19 16 20 15 21 |
-| tile-sarsa | **498.2** | 500 500 500 500 491 |
+| tile-sarsa | 498.2 | 500 500 500 500 491 |
 | tile-q | 418.8 | 500 500 500 500 94 |
-| reinforce | 356.5 | 500 143 140 500 500 |
-| actor-critic | 8.4 | **8 8 8 8 9** |
+| reinforce | **500.0** | 500 500 500 500 500 |
+| actor-critic | 146.8 | 500 **8 8** 80 138 |
 
 A return of 8 is a pole that fell over: the policy has gone entirely
-deterministic and pushes the cart one way until it drops. Four of the five
+deterministic and pushes the cart one way until it drops. Two of the five
 numbers in the last row are that.
 
-The order here is the opposite of what a reader who knows the field might
-expect. The oldest and simplest method on the list, a tile coded SARSA, solves
-the problem on five seeds of five. The two that learn a policy directly do
-worse, and one of them fails completely. Neither of those is a claim about the
-methods. It is a claim about these implementations, and the settings behind it
-are below.
+Three of these four rows solve the problem and one does not, and the one that
+does not is the most recent method on the list. That is not a claim about
+actor critic methods. It is a claim about this actor critic, and the sweep
+that says so is below.
+
+Both of the numbers in the last two rows moved a long way during one session.
+REINFORCE was at 220.7 until the step limit fault above was fixed, and at
+356.5 until its entropy default was measured rather than guessed. The actor
+critic was at 8.4 until the same entropy default moved. A row of this table is
+a statement about an implementation and its settings, and never about a method.
 
 ### The exploration setting on a tile coder
 
@@ -373,18 +377,24 @@ slower. That is reported here rather than tuned away.
 ### On the cliff walk
 
 ```console
-$ python scripts/measure_agents.py --env cliff --agents reinforce --runs 6 --episodes 400
+$ python scripts/measure_agents.py --env cliff --agents reinforce \
+    --runs 12 --episodes 400 --each-seed
 ```
 
-Six seeds, four hundred episodes, exact value of the greedy policy afterwards:
+Twelve seeds, four hundred episodes, exact value of the greedy policy
+afterwards:
 
 ```
-REINFORCE:  -15  -13  never  -13  -13  -13
+REINFORCE:  -13 -13 -13 -13 -13 -13 -15 -13 -15 never -15 -15
 ```
 
-Four seeds of six find the optimal policy of -13. One reaches -15. One never
-reaches the goal at all. Over the five that finish the mean is **-13.40**,
-against a best possible of -13.
+Seven seeds of twelve find the optimal policy of -13. Four reach -15. One
+never reaches the goal at all. Over the eleven that finish the mean is
+**-13.73**, against a best possible of -13.
+
+Twelve rather than six, and the reason is in
+[the entropy section](#the-entropy-bonus-on-a-policy-gradient) below. Six
+seeds said this setting was perfect. It is not.
 
 #### The step limit is not an ending
 
@@ -439,11 +449,12 @@ seed. That one is in [milestones.md](milestones.md) as an open question.
 $ python scripts/measure_control.py --env cartpole --episodes 600 --agents reinforce
 ```
 
-REINFORCE, five seeds, six hundred episodes: **500, 143, 140, 500, 500**. The
-same command before the step limit fix above gave 198, 181, 77, 500, 148.
+REINFORCE, five seeds, six hundred episodes: **500 on every one of them**.
+That is the full score. The same command gave 198, 181, 77, 500, 148 before
+the step limit fault above was fixed, and 500, 143, 140, 500, 500 after the
+fix and before the entropy default was measured.
 
-The actor critic here does not solve the cart pole at any setting that was
-tried. Every seed collapses to a policy that drops the pole in eight steps.
+The actor critic does not solve the cart pole at any setting that was tried.
 What was tried:
 
 | setting | result |
@@ -487,6 +498,50 @@ have: a target network, or n-step returns to lengthen the part of the target
 that is measured rather than guessed. That is in
 [milestones.md](milestones.md) as well.
 
+### The entropy bonus on a policy gradient
+
+Williams' method has no entropy bonus at all, and this project's classes
+default to little or none. The registry does not, and the reason is the same
+one as for the tile coder above: a default is worth choosing by measurement.
+
+```console
+$ python scripts/measure_control.py --env cartpole --episodes 600 \
+    --agents reinforce --set entropy=0.05
+$ python scripts/measure_agents.py --env cliff --agents reinforce \
+    --runs 12 --episodes 400 --each-seed --set entropy=0.05
+```
+
+**Cart pole**, five seeds, six hundred episodes:
+
+| entropy | mean | each seed |
+| --- | ---: | --- |
+| 0.01 | 356.5 | 500 143 140 500 500 |
+| **0.05** | **500.0** | 500 500 500 500 500 |
+
+**Cliff walk**, twelve seeds, four hundred episodes, exact value of the greedy
+policy:
+
+| entropy | mean of those that finish | never reaches the goal | each seed |
+| --- | ---: | ---: | --- |
+| 0.01 | **-13.22** | 3 of 12 | -15 -13 never -13 -13 -13 -13 never -13 never -13 -13 |
+| 0.05 | -13.73 | **1 of 12** | -13 -13 -13 -13 -13 -13 -15 -13 -15 never -15 -15 |
+
+So 0.05 is the default. On the cart pole it is the whole score against two
+thirds of it. On the cliff walk it is a trade rather than a win: it loses one
+seed instead of three, and the policies it does find are 0.7 blunter. An agent
+that fails one run in four is worse than one that is a little short of optimal,
+so the trade is taken, and it is a trade rather than a free lunch.
+
+#### Six seeds said this was a clean win, and six seeds were wrong
+
+The first sweep of this was six seeds. At 0.05 it read `-13 -13 -13 -13 -13
+-13`: the optimal policy on every seed, no failures, nothing to trade. Twelve
+seeds says otherwise, because seeds 7 to 12 are `-15 -13 -15 never -15 -15`.
+
+Nothing went wrong in the first measurement. It is what six samples of a noisy
+thing look like, and the mistake would have been to publish it. The number of
+seeds behind a claim on this page is now part of the claim.
+
 ### They are hundreds of times slower
 
 Two hundred episodes of the cliff walk, seed 1:
@@ -509,6 +564,8 @@ a network in pure Python.
 | --- | --- |
 | Every agent on a grid | `python scripts/measure_agents.py --env cliff --runs 10` |
 | The agents that approximate | `python scripts/measure_control.py --env cartpole` |
+| One setting swept | `python scripts/measure_control.py --env cartpole --set entropy=0.05` |
+| Every seed behind a mean | `python scripts/measure_agents.py --env cliff --each-seed` |
 | The tile coder offsets | `python scripts/measure_tiling_offsets.py` |
 | Specification gaming | `rel gaming` |
 | One run in detail | `rel train q-learning --env cliff --seed 7` |

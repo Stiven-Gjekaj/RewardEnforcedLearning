@@ -107,3 +107,9 @@ Everything below is new.
   naive alternative in four dimensions, 2.53 against 1.13. It was measuring the
   clamping fault above. With that fixed the rule is better in both, 0.97
   against 1.13.
+- **Six seeds said the entropy default was a clean win.** At 0.05 the first
+  sweep read -13 on all six cliff walk seeds: the optimal policy every time.
+  Twelve seeds says it loses one seed and that the policies it finds are 0.7
+  blunter, because seeds 7 to 12 are nothing like seeds 1 to 6. Nothing went
+  wrong in the first measurement. It is what six samples of a noisy thing look
+  like. The number of seeds is now part of every claim on that page.
