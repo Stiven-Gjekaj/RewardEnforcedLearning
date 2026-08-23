@@ -464,18 +464,19 @@ sensitive, and that making it work would need something this project does not
 have: a target network, n-step returns, or an entropy weight tuned per
 environment. That is in [milestones.md](milestones.md) as well.
 
-### They are a thousand times slower
+### They are hundreds of times slower
 
 Two hundred episodes of the cliff walk, seed 1:
 
 | agent | time | steps |
 | --- | ---: | ---: |
 | q-learning | 0.05s | 5,159 |
-| reinforce | 49.36s | 100,000 |
+| reinforce | 37.53s | 71,867 |
 
-Twenty times the steps and a thousand times the time. The steps are the agent's
-own fault: on this seed it never finds the goal, so every episode runs to the
-five hundred step limit. The rest is a network in pure Python.
+Fourteen times the steps and seven hundred times the time. The steps are the
+agent's own fault: it does not find the goal until episode 126 of the 200, so
+most of the run is episodes that reach the five hundred step limit. The rest is
+a network in pure Python.
 
 ---
 

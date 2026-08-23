@@ -36,14 +36,14 @@ questions. Everything here that has a number behind it says what was measured.
 | dyna-q, twenty planning steps | 0.16s | 3,721 |
 | monte-carlo | 0.20s | 21,863 |
 | random | 0.59s | 96,745 |
-| **reinforce** | **49.36s** | 100,000 |
+| **reinforce** | **37.53s** | 71,867 |
 
 The tabular agents are fast enough that a dependency would buy nothing: a run
 that takes a twentieth of a second does not need to take a thousandth.
 
-The network agents are a different matter. REINFORCE is a thousand times slower
-than Q-learning on the same environment, and almost all of that is Python
-running loops over lists of floats. NumPy would give most of it back.
+The network agents are a different matter. REINFORCE is seven hundred times
+slower than Q-learning on the same environment, and almost all of that is
+Python running loops over lists of floats. NumPy would give most of it back.
 
 It is still not here, and the reason is the claim rather than the speed. A
 project whose point is that every algorithm is written out and can be read
