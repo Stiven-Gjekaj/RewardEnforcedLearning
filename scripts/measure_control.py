@@ -20,6 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from rel.agents import AGENTS
+from rel.cli import parse_settings
 from rel.envs import ENVIRONMENTS
 from rel.rng import Rng
 from rel.training import evaluate, train
@@ -28,7 +29,12 @@ AGENT_NAMES = ("random", "tile-sarsa", "tile-q", "reinforce", "actor-critic")
 
 
 def measure(
-    name: str, environment: str, episodes: int, runs: int, first_seed: int
+    name: str,
+    environment: str,
+    episodes: int,
+    runs: int,
+    first_seed: int,
+    settings: dict[str, object] | None = None,
 ) -> tuple[str, ...]:
     greedy: list[float] = []
     started = time.perf_counter()
@@ -37,7 +43,7 @@ def measure(
         seed = first_seed + run
         root = Rng(seed)
         env = ENVIRONMENTS.make(environment, root.stream("env"))
-        agent = AGENTS.make(name, root.stream("agent"), env)
+        agent = AGENTS.make(name, root.stream("agent"), env, **(settings or {}))
 
         train(env, agent, episodes)
         watched = evaluate(
@@ -58,17 +64,28 @@ def main() -> int:
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--agents", nargs="+", default=list(AGENT_NAMES))
+    parser.add_argument(
+        "--set",
+        nargs="+",
+        dest="agent_set",
+        metavar="NAME=VALUE",
+        help="a setting for every agent measured, such as entropy=0.05",
+    )
     args = parser.parse_args()
+    settings = parse_settings(args.agent_set)
 
     print(
         f"{args.env}, {args.episodes} episodes, seeds {args.seed} to "
         f"{args.seed + args.runs - 1}"
     )
+    if settings:
+        named = ", ".join(f"{name}={value!r}" for name, value in settings.items())
+        print(f"every agent is built with {named}")
     print()
 
     headings = ("agent", "greedy, mean", "each seed", "time")
     rows = [
-        measure(name, args.env, args.episodes, args.runs, args.seed)
+        measure(name, args.env, args.episodes, args.runs, args.seed, settings)
         for name in args.agents
     ]
 

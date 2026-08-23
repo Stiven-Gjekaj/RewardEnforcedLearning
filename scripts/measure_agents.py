@@ -34,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from rel.agents import AGENTS
 from rel.agents.dp import evaluate_policy, value_iteration
+from rel.cli import parse_settings
 from rel.core import TabularEnv
 from rel.envs import ENVIRONMENTS
 from rel.metrics import summarise
@@ -59,7 +60,12 @@ AGENT_NAMES = (
 
 
 def measure(
-    name: str, environment: str, episodes: int, runs: int, first_seed: int
+    name: str,
+    environment: str,
+    episodes: int,
+    runs: int,
+    first_seed: int,
+    settings: dict[str, object] | None = None,
 ) -> tuple[str, ...]:
     learned: list[float] = []
     exact: list[float] = []
@@ -70,7 +76,7 @@ def measure(
         seed = first_seed + run
         root = Rng(seed)
         env = ENVIRONMENTS.make(environment, root.stream("env"))
-        agent = AGENTS.make(name, root.stream("agent"), env)
+        agent = AGENTS.make(name, root.stream("agent"), env, **(settings or {}))
 
         discount = env.spec.suggested_discount
         record = train(env, agent, episodes, discount=discount)
@@ -109,7 +115,15 @@ def main() -> int:
         default=list(AGENT_NAMES),
         help="which agents to measure",
     )
+    parser.add_argument(
+        "--set",
+        nargs="+",
+        dest="agent_set",
+        metavar="NAME=VALUE",
+        help="a setting for every agent measured, such as entropy=0.05",
+    )
     args = parser.parse_args()
+    settings = parse_settings(args.agent_set)
 
     env = ENVIRONMENTS.make(args.env, Rng(args.seed).stream("env"))
     discount = env.spec.suggested_discount
@@ -124,11 +138,14 @@ def main() -> int:
         f"{args.seed + args.runs - 1}, discount {discount:g}"
     )
     print(f"the best possible return is {best}")
+    if settings:
+        named = ", ".join(f"{name}={value!r}" for name, value in settings.items())
+        print(f"every agent is built with {named}")
     print()
 
     headings = ("agent", "while learning", "greedy, exactly", "stuck", "time")
     rows = [
-        measure(name, args.env, args.episodes, args.runs, args.seed)
+        measure(name, args.env, args.episodes, args.runs, args.seed, settings)
         for name in args.agents
     ]
 
