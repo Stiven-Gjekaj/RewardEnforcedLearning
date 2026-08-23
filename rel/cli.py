@@ -594,6 +594,7 @@ def command_demo(args: argparse.Namespace) -> int:
 
     live = Live(enabled=args.colour is not False, every=args.delay)
     total = 0.0
+    frame: list[str] = []
 
     with live:
         for step in range(args.steps):
@@ -602,22 +603,27 @@ def command_demo(args: argparse.Namespace) -> int:
             total += outcome.reward
             observation = outcome.observation
 
-            live.update(
-                [
-                    palette.paint(
-                        f"{args.agent} on {args.env} after {args.episodes} episodes",
-                        "bold",
-                    ),
-                    *watch_env.render().splitlines(),
-                    f"step {step + 1}   action {action}   "
-                    f"reward {outcome.reward:+.2f}   total {total:+.2f}",
-                ],
-                force=True,
-            )
+            frame = [
+                palette.paint(
+                    f"{args.agent} on {args.env} after {args.episodes} episodes",
+                    "bold",
+                ),
+                *watch_env.render().splitlines(),
+                f"step {step + 1}   action {action}   "
+                f"reward {outcome.reward:+.2f}   total {total:+.2f}",
+            ]
+            live.update(frame, force=True)
             time.sleep(args.delay)
 
             if outcome.done:
                 break
+
+    # Nothing was drawn if this is not a terminal, because moving a cursor in a
+    # pipe writes the escape codes into the pipe. Leave the last frame behind,
+    # so that a run in a log says something rather than nothing at all.
+    if not live.enabled and frame:
+        for line in frame:
+            print(line)
 
     audited = watch_env.audit()
     if audited:

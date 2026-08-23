@@ -326,6 +326,53 @@ class TestCompare:
         assert "last 100" in printed
 
 
+class TestDemo:
+    def test_it_leaves_the_last_frame_behind_without_a_terminal(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # Moving a cursor in a pipe writes the escape codes into the pipe, so
+        # nothing is drawn as it goes. A run in a log has to say something.
+        code = main(
+            [
+                "demo",
+                "q-learning",
+                "--env",
+                "boatrace",
+                "--episodes",
+                "20",
+                "--steps",
+                "12",
+                "--delay",
+                "0",
+                "--no-colour",
+            ]
+        )
+        printed = capsys.readouterr().out
+        assert code == 0
+        assert "step 12" in printed
+        assert "laps" in printed
+
+    def test_it_reports_what_the_reward_did_not_pay_for(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        main(
+            [
+                "demo",
+                "q-learning",
+                "--env",
+                "vase",
+                "--episodes",
+                "20",
+                "--steps",
+                "8",
+                "--delay",
+                "0",
+                "--no-colour",
+            ]
+        )
+        assert "vase_broken" in capsys.readouterr().out
+
+
 class TestGaming:
     def test_it_shows_the_gap_for_all_three(
         self, capsys: pytest.CaptureFixture[str]
