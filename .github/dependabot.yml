@@ -1,0 +1,37 @@
+version: 2
+
+# Every label named below has to exist in the repository before Dependabot can
+# use it. Left to itself Dependabot makes its own label, but a label it is told
+# to use and cannot find stops it labelling anything, and it says so in a
+# comment on the pull request rather than carrying on.
+
+updates:
+  # The package has no dependencies, and a test holds it that way. This entry
+  # covers requirements-dev.txt, which pins the four tools that the gate runs.
+  # They move together and the suite checks them, so one pull request for the
+  # lot is enough.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    commit-message:
+      prefix: "deps"
+    groups:
+      tooling:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]

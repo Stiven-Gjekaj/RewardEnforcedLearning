@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  docs:
+    name: Check the documentation links
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      # Every result in the documentation names the command behind it, and a
+      # broken link into docs/ takes a reader away from that evidence. This is
+      # the defect the documentation can actually have, so it is checked.
+      - name: Check that every relative link resolves
+        run: bash scripts/check-links.sh
+
+  gate:
+    name: Lint, type check and test on Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Install Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+
+      # Only the four tools that the gate runs. The package itself needs
+      # nothing, and the job below proves that separately.
+      - name: Install the development tools
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Check the formatting
+        run: ruff format --check .
+
+      - name: Type check
+        run: mypy rel
+
+      - name: Test
+        run: pytest
+
+  standalone:
+    name: Run with nothing else installed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Install Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      # The README says that this project imports nothing outside the standard
+      # library. A test reads the import statements and says the same thing,
+      # but a test runs inside an interpreter that pytest has already filled.
+      # This job builds an interpreter that holds the package and nothing else,
+      # and then does real work in it. An import that a test missed fails here.
+      - name: Install the package on its own
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/python -m pip install --quiet .
+          /tmp/clean/bin/python -m pip list
+
+      - name: Train an agent in it
+        run: /tmp/clean/bin/rel train q-learning --env cliff --episodes 200 --seed 7
+
+  reproduce:
+    name: Check that a seed replays a run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Install Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      # A seed that replays the same run is the promise this project makes
+      # first. A unit test holds the generator to a pinned sequence, and this
+      # job holds the whole program to the same promise from the outside: two
+      # runs of one command agree, and a run on another seed does not.
+      - name: Run the same seed twice and compare the digests
+        run: |
+          a=$(python -m rel train sarsa --env cliff --episodes 300 --seed 11 --quiet --print digest)
+          b=$(python -m rel train sarsa --env cliff --episodes 300 --seed 11 --quiet --print digest)
+          c=$(python -m rel train sarsa --env cliff --episodes 300 --seed 12 --quiet --print digest)
+          echo "seed 11: $a"
+          echo "seed 11: $b"
+          echo "seed 12: $c"
+          if [ "$a" != "$b" ]; then
+            echo "::error::The same seed gave two different runs."
+            exit 1
+          fi
+          if [ "$a" = "$c" ]; then
+            echo "::error::Two seeds gave the same run, so the seed does nothing."
+            exit 1
+          fi
