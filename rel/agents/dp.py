@@ -78,7 +78,12 @@ class Solution:
 
 @dataclass(frozen=True, slots=True)
 class PolicyReport:
-    """What a fixed policy is worth, and whether it finishes at all."""
+    """What a fixed policy is worth, and whether it finishes at all.
+
+    A value that is not a number belongs to a state this policy never reaches.
+    That is different from a value of zero, which would be a claim about a
+    state the policy does visit.
+    """
 
     reaches_end: bool
     values: tuple[float, ...]
@@ -200,15 +205,26 @@ def evaluate_policy(
     estimate with noise in it, and gives the step limit rather than an answer
     when the policy does not finish.
     """
-    if not reaches_end(env, policy):
+    terminal = env.terminal_states()
+    edges = _policy_edges(env, policy, terminal)
+    forward = _reachable_from_start(env, edges)
+
+    if not forward <= _can_finish(edges, terminal):
         return PolicyReport(
             reaches_end=False,
             values=(-math.inf,) * env.observation_space.n,
             start_value=-math.inf,
         )
 
-    terminal = env.terminal_states()
-    values = _evaluate(env, policy, discount, tolerance, max_sweeps, terminal)
+    # Only the states the policy can actually be in. A state it can never
+    # reach has no bearing on what it is worth, and sweeping one is not merely
+    # wasted work: if the policy circles there, the sweep never settles, and
+    # the whole evaluation fails over a corner of the grid that the policy
+    # never visits. That happened to `rel train q-learning --env cliff`, which
+    # reported no exact value at all until this was fixed.
+    values = _evaluate(
+        env, policy, discount, tolerance, max_sweeps, terminal, live=forward
+    )
     return PolicyReport(
         reaches_end=True,
         values=values,
@@ -229,17 +245,21 @@ def reaches_end(env: TabularEnv, policy: Sequence[int]) -> bool:
     """
     terminal = env.terminal_states()
     edges = _policy_edges(env, policy, terminal)
+    forward = _reachable_from_start(env, edges)
+    return forward <= _can_finish(edges, terminal)
 
-    forward: set[int] = set()
+
+def _reachable_from_start(env: TabularEnv, edges: dict[int, list[int]]) -> set[int]:
+    """Every state the policy can put the agent in, starting from a start."""
+    found: set[int] = set()
     frontier = [state for _, state in env.start_states()]
     while frontier:
         state = frontier.pop()
-        if state in forward:
+        if state in found:
             continue
-        forward.add(state)
+        found.add(state)
         frontier.extend(edges[state])
-
-    return forward <= _can_finish(edges, terminal)
+    return found
 
 
 # -- The searches -----------------------------------------------------------
@@ -405,14 +425,25 @@ def _evaluate(
     tolerance: float,
     max_sweeps: int,
     terminal: frozenset[int],
+    live: set[int] | None = None,
 ) -> tuple[float, ...]:
+    """What each state is worth under this policy.
+
+    `live` names the states to sweep. A state left out keeps a value that is
+    not a number, which says "this policy never goes here" rather than zero,
+    which would say "this policy goes here and it is worth nothing".
+    """
     count = env.observation_space.n
-    values = [0.0] * count
-    live = [state for state in range(count) if state not in terminal]
+    if live is None:
+        values = [0.0] * count
+        sweeping = [state for state in range(count) if state not in terminal]
+    else:
+        values = [0.0 if state in live else math.nan for state in range(count)]
+        sweeping = [state for state in sorted(live) if state not in terminal]
 
     for _ in range(max_sweeps):
         largest = 0.0
-        for state in live:
+        for state in sweeping:
             updated = _backup(env, values, state, policy[state], discount)
             largest = max(largest, abs(updated - values[state]))
             values[state] = updated
