@@ -310,7 +310,7 @@ that rocks the car gets out at all.
 | random | 18.3 | 19 16 20 15 21 |
 | tile-sarsa | **498.2** | 500 500 500 500 491 |
 | tile-q | 418.8 | 500 500 500 500 94 |
-| reinforce | 220.7 | 198 181 77 500 148 |
+| reinforce | 356.5 | 500 143 140 500 500 |
 | actor-critic | 8.4 | **8 8 8 8 9** |
 
 A return of 8 is a pole that fell over: the policy has gone entirely
