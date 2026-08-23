@@ -649,10 +649,10 @@ Two hundred episodes of the cliff walk, seed 1:
 | agent | time | steps |
 | --- | ---: | ---: |
 | q-learning | 0.05s | 5,159 |
-| reinforce | 37.53s | 71,867 |
+| reinforce | 37.41s | 74,726 |
 
 Fourteen times the steps and seven hundred times the time. The steps are the
-agent's own fault: it does not find the goal until episode 126 of the 200, so
+agent's own fault: it does not find the goal until episode 139 of the 200, so
 most of the run is episodes that reach the five hundred step limit. The rest is
 a network in pure Python.
 

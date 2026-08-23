@@ -36,7 +36,7 @@ questions. Everything here that has a number behind it says what was measured.
 | dyna-q, twenty planning steps | 0.16s | 3,721 |
 | monte-carlo | 0.20s | 21,863 |
 | random | 0.59s | 96,745 |
-| **reinforce** | **37.53s** | 71,867 |
+| **reinforce** | **37.41s** | 74,726 |
 
 The tabular agents are fast enough that a dependency would buy nothing: a run
 that takes a twentieth of a second does not need to take a thousandth.
