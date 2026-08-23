@@ -96,6 +96,15 @@ class Episode:
     terminated: bool
     audit: Mapping[str, float]
 
+    #: Every reward in order, kept only when the caller asked for it.
+    #:
+    #: A bandit run needs this. The interesting curve there is the reward at
+    #: each pull averaged over problems, not the total of a whole problem, and
+    #: the total hides the shape entirely: an agent that finds the best lever
+    #: on pull fifty and one that finds it on pull five hundred differ by a
+    #: few percent in the total and are not the same agent.
+    rewards: tuple[float, ...] = ()
+
 
 @dataclass
 class Record:
@@ -106,6 +115,7 @@ class Record:
     discounted: list[float] = field(default_factory=list)
     terminated: list[bool] = field(default_factory=list)
     audits: dict[str, list[float]] = field(default_factory=dict)
+    step_rewards: list[tuple[float, ...]] = field(default_factory=list)
     digest: Digest = field(default_factory=Digest)
 
     def add(self, episode: Episode) -> None:
@@ -113,8 +123,27 @@ class Record:
         self.lengths.append(episode.length)
         self.discounted.append(episode.discounted_reward)
         self.terminated.append(episode.terminated)
+        if episode.rewards:
+            self.step_rewards.append(episode.rewards)
         for key, value in episode.audit.items():
             self.audits.setdefault(key, []).append(value)
+
+    def reward_by_step(self) -> list[float]:
+        """The mean reward at each step, over the episodes that reached it.
+
+        Empty unless the run was asked to keep its steps.
+        """
+        if not self.step_rewards:
+            return []
+
+        longest = max(len(rewards) for rewards in self.step_rewards)
+        totals = [0.0] * longest
+        counts = [0] * longest
+        for rewards in self.step_rewards:
+            for index, reward in enumerate(rewards):
+                totals[index] += reward
+                counts[index] += 1
+        return [total / count for total, count in zip(totals, counts, strict=True)]
 
     def __len__(self) -> int:
         return len(self.returns)
@@ -146,6 +175,7 @@ def run_episode(
     number: int = 0,
     digest: Digest | None = None,
     discount: float = 1.0,
+    keep_steps: bool = False,
 ) -> Episode:
     """One episode, from reset to an ending.
 
@@ -154,11 +184,13 @@ def run_episode(
     separate choice: an agent can be watched greedily while it still learns.
     """
     observation = env.reset()
+    agent.start_episode()
     total = 0.0
     discounted = 0.0
     weight = 1.0
     length = 0
     terminated = False
+    rewards: list[float] = []
 
     while True:
         action = agent.greedy(observation) if greedy else agent.act(observation)
@@ -176,6 +208,9 @@ def run_episode(
             digest.add(transition)
         if learn:
             agent.observe(transition)
+
+        if keep_steps:
+            rewards.append(outcome.reward)
 
         total += outcome.reward
         discounted += weight * outcome.reward
@@ -197,6 +232,7 @@ def run_episode(
         length=length,
         terminated=terminated,
         audit=dict(env.audit()),
+        rewards=tuple(rewards),
     )
 
 
@@ -206,6 +242,7 @@ def train(
     episodes: int,
     *,
     discount: float = 1.0,
+    keep_steps: bool = False,
     on_episode: Callable[[Episode, Record], None] | None = None,
 ) -> Record:
     """Run the agent for `episodes` episodes while it learns."""
@@ -219,6 +256,7 @@ def train(
             number=number,
             digest=record.digest,
             discount=discount,
+            keep_steps=keep_steps,
         )
         record.add(episode)
         if on_episode is not None:
@@ -232,6 +270,7 @@ def evaluate(
     episodes: int,
     *,
     discount: float = 1.0,
+    keep_steps: bool = False,
 ) -> Record:
     """Run the greedy policy with the learning switched off."""
     record = Record()
@@ -244,6 +283,7 @@ def evaluate(
             number=number,
             digest=record.digest,
             discount=discount,
+            keep_steps=keep_steps,
         )
         record.add(episode)
     return record

@@ -77,6 +77,14 @@ class Agent(ABC, Generic[ObsT]):
         run.
         """
 
+    def start_episode(self) -> None:
+        """Called after the environment resets and before the first action.
+
+        Almost nothing needs this. A bandit agent does: every episode of that
+        environment is a new set of levers, so an agent that carried its
+        estimates across would be answering a question about the last problem.
+        """
+
     def observe(self, transition: Transition[ObsT]) -> None:
         """Take in one step. The default learns nothing."""
         self.steps += 1
