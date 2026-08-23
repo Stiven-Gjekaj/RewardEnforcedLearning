@@ -1,0 +1,31 @@
+# Python build and cache output
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Test and type checker output
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Run output. A run writes here, and a run is reproducible from its seed, so
+# there is nothing in this directory worth keeping in the repository.
+runs/
+
+# Editor and operating system
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
