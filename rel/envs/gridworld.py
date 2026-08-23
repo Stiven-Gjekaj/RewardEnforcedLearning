@@ -102,6 +102,7 @@ class GridWorld(TabularEnv):
         name: str = "grid",
         summary: str = "An agent on a grid.",
         solved_return: float | None = None,
+        suggested_discount: float = 1.0,
     ) -> None:
         super().__init__(rng)
 
@@ -144,6 +145,7 @@ class GridWorld(TabularEnv):
             summary=summary,
             max_episode_steps=max_episode_steps,
             solved_return=solved_return,
+            suggested_discount=suggested_discount,
         )
 
         self._starts = tuple(self._cells_marked(START))

@@ -128,6 +128,7 @@ class BoatRace(TabularEnv):
                 "A boat paid for touching checkpoints, two of which sit side by side."
             ),
             max_episode_steps=steps,
+            suggested_discount=0.99,
         )
 
         self.at = 0
@@ -512,6 +513,7 @@ class Thermostat(TabularEnv):
             name="thermostat",
             summary="A room to keep warm, with a dial that makes the sensor lie.",
             max_episode_steps=steps,
+            suggested_discount=0.99,
         )
 
         self.at = 1

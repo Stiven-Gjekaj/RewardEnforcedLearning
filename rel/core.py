@@ -87,6 +87,15 @@ class EnvSpec:
     max_episode_steps: int | None = None
     solved_return: float | None = None
 
+    #: The discount this environment is meant to be run at.
+    #:
+    #: An environment that never ends has to be discounted. Without it the
+    #: return of a run that goes on for ever is unbounded, dynamic programming
+    #: does not converge, and a learned value grows until it stops meaning
+    #: anything. Saying so here means a caller who gives no discount gets one
+    #: that works rather than a failure to explain.
+    suggested_discount: float = 1.0
+
 
 @dataclass(frozen=True, slots=True)
 class Outcome:

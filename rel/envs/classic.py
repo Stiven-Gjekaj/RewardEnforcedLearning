@@ -157,6 +157,7 @@ def dyna_maze(rng: Rng) -> GridWorld:
         max_episode_steps=2000,
         name="maze",
         summary="Six by nine with seven blocked cells. Only the goal pays.",
+        suggested_discount=0.95,
     )
 
 
