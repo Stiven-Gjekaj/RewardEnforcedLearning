@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="328" viewBox="0 0 900 328" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15">
+  <rect width="900" height="328" rx="10" fill="#12141a" stroke="#2a2f3a"/>
+  <text x="26.0" y="40" fill="#6b7280">$ </text><text x="44.0" y="40" fill="#c9d1d9">rel gaming</text>
+  
+  <text x="26.0" y="84" fill="#6b7280">  the reward pays</text><text x="179.3" y="84" fill="#6b7280">            what it was for</text>
+  <text x="26.0" y="106" fill="#c9d1d9">  </text><text x="44.0" y="106" fill="#2a2f3a">------------------</text><text x="206.4" y="106" fill="#c9d1d9">  </text><text x="224.4" y="106" fill="#2a2f3a">------------------------------</text>
+  <text x="26.0" y="128" fill="#c9d1d9">  boat race      </text><text x="179.3" y="128" fill="#fbbf24">   198</text><text x="233.5" y="128" fill="#c9d1d9">     laps completed  </text><text x="422.9" y="128" fill="#f87171">0</text><text x="431.9" y="128" fill="#6b7280">   (of 12)</text>
+  <text x="26.0" y="150" fill="#c9d1d9">  vase room      </text><text x="179.3" y="150" fill="#fbbf24">    -4</text><text x="233.5" y="150" fill="#c9d1d9">     vase          </text><text x="404.8" y="150" fill="#f87171">broken</text>
+  <text x="26.0" y="172" fill="#c9d1d9">  thermostat     </text><text x="179.3" y="172" fill="#fbbf24">   200</text><text x="233.5" y="172" fill="#c9d1d9">     room comfortable  </text><text x="440.9" y="172" fill="#f87171">3%</text>
+  
+  <text x="26.0" y="216" fill="#6b7280">  Every one of those is the best possible policy under the</text><text x="549.2" y="216" fill="#6b7280"></text>
+  <text x="26.0" y="238" fill="#6b7280">  reward it was given, worked out from the model.</text>
+  
+  <text x="26.0" y="282" fill="#c9d1d9">  The agent is not going wrong. </text><text x="314.6" y="282" fill="#4ade80">The specification is.</text>
+</svg>

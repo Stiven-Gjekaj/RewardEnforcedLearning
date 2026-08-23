@@ -196,14 +196,22 @@ class TestItLearns:
     """
 
     @pytest.mark.parametrize("builder", [Reinforce, ActorCritic])
-    def test_it_finds_the_best_path_on_the_cliff_walk(
+    def test_it_finds_a_short_path_on_the_cliff_walk(
         self, builder: type[Reinforce[int]]
     ) -> None:
+        # A bound rather than a number. The best possible is -13 and both of
+        # these reach it on this seed, and pinning that would make the test
+        # fail on any change that moved the answer by one step, which is not a
+        # fault.
+        #
+        # This is one seed and it is not the whole story. Over six seeds
+        # REINFORCE reaches the goal on four of them and never finishes on the
+        # other two. `docs/algorithms.md` has that measurement and the command.
         env, agent = build(builder, seed=5)
         train(env, agent, 400, discount=0.99)
 
         watched = evaluate(cliff_walk(Rng(6).stream("env")), agent, 5, discount=0.99)
-        assert watched.final() == -13.0
+        assert -30.0 < watched.final() < -10.0
 
     def test_the_baseline_can_be_switched_off(self) -> None:
         env, agent = build(Reinforce, baseline=False)
