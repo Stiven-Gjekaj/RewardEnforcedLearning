@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/Stiven-Gjekaj/RewardEnforcedLearning/main/assets/banner.svg" alt="Three tables. A boat race paid 198 points and completed no laps. A vase room paid -4 and broke the vase. A thermostat paid 200 while the room was comfortable three percent of the time. Every one is the best possible policy under the reward it was given." width="100%">
+<img src="assets/banner.svg" alt="Three tables. A boat race paid 198 points and completed no laps. A vase room paid -4 and broke the vase. A thermostat paid 200 while the room was comfortable three percent of the time. Every one is the best possible policy under the reward it was given." width="100%">
 
 ### A reinforcement learning workbench that imports nothing
 
