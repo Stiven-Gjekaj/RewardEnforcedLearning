@@ -101,6 +101,20 @@ class Agent(ABC, Generic[ObsT]):
         """
         return None
 
+    def knows(self, observation: ObsT) -> bool:
+        """Whether this agent has ever been in this state.
+
+        A value map has to tell a state worth nothing from a state nothing is
+        known about. An agent whose table starts at zero says the same number
+        for both, and on an environment where every reward is negative that
+        number is the highest in the table, so the cells nobody has visited are
+        drawn as the best cells on the map.
+
+        The default is `True`, for an agent that generalises and therefore has
+        an opinion everywhere.
+        """
+        return True
+
     def __repr__(self) -> str:
         return f"{type(self).__name__}()"
 
@@ -163,12 +177,34 @@ class TabularAgent(Agent[ObsT]):
     # -- The table ----------------------------------------------------------
 
     def values(self, observation: ObsT) -> list[float]:
-        """The row for this observation, made on first sight."""
+        """The row for this observation, made on first sight.
+
+        This is the row an update writes to, so it has to exist. Use `peek` to
+        read without making one.
+        """
         row = self.q.get(observation)
         if row is None:
             row = [self.optimism] * self.actions.n
             self.q[observation] = row
         return row
+
+    def peek(self, observation: ObsT) -> Sequence[float]:
+        """The row, without adding one to the table.
+
+        Reading has to be free of side effects, and this is not a nicety. The
+        renderer asks for the greedy action of every cell of a grid in order to
+        draw the policy. With `values` behind that, drawing the picture put a
+        row in the table for every cell, including the eleven cliff cells the
+        agent is never in, and the value map then reported that it had stood in
+        all of them.
+        """
+        row = self.q.get(observation)
+        if row is None:
+            return [self.optimism] * self.actions.n
+        return row
+
+    def knows(self, observation: ObsT) -> bool:
+        return observation in self.q
 
     def action_scores(self, observation: ObsT) -> Sequence[float]:
         """The numbers the policy ranks actions by.
@@ -177,8 +213,11 @@ class TabularAgent(Agent[ObsT]):
         tables and acts on their sum, so it overrides this one method and gets
         the greedy rule, the exploration probabilities and the renderer to
         agree with it for free.
+
+        This reads and does not write, because the renderer calls it for every
+        state of a grid.
         """
-        return self.values(observation)
+        return self.peek(observation)
 
     def action_values(self, observation: ObsT) -> Sequence[float] | None:
         return self.action_scores(observation)

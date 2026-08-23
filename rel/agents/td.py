@@ -199,11 +199,20 @@ class DoubleQ(TabularAgent[ObsT]):
             self.q_other[observation] = row
         return row
 
+    def peek_other(self, observation: ObsT) -> Sequence[float]:
+        row = self.q_other.get(observation)
+        if row is None:
+            return [self.optimism] * self.actions.n
+        return row
+
+    def knows(self, observation: ObsT) -> bool:
+        return observation in self.q or observation in self.q_other
+
     def action_scores(self, observation: ObsT) -> Sequence[float]:
         return [
             first + second
             for first, second in zip(
-                self.values(observation), self.other_values(observation), strict=True
+                self.peek(observation), self.peek_other(observation), strict=True
             )
         ]
 
