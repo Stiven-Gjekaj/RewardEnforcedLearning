@@ -153,7 +153,7 @@ class TestTheReturns:
         _, agent = build(Reinforce, discount=0.5)
         assert agent.value is not None
 
-        cut_off = Transition(0, 0, 1.0, 7, False, True)
+        cut_off = Transition(0, 0, 1.0, 7, terminated=False, truncated=True)
         agent._episode = [cut_off]
 
         ahead = agent.value(agent.encoder(7)).item()
@@ -168,7 +168,8 @@ class TestTheReturns:
 
         _, agent = build(Reinforce, discount=0.9, baseline=False)
         agent._episode = [
-            Transition(step, 0, -1.0, step + 1, False, step == 4) for step in range(5)
+            Transition(step, 0, -1.0, step + 1, terminated=False, truncated=step == 4)
+            for step in range(5)
         ]
         assert agent._returns() == pytest.approx([-10.0] * 5)
 
@@ -179,8 +180,8 @@ class TestTheReturns:
 
         _, agent = build(Reinforce, discount=1.0, baseline=False)
         agent._episode = [
-            Transition(0, 0, -1.0, 1, False, False),
-            Transition(1, 0, -1.0, 2, False, True),
+            Transition(0, 0, -1.0, 1, terminated=False, truncated=False),
+            Transition(1, 0, -1.0, 2, terminated=False, truncated=True),
         ]
         assert agent._returns() == pytest.approx([-2.0, -1.0])
 
@@ -197,7 +198,7 @@ class TestTheReturns:
 
         _, agent = build(Reinforce, discount=0.99, baseline=False)
         agent._episode = [
-            Transition(step, 0, -1.0, step + 1, False, step == 499)
+            Transition(step, 0, -1.0, step + 1, terminated=False, truncated=step == 499)
             for step in range(500)
         ]
         weights = standardised(agent._returns())
