@@ -36,12 +36,13 @@ class Entry(Generic[T]):
     build: Callable[..., T]
     tags: tuple[str, ...] = field(default=())
 
-    def options(self) -> dict[str, Any]:
+    def options(self, fixed: int = 1) -> dict[str, Any]:
         """The named settings that `build` accepts, with their defaults.
 
-        The first parameter is the source of chance and is not a setting, so it
-        is left out. Everything else is something a caller can change from the
-        command line.
+        The first `fixed` parameters are supplied by the caller rather than by
+        a setting. For an environment that is the source of chance. For an
+        agent it is the source of chance and the environment, which the builder
+        reads two things off and the agent never sees.
         """
         parameters = list(inspect.signature(self.build).parameters.values())
         return {
@@ -50,7 +51,7 @@ class Entry(Generic[T]):
                 if parameter.default is inspect.Parameter.empty
                 else parameter.default
             )
-            for parameter in parameters[1:]
+            for parameter in parameters[fixed:]
             if parameter.kind
             in (
                 inspect.Parameter.POSITIONAL_OR_KEYWORD,
@@ -62,10 +63,13 @@ class Entry(Generic[T]):
 class Registry(Generic[T]):
     """A name to entry table, with an error message that helps."""
 
-    __slots__ = ("_entries", "kind")
+    __slots__ = ("_entries", "fixed", "kind")
 
-    def __init__(self, kind: str, entries: Sequence[Entry[T]] = ()) -> None:
+    def __init__(
+        self, kind: str, entries: Sequence[Entry[T]] = (), fixed: int = 1
+    ) -> None:
         self.kind = kind
+        self.fixed = fixed
         self._entries: dict[str, Entry[T]] = {}
         for entry in entries:
             self.add(entry)
@@ -104,7 +108,7 @@ class Registry(Generic[T]):
     def make(self, name: str, *args: Any, **options: Any) -> T:
         """Build one, and say something useful when the settings are wrong."""
         entry = self[name]
-        accepted = entry.options()
+        accepted = entry.options(self.fixed)
 
         unknown = [key for key in options if key not in accepted]
         if unknown:
