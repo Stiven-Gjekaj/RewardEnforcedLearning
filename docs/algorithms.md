@@ -29,11 +29,14 @@ right, one down.
 | expected-sarsa | **-19.99 +/- 0.70** | -15.00 | |
 | q-learning | -50.71 +/- 2.21 | **-13.00** | |
 | double-q | -22.97 +/- 1.16 | -17.00 | |
-| n-step-sarsa | -49.79 +/- 8.73 | -18.67 | 4 |
+| n-step-sarsa | -23.13 +/- 1.35 | -16.80 | |
 | dyna-q | -52.80 +/- 1.96 | **-13.00** | |
 | dyna-q-plus | -47.56 +/- 1.91 | **-13.00** | |
 
-*500 episodes, seeds 1 to 10, step size 0.5, epsilon 0.1.*
+*500 episodes, seeds 1 to 10, epsilon 0.1, and a step size of 0.5 for
+every agent except `n-step-sarsa`, which the registry builds at 0.2. The
+reason is measured in [how many steps, and how big a
+step](#how-many-steps-and-how-big-a-step).*
 
 Three numbers, because one of them cannot say what happened.
 
@@ -71,8 +74,7 @@ grid it gets the best learning return of anything and a policy worth -15.
 
 ### The stuck column
 
-Two of ten SARSA seeds and four of ten n-step seeds produce a greedy policy
-that never finishes.
+Two of ten SARSA seeds produce a greedy policy that never finishes.
 
 The mechanism is worth knowing because it looks like a bug and is not. On the
 top row, moving up runs into the edge and the agent stays where it is. The four
@@ -87,6 +89,13 @@ action costs a hundred, and no amount of noise reorders that.
 **So the agents that learn the safe path are the agents whose safe path can trap
 them.** The step limit is what makes it visible instead of infinite, and a
 report that averaged the truncated episodes in would call it a long path.
+
+Four of ten n-step seeds sat in this column as well until its step size was
+measured. This is why that setting mattered so much: the trap is the noise in
+an estimate against a difference of one point, and a larger step size keeps
+more noise in the estimate. Dropping it from 0.5 to 0.2 empties the column for
+that agent on this grid, and [how many steps, and how big a
+step](#how-many-steps-and-how-big-a-step) has the sweep.
 
 ---
 
@@ -106,7 +115,7 @@ $ python scripts/measure_agents.py --env windy --runs 10 --episodes 600
 | expected-sarsa | -17.26 +/- 0.07 | **-15.00** | |
 | q-learning | -17.14 +/- 0.07 | **-15.00** | |
 | double-q | -18.55 +/- 0.27 | -16.20 | |
-| n-step-sarsa | -27.10 +/- 1.05 | -17.50 | 6 |
+| n-step-sarsa | -17.55 +/- 0.09 | **-15.00** | |
 | dyna-q | **-17.12 +/- 0.05** | **-15.00** | |
 | dyna-q-plus | -17.15 +/- 0.06 | **-15.00** | |
 
@@ -120,7 +129,7 @@ $ python scripts/measure_agents.py --env windy --runs 10 --episodes 600
 | expected-sarsa | -22.73 +/- 0.09 | **-20.00** | |
 | q-learning | -22.60 +/- 0.09 | **-20.00** | |
 | double-q | -22.59 +/- 0.10 | **-20.00** | |
-| n-step-sarsa | -27.83 +/- 0.55 | -20.67 | 1 |
+| n-step-sarsa | -22.84 +/- 0.11 | **-20.00** | |
 | dyna-q | **-22.40 +/- 0.07** | **-20.00** | |
 | dyna-q-plus | -22.41 +/- 0.07 | **-20.00** | |
 
@@ -134,7 +143,7 @@ $ python scripts/measure_agents.py --env windy --runs 10 --episodes 600
 | expected-sarsa | 1.00 +/- 0.00 | 0.49 | |
 | q-learning | 1.00 +/- 0.00 | 0.48 | |
 | double-q | 1.00 +/- 0.00 | **0.51** | |
-| n-step-sarsa | 0.82 +/- 0.10 | 0.45 | 7 |
+| n-step-sarsa | 1.00 +/- 0.00 | 0.49 | 3 |
 | dyna-q | 1.00 +/- 0.00 | 0.50 | |
 | dyna-q-plus | 1.00 +/- 0.00 | 0.49 | 2 |
 
@@ -154,7 +163,7 @@ and 0.51" are both true and only the second is informative.
 | expected-sarsa | **0.26 +/- 0.01** | **0.60** | |
 | q-learning | 0.26 +/- 0.03 | 0.57 | 2 |
 | double-q | 0.08 +/- 0.02 | 0.15 | |
-| n-step-sarsa | 0.08 +/- 0.01 | 0.14 | |
+| n-step-sarsa | 0.20 +/- 0.03 | 0.40 | |
 | dyna-q | 0.14 +/- 0.01 | 0.36 | |
 | dyna-q-plus | 0.12 +/- 0.01 | 0.29 | |
 
@@ -162,7 +171,93 @@ Nothing here gets near 0.82 in six hundred episodes, and the ones that do worst
 are the ones whose assumptions the lake breaks. Dyna keeps one result for each
 state and action, and on a slippery lake it remembers the last slip and replays
 it as if it were certain. n-step SARSA carries several steps of a trajectory
-that the slipping made unrepresentative.
+that the slipping made unrepresentative, and it carries two of them rather
+than four since its default was measured, which is most of the difference
+between 0.14 and 0.40 in that row.
+
+---
+
+## How many steps, and how big a step
+
+`n-step-sarsa` used to take four steps at a step size of 0.5. In the tables
+above it got stuck more often than any other agent on four grids of five, and
+on the cliff walk it also had the worst policy of anything that learned.
+Nobody had swept it. Swept, on thirty seeds of each of the five grids:
+
+```console
+$ python scripts/measure_agents.py --env cliff --agents n-step-sarsa \
+    --runs 30 --set n=4 step_size=0.5
+```
+
+| grid | n=4, 0.5 | n=2, 0.5 | n=1, 0.5 | n=4, 0.2 | n=2, 0.2 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| cliff, best -13 | -18.24 (9) | -17.84 (11) | -17.18 (8) | -17.71 (2) | **-16.80 (0)** |
+| windy, best -15 | -17.86 (8) | -16.41 (8) | -15.96 (3) | -16.07 (1) | **-15.21 (1)** |
+| rooms, best -20 | -21.14 (9) | -20.08 (6) | -20.00 (1) | -20.07 (1) | **-20.00 (0)** |
+| lake, best 0.82 | 0.076 (1) | 0.137 (0) | **0.335** (0) | 0.119 (0) | 0.294 (0) |
+| maze, best 0.51 | 0.460 (20) | 0.460 (18) | **0.486** (4) | 0.459 (13) | 0.473 (9) |
+
+The bracket is how many of the thirty seeds ended with a policy that never
+reaches the goal. Every other grid and setting is the same command with a
+different `--env` and a different `--set`.
+
+The two tables after this one are differences, and each cell is the value at
+n=4 minus the value at n=1 from two runs of that command.
+
+**At a step size of 0.5, one step wins on all five grids.** One step is plain
+SARSA, so at the setting every other tabular agent here uses, the n step
+return earns nothing at all.
+
+### Two explanations, and the measurement refused both
+
+The first guess was exploration. An n step return of an on-policy agent folds
+n exploratory actions into one target, and with epsilon 0.1 and n=4 about a
+third of the targets carry at least one. If that were the cause, less
+exploration would shrink the cost of n. It grows:
+
+| epsilon | cliff | windy | rooms |
+| ---: | ---: | ---: | ---: |
+| 0.20 | -0.51 | -1.52 | -1.17 |
+| 0.10 | -1.06 | -1.90 | -1.14 |
+| 0.05 | -1.31 | -1.89 | -0.43 |
+| 0.02 | **-1.54** | **-2.52** | -0.64 |
+
+The second guess was the step size, on the ground that a four step target sums
+four rewards and carries more spread, which a step size of 0.5 then writes
+straight into the table. That one does not survive either, and the way it fails
+is the answer:
+
+| step size | cliff | windy | rooms |
+| ---: | ---: | ---: | ---: |
+| 0.50 | -1.06 | -1.90 | -1.14 |
+| 0.20 | -1.18 | -0.42 | -0.07 |
+| 0.10 | -2.06 | **+2.75** | **+0.67** |
+| 0.05 | -1.07 | **+3.04** | one step reaches nothing |
+
+**The sign flips.** At a step size of 0.1 on the windy grid, four steps beats
+one step by 2.75, and one step gets stuck on 23 of 30 seeds where four steps
+gets stuck on none. On four rooms at 0.05, one step gets stuck on all thirty.
+
+So the two settings are not independent and neither is a fault of the other.
+An n step return carries a value n cells further per update and n times the
+spread. A large step size is already moving the table fast, so the spread is
+all cost. A small step size is not, and then the reach is worth the spread.
+
+The registry default is n=2 at a step size of 0.2, which is the best of the
+settings above on every grid where the n step return is used at all. Over the
+five grids and thirty seeds each, the count of policies that never reach the
+goal falls from 47 to 10.
+
+### What that cost
+
+The comparison tables above are a comparison of learning rules at one shared
+setting, and this row is now the exception: every other agent runs at 0.5 and
+this one at 0.2. That is stated in the caption rather than hidden, and the
+like-for-like row is in the table above under `n=2, 0.5`.
+
+The alternative was to leave the agent at a setting where it is beaten by
+one-step SARSA on every grid in the project, so that one row of one table
+stayed tidy. The measurement is more use than the tidiness.
 
 ---
 

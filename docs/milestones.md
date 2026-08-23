@@ -104,11 +104,35 @@ evaluation episodes ran out of steps. `optimism` is an argument, and
 
 ## Open questions
 
-**Should `n-step-sarsa` default to a smaller `n`?** It is the worst agent in
-the tables on four of the five grids and gets stuck most often. Four may simply
-be too many for grids this small. Nobody has swept it.
+**Why does one cliff walk seed of twelve still never reach the goal?** The
+agent never sees the goal on that seed, so no rule for sharing out a return
+can help. The entropy bonus is what holds the policy wide enough to find it,
+and raising the default from 0.01 to 0.05 took the count from three seeds to
+one. Whether the last one wants more entropy, more episodes, or something that
+is not a knob at all is not measured.
 
-**Why does REINFORCE still fail on one seed of six on the cliff walk?** Three
+**Should the digest cover the agent as well as the environment?** It currently
+hashes the transitions, so two agents that happen to walk the same path get the
+same digest. That is arguably the right thing, because the digest is about the
+run and not about the learner, and arguably not.
+
+---
+
+## Questions that were open, and what the measurement said
+
+**Should `n-step-sarsa` default to a smaller `n`?** Swept, and the answer is
+that the question was half of one. `n` and the step size trade against each
+other, and [algorithms.md](algorithms.md) has both sweeps. At a step size of
+0.5 one step wins on all five grids, which means the n step return earns
+nothing at the setting the rest of the table uses. At 0.1 the sign flips and
+four steps wins by a wide margin, because one step has not carried the value
+far enough in five hundred episodes.
+
+The default is now n=2 at a step size of 0.2. Over five grids and thirty seeds
+each, the count of policies that never reach the goal falls from 47 to 10. Two
+explanations were tested before that one and neither survived the measurement.
+
+**Why did REINFORCE fail on three seeds of six on the cliff walk?** Three
 of those failures were one fault and it is fixed. `_returns` read an episode
 that the step limit cut off as an episode that ended, and
 [algorithms.md](algorithms.md) has what that did to the weights. The guess
@@ -141,11 +165,6 @@ this file, this encoder and this optimiser and reaches five hundred on all five
 seeds. The difference is the one thing the two do not share, which is a target
 bootstrapped from a value network that is still wrong. A target network or
 n-step returns are what would test that, and neither is here.
-
-**Should the digest cover the agent as well as the environment?** It currently
-hashes the transitions, so two agents that happen to walk the same path get the
-same digest. That is arguably the right thing, because the digest is about the
-run and not about the learner, and arguably not.
 
 ---
 

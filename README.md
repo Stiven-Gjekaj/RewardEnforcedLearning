@@ -238,7 +238,7 @@ The cliff walk, ten seeds, five hundred episodes:
 | expected-sarsa | **-19.99 +/- 0.70** | -15.00 | |
 | q-learning | -50.71 +/- 2.21 | **-13.00** | |
 | double-q | -22.97 +/- 1.16 | -17.00 | |
-| n-step-sarsa | -49.79 +/- 8.73 | -18.67 | 4 of 10 |
+| n-step-sarsa | -23.13 +/- 1.35 | -16.80 | |
 | dyna-q | -52.80 +/- 1.96 | **-13.00** | |
 
 ```console
