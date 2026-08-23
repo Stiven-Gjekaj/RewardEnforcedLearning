@@ -1,0 +1,4 @@
+# The package itself needs nothing. These are the tools that the gate runs.
+ruff==0.15.8
+mypy==1.19.1
+pytest==9.0.2
