@@ -101,6 +101,27 @@ class TestEveryEnvironment:
             env.reset()
             env.step(action)
 
+    def test_it_says_whether_an_episode_can_end_at_all(self, name: str) -> None:
+        # An environment with no ending truncates every episode by definition.
+        # A report that counted those would be describing the environment
+        # rather than the policy, so the environment says which it is and a
+        # test checks that what it says is true.
+        env = build(name, 5)
+        policy = Rng(5).stream("policy")
+
+        ended = False
+        env.reset()
+        for _ in range(20_000):
+            outcome = env.step(policy.below(env.action_space.n))
+            if outcome.terminated:
+                ended = True
+                break
+            if outcome.done:
+                env.reset()
+
+        if not env.spec.ends:
+            assert not ended, f"{name} says it never ends and it ended"
+
     def test_the_summary_on_the_spec_matches_the_table(self, name: str) -> None:
         # Two places say what an environment is. They are allowed to differ in
         # wording, and they are not allowed to describe different things, so

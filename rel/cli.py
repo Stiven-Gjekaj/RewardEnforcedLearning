@@ -174,7 +174,12 @@ def report_lines(
 
     learned_tail = summarise(learning.returns[-over:])
     watched_summary = summarise(watched.returns)
-    cut_off = sum(1 for finished in watched.terminated if not finished)
+
+    # An environment with no ending truncates every episode by definition, so
+    # counting them would describe the environment rather than the policy.
+    cut_off = 0
+    if env.spec.ends:
+        cut_off = sum(1 for finished in watched.terminated if not finished)
 
     rows = [
         ("episodes", f"{len(learning)} learning, {len(watched)} watched"),

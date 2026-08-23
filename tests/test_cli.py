@@ -179,6 +179,53 @@ class TestTrain:
         printed = capsys.readouterr().out
         assert "greedy policy" in printed
 
+    def test_an_environment_with_no_ending_is_not_reported_as_stuck(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # Every episode of a bandit runs to its step limit, because there is
+        # nothing to reach. Saying "twenty of twenty ran out of steps" about
+        # that would be describing the environment rather than the policy.
+        main(
+            [
+                "train",
+                "bandit-ucb",
+                "--env",
+                "bandit",
+                "--episodes",
+                "5",
+                "--quiet",
+                "--no-colour",
+                "--env-set",
+                "pulls=200",
+            ]
+        )
+        assert "ran out of steps" not in capsys.readouterr().out
+
+    def test_a_policy_that_stops_moving_is_reported(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # The same line on an environment that can end means the policy
+        # stopped moving, which is worth saying loudly. This is the seed where
+        # SARSA on the cliff walk does it.
+        main(
+            [
+                "train",
+                "sarsa",
+                "--env",
+                "cliff",
+                "--episodes",
+                "500",
+                "--seed",
+                "7",
+                "--quiet",
+                "--no-colour",
+                "--no-maps",
+            ]
+        )
+        printed = capsys.readouterr().out
+        assert "ran out of steps" in printed
+        assert "never reaches an ending" in printed
+
 
 class TestSolve:
     def test_it_gives_the_best_possible_return(

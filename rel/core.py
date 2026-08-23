@@ -87,6 +87,15 @@ class EnvSpec:
     max_episode_steps: int | None = None
     solved_return: float | None = None
 
+    #: Whether an episode of this can end inside the rules at all.
+    #:
+    #: A bandit and a boat race have no ending. Every episode of one runs to
+    #: its step limit, and a report that said "twenty of twenty ran out of
+    #: steps" about them would be describing the environment rather than the
+    #: policy. On an environment that can end, the same line means the policy
+    #: stopped moving, which is worth saying loudly.
+    ends: bool = True
+
     #: The discount this environment is meant to be run at.
     #:
     #: An environment that never ends has to be discounted. Without it the

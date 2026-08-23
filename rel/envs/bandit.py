@@ -71,6 +71,7 @@ class KArmedBandit(Env[int]):
                 f"its own true value."
             ),
             max_episode_steps=pulls,
+            ends=False,
         )
 
         self.values: list[float] = [0.0] * arms
