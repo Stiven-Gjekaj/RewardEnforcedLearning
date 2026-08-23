@@ -24,6 +24,7 @@ KNOWN_TAGS = frozenset(
         "baseline",
         "linear",
         "needs-model",
+        "network",
         "off-policy",
         "on-policy",
         "planning",
@@ -76,7 +77,7 @@ class TestTheTable:
         # this project to show it. An agent whose entry does not say is an
         # entry somebody forgot to finish.
         for entry in AGENTS:
-            if {"tabular", "linear"} & set(entry.tags):
+            if {"tabular", "linear", "network"} & set(entry.tags):
                 assert {"on-policy", "off-policy"} & set(entry.tags), entry.name
 
     def test_the_settings_of_every_agent_can_be_read(self) -> None:

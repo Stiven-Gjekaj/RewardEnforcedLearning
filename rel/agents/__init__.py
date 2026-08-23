@@ -39,8 +39,10 @@ from rel.agents.bandit import (
 from rel.agents.base import Agent, RandomAgent, TabularAgent, Transition
 from rel.agents.dp import FixedPolicyAgent, value_iteration
 from rel.agents.dyna import DynaQ, DynaQPlus
+from rel.agents.features import encoder_for
 from rel.agents.linear import SemiGradientQ, SemiGradientSarsa
 from rel.agents.monte_carlo import MonteCarloControl
+from rel.agents.policy import ActorCritic, Reinforce
 from rel.agents.td import DoubleQ, ExpectedSarsa, NStepSarsa, QLearning, Sarsa
 from rel.agents.tiles import TileCoder
 from rel.core import Env, TabularEnv
@@ -175,6 +177,36 @@ def _dyna_plus(
         discount=discount,
         epsilon=epsilon,
     )
+
+
+def _policy_gradient(cls: type[Reinforce[Any]]) -> AgentBuilder:
+    def build(
+        rng: Rng,
+        env: Env[Any],
+        hidden: int = 16,
+        step_size: float = 0.02,
+        value_step_size: float = 0.05,
+        discount: float = 0.99,
+        entropy: float = 0.01,
+        normalise: bool = True,
+        clip: float = 1.0,
+    ) -> Agent[Any]:
+        encoder, features = encoder_for(env.observation_space)
+        return cls(
+            rng,
+            env.action_space,
+            encoder,
+            features,
+            hidden=hidden,
+            step_size=step_size,
+            value_step_size=value_step_size,
+            discount=discount,
+            entropy=entropy,
+            normalise=normalise,
+            clip=clip,
+        )
+
+    return build
 
 
 def _linear(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder:
@@ -316,6 +348,18 @@ AGENTS: Registry[Agent[Any]] = Registry(
             "Q-learning over a tile coder.",
             _linear(SemiGradientQ),
             tags=("linear", "off-policy"),
+        ),
+        Entry(
+            "reinforce",
+            "Waits for the episode, then pushes up whatever led to a good return.",
+            _policy_gradient(Reinforce),
+            tags=("network", "on-policy"),
+        ),
+        Entry(
+            "actor-critic",
+            "Replaces the tail of the return with what a value network believes.",
+            _policy_gradient(ActorCritic),
+            tags=("network", "on-policy"),
         ),
         Entry(
             "bandit-greedy",
