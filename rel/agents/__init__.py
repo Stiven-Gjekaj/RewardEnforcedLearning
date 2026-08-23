@@ -15,6 +15,15 @@ slowly. The entries below use 0.5, which is what the chapter uses for that
 figure. Both numbers are correct answers to their own question, and putting
 them in two places is how each one stays readable.
 
+The exploration of the agents over a tile coder is the clearest case. The
+classes default to none at all, which is what the mountain car chapter uses
+and what works there. Measured over five seeds, a tile coded SARSA with no
+exploration reaches 157 on the cart pole and one with epsilon at 0.05 reaches
+498 out of a possible 500, and on the mountain car the two are within two
+points of each other. So the entry here says 0.05: a setting that solves one
+environment and costs nothing on the other is a better default than one that
+is right in the chapter it came from. `docs/algorithms.md` has the sweep.
+
 ## Why a builder takes the environment
 
 An agent never sees the environment. A builder does, for one turn, to read two
@@ -217,7 +226,7 @@ def _linear(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder:
         grids: int = 8,
         step_size: float | Schedule = 0.5,
         discount: float = 1.0,
-        epsilon: float | Schedule = 0.0,
+        epsilon: float | Schedule = 0.05,
         optimism: float = 0.0,
     ) -> Agent[Any]:
         box = getattr(env, "tiling_space", env.observation_space)

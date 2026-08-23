@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-914_passing-427819?style=for-the-badge" alt="914 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-928_passing-427819?style=for-the-badge" alt="928 tests passing"/>
 </p>
 
 <p align="center">
@@ -280,17 +280,17 @@ scripts/            the scripts that produce the numbers in the documentation
 
 | Area | Files | Lines |
 | --- | ---: | ---: |
-| Core | 4 | 864 |
-| Environments | 6 | 1852 |
-| Agents | 11 | 2834 |
+| Core | 4 | 873 |
+| Environments | 6 | 1855 |
+| Agents | 11 | 2857 |
 | Network | 4 | 672 |
-| Running | 3 | 510 |
-| Interface | 6 | 924 |
-| Command line | 3 | 1108 |
-| **Total** | **37** | **8764** |
+| Running | 3 | 506 |
+| Interface | 6 | 931 |
+| Command line | 3 | 1116 |
+| **Total** | **37** | **8810** |
 
-Not counting 5549 lines of tests. Run `python scripts/lines.py` for the current
-numbers.
+Not counting 5625 lines of tests and 597 of measurement scripts. Run
+`python scripts/lines.py` for the current numbers.
 
 Three rules about who may import whom are enforced by a test that reads the
 import statements of every module:
@@ -310,7 +310,7 @@ import statements of every module:
 $ pytest
 ```
 
-914 tests. Some of what they cover, and why each one is there rather than the
+928 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A
@@ -358,7 +358,7 @@ what it was for.
 ## Status
 
 Alpha, and complete enough to be useful. Twelve environments and eighteen
-agents, all of them covered by a suite that runs in about two minutes with no
+agents, all of them covered by a suite that runs in about five minutes with no
 browser, no display and no network.
 
 What is honestly weak is written down rather than left for a reader to find.

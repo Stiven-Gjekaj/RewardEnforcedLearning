@@ -28,11 +28,19 @@ from rel.training import evaluate, train
 from rel.ui.colour import Palette, palette_for
 from rel.ui.table import table
 
-#: These environments never end, so an undiscounted run of them is worth an
-#: unbounded amount and nothing converges.
-DISCOUNT = 0.99
-
 Builder = Callable[[Rng], TabularEnv]
+
+
+def _discount(args: argparse.Namespace, env: TabularEnv) -> float:
+    """The discount to use: the one asked for, or the one the environment wants.
+
+    Two of these environments never end, so an undiscounted run of one is worth
+    an unbounded amount and nothing converges. Each of them says so, and this
+    takes them at their word unless the caller said otherwise.
+    """
+    if args.discount is not None:
+        return float(args.discount)
+    return env.spec.suggested_discount
 
 
 def _solved(build: Builder, discount: float) -> tuple[float, Mapping[str, float]]:
@@ -88,7 +96,8 @@ def _boat_race(args: argparse.Namespace, palette: Palette) -> None:
         def build(rng: Rng, mode: str = mode) -> TabularEnv:
             return BoatRace(rng, reward=mode)
 
-        paid, audited = _solved(build, args.discount)
+        discount = _discount(args, build(Rng(1).stream("env")))
+        paid, audited = _solved(build, discount)
         row = [
             label,
             f"{paid:.1f}",
@@ -96,7 +105,7 @@ def _boat_race(args: argparse.Namespace, palette: Palette) -> None:
             f"{audited['reverse_share']:.0%}",
         ]
         if args.learn:
-            paid, audited = _learned(build, args.episodes, args.discount)
+            paid, audited = _learned(build, args.episodes, discount)
             row += [f"{paid:.1f}", f"{audited['laps']:.0f}"]
         rows.append(row)
 
@@ -139,7 +148,8 @@ def _vase_room(args: argparse.Namespace, palette: Palette) -> None:
         def build(rng: Rng, penalty: float = penalty) -> TabularEnv:
             return VaseRoom(rng, vase_penalty=penalty)
 
-        paid, audited = _solved(build, 1.0)
+        discount = _discount(args, build(Rng(1).stream("env")))
+        paid, audited = _solved(build, discount)
         broken = "yes" if audited["vase_broken"] else "no"
         row = [
             "as written" if penalty == 0.0 else f"penalty {penalty:g}",
@@ -147,7 +157,7 @@ def _vase_room(args: argparse.Namespace, palette: Palette) -> None:
             palette.paint(broken, "red" if broken == "yes" else "green"),
         ]
         if args.learn:
-            paid, audited = _learned(build, args.episodes, 1.0)
+            paid, audited = _learned(build, args.episodes, discount)
             row.append(
                 palette.paint(
                     "yes" if audited["vase_broken"] else "no",
@@ -196,7 +206,8 @@ def _thermostat(args: argparse.Namespace, palette: Palette) -> None:
         def build(rng: Rng, mode: str = mode) -> TabularEnv:
             return Thermostat(rng, reward=mode)
 
-        paid, audited = _solved(build, args.discount)
+        discount = _discount(args, build(Rng(1).stream("env")))
+        paid, audited = _solved(build, discount)
         row = [
             label,
             f"{paid:.0f}",
@@ -204,7 +215,7 @@ def _thermostat(args: argparse.Namespace, palette: Palette) -> None:
             "yes" if audited["sensor_tampered"] else "no",
         ]
         if args.learn:
-            paid, audited = _learned(build, args.episodes, args.discount)
+            paid, audited = _learned(build, args.episodes, discount)
             row += [f"{paid:.0f}", f"{audited['comfortable_share']:.1%}"]
         rows.append(row)
 
@@ -239,8 +250,6 @@ def _thermostat(args: argparse.Namespace, palette: Palette) -> None:
 
 def run_gaming(args: argparse.Namespace) -> int:
     palette = palette_for(forced=args.colour)
-    if args.discount is None:
-        args.discount = DISCOUNT
 
     print(palette.paint("Reward Enforced Learning", "bold"))
     print()
@@ -284,4 +293,4 @@ def run_gaming(args: argparse.Namespace) -> int:
     return 0
 
 
-__all__ = ["DISCOUNT", "run_gaming"]
+__all__ = ["run_gaming"]

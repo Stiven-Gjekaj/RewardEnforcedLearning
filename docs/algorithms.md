@@ -278,6 +278,130 @@ usually said.
 
 ---
 
+## The two control problems
+
+Neither has a table of states and neither has a model, so there is no exact
+value to compare against. What is reported is the greedy return of every seed,
+because these agents vary far more than the tabular ones and a mean on its own
+would hide it.
+
+```console
+$ python scripts/measure_control.py --env mountaincar --episodes 300
+$ python scripts/measure_control.py --env cartpole --episodes 600
+```
+
+CONTROL_TABLES_GO_HERE
+
+### The exploration setting on a tile coder
+
+The mountain car chapter uses a greedy policy with no exploration at all, and
+that is what the classes here default to. It is the wrong default for this
+project, and the measurement says so plainly.
+
+```console
+$ python scripts/measure_control.py --env cartpole --agents tile-sarsa
+```
+
+Five seeds each, greedy return afterwards:
+
+| environment | agent | epsilon | mean | each seed |
+| --- | --- | ---: | ---: | --- |
+| mountain car | tile-sarsa | 0.00 | -115.8 | -118 -132 -103 -120 -106 |
+| mountain car | tile-sarsa | 0.01 | -137.0 | -137 -135 -129 -140 -143 |
+| mountain car | tile-sarsa | 0.05 | **-114.2** | -129 -109 -122 -105 -105 |
+| mountain car | tile-q | 0.00 | -127.9 | -123 -133 -119 -130 -134 |
+| mountain car | tile-q | 0.05 | -123.9 | -126 -106 -142 -129 -117 |
+| cart pole | tile-sarsa | 0.00 | 157.7 | 95 500 95 **8** 89 |
+| cart pole | tile-sarsa | 0.01 | 432.6 | 500 500 500 163 500 |
+| cart pole | tile-sarsa | 0.05 | **498.2** | 500 500 500 500 491 |
+| cart pole | tile-q | 0.00 | 106.7 | **8** 500 **8** **8** **8** |
+| cart pole | tile-q | 0.05 | 418.8 | 500 500 500 500 94 |
+
+On the mountain car the setting hardly matters: every row is between -114 and
+-137. On the cart pole it is the difference between an agent that solves the
+problem on five seeds of five and one that falls over in eight steps on four of
+them.
+
+A return of 8 is a policy that has gone entirely deterministic and pushes the
+cart one way until the pole drops. Without exploration a tile coded value
+function has nothing to pull it back out.
+
+So the registry default is 0.05: **a setting that solves one environment and
+costs nothing on the other is a better default than the one from the chapter a
+method came from.** The classes keep the chapter's default, because that is
+what a reader comparing this code with the book needs to see.
+
+---
+
+## The two agents that learn a policy directly
+
+Neither is as steady as anything tabular in this project, and both are far
+slower. That is reported here rather than tuned away.
+
+### On the cliff walk
+
+```console
+$ rel train reinforce --env cliff --seed 5
+```
+
+Six seeds, four hundred episodes, greedy return afterwards:
+
+```
+REINFORCE:  -500  -13  -500  -13  -13  -17
+```
+
+It finds the optimal policy on four seeds of six and never reaches the goal on
+the other two. Over five seeds the ones that finish average **-14.33**, against
+a best possible of -13.
+
+**Why the two failures happen is not known.** The suspicion is that
+standardising the returns within an episode removes the signal when every step
+of the episode is equally bad, which is exactly the case for an episode that
+never reaches the goal, so the agent that has not yet found the goal has no
+gradient telling it where to look. That is a guess. It has not been measured
+and it is in [milestones.md](milestones.md) as an open question.
+
+### On the cart pole
+
+REINFORCE, three seeds, a thousand episodes: **500, 500, 189**.
+
+The actor critic here does not solve the cart pole at any setting that was
+tried. Every seed collapses to a policy that drops the pole in eight steps.
+What was tried:
+
+| setting | result |
+| --- | --- |
+| step size 0.02, 400 episodes | 500 on one seed, and it collapses by 1000 |
+| step size 0.05 | 8 on every seed, immediately |
+| entropy 0.01, three seeds | 8, 8, 14 |
+| entropy 0.03, three seeds | 66, 121, 8 |
+| a hidden layer of 32 | 78 |
+
+It does find the optimal policy on the cliff walk, which says the pieces are
+put together correctly rather than that the algorithm is right. The gradient
+engine underneath is checked against the definition of a derivative for every
+operation, so the fault is not there either.
+
+The honest reading is that this is a working implementation of a method that is
+sensitive, and that making it work would need something this project does not
+have: a target network, n-step returns, or an entropy weight tuned per
+environment. That is in [milestones.md](milestones.md) as well.
+
+### They are a thousand times slower
+
+Two hundred episodes of the cliff walk, seed 1:
+
+| agent | time | steps |
+| --- | ---: | ---: |
+| q-learning | 0.05s | 5,159 |
+| reinforce | 49.36s | 100,000 |
+
+Twenty times the steps and a thousand times the time. The steps are the agent's
+own fault: on this seed it never finds the goal, so every episode runs to the
+five hundred step limit. The rest is a network in pure Python.
+
+---
+
 ## Where the numbers on this page can be checked
 
 | Table | Command |
