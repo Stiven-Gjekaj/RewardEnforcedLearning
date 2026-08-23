@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-928_passing-427819?style=for-the-badge" alt="928 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-992_passing-427819?style=for-the-badge" alt="992 tests passing"/>
 </p>
 
 <p align="center">
@@ -280,16 +280,16 @@ scripts/            the scripts that produce the numbers in the documentation
 
 | Area | Files | Lines |
 | --- | ---: | ---: |
-| Core | 4 | 873 |
+| Core | 4 | 874 |
 | Environments | 6 | 1855 |
 | Agents | 11 | 2857 |
 | Network | 4 | 672 |
 | Running | 3 | 506 |
-| Interface | 6 | 931 |
-| Command line | 3 | 1116 |
-| **Total** | **37** | **8810** |
+| Interface | 6 | 921 |
+| Command line | 3 | 1131 |
+| **Total** | **37** | **8816** |
 
-Not counting 5625 lines of tests and 597 of measurement scripts. Run
+Not counting 6225 lines of tests and 597 of measurement scripts. Run
 `python scripts/lines.py` for the current numbers.
 
 Three rules about who may import whom are enforced by a test that reads the
@@ -310,7 +310,7 @@ import statements of every module:
 $ pytest
 ```
 
-928 tests. Some of what they cover, and why each one is there rather than the
+992 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A
