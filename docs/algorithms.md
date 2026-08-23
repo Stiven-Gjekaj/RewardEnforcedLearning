@@ -165,7 +165,7 @@ and 0.51" are both true and only the second is informative.
 | double-q | 0.08 +/- 0.02 | 0.15 | |
 | n-step-sarsa | 0.20 +/- 0.03 | 0.40 | |
 | dyna-q | 0.14 +/- 0.01 | 0.36 | |
-| dyna-q-plus | 0.12 +/- 0.01 | 0.29 | |
+| dyna-q-plus | 0.12 +/- 0.01 | 0.29 | 1 |
 
 Nothing here gets near 0.82 in six hundred episodes, and the ones that do worst
 are the ones whose assumptions the lake breaks. Dyna keeps one result for each
