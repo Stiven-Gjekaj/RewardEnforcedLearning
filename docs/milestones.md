@@ -123,11 +123,19 @@ bonus is what holds the policy wide enough to find the goal, and the default of
 0.01 is not enough on this seed. Whether a larger one fixes it, or only slows
 every other seed down, is not swept.
 
-**Is the actor critic here wrong, or only untuned?** It finds the optimal
-policy on the cliff walk, which says the pieces are put together correctly. It
-does not solve the cart pole at any setting that was tried, and the settings
-that were tried are listed in `docs/algorithms.md`. An entropy bonus helps and
-does not fix it.
+**Is the actor critic here wrong, or only untuned?** Measured, and the answer
+is neither on its own. The entropy bonus was swept on five seeds and six
+hundred episodes of the cart pole, and [algorithms.md](algorithms.md) has the
+table. The mean does not rise with the setting: 0.05 gives 146.8, 0.10 gives
+33.3, and 0.20 gives 207.2. Two settings reach five hundred on one seed each
+and none reaches it on two.
+
+So it is not a default away from working, and it is not put together wrongly
+either: it finds the optimal policy on the cliff walk, and REINFORCE shares
+this file, this encoder and this optimiser and reaches five hundred on all five
+seeds. The difference is the one thing the two do not share, which is a target
+bootstrapped from a value network that is still wrong. A target network or
+n-step returns are what would test that, and neither is here.
 
 **Should the digest cover the agent as well as the environment?** It currently
 hashes the transitions, so two agents that happen to walk the same path get the

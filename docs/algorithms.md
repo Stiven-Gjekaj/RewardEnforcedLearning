@@ -450,19 +450,42 @@ What was tried:
 | --- | --- |
 | step size 0.02, 400 episodes | 500 on one seed, and it collapses by 1000 |
 | step size 0.05 | 8 on every seed, immediately |
-| entropy 0.01, three seeds | 8, 8, 14 |
 | entropy 0.03, three seeds | 66, 121, 8 |
 | a hidden layer of 32 | 78 |
+
+The entropy bonus is the one setting that moves it a long way, so it was swept
+on five seeds and six hundred episodes:
+
+```console
+$ python scripts/measure_control.py --env cartpole --episodes 600 \
+    --agents actor-critic --set entropy=0.05
+```
+
+| entropy | mean | each seed |
+| --- | ---: | --- |
+| 0.01, the default | 8.4 | 8 8 8 8 9 |
+| 0.05 | 146.8 | **500** 8 8 80 138 |
+| 0.10 | 33.3 | 113 22 8 16 8 |
+| 0.20 | 207.2 | 212 177 **500** 126 22 |
+
+The shape of that table is the answer. The mean does not rise with the
+setting: 0.10 is worse than 0.05 and worse than 0.20. Two settings reach the
+full five hundred on one seed each, and no setting reaches it on two. A knob
+that a run is this sensitive to is not a knob that has a right value.
 
 It does find the optimal policy on the cliff walk, which says the pieces are
 put together correctly rather than that the algorithm is right. The gradient
 engine underneath is checked against the definition of a derivative for every
-operation, so the fault is not there either.
+operation, so the fault is not there either. REINFORCE, which shares this
+file, this encoder and this optimiser, reaches five hundred on all five seeds
+once its entropy is raised. So the difference is the one thing the two do not
+share: bootstrapping a target from a value network that is still wrong.
 
 The honest reading is that this is a working implementation of a method that is
 sensitive, and that making it work would need something this project does not
-have: a target network, n-step returns, or an entropy weight tuned per
-environment. That is in [milestones.md](milestones.md) as well.
+have: a target network, or n-step returns to lengthen the part of the target
+that is measured rather than guessed. That is in
+[milestones.md](milestones.md) as well.
 
 ### They are hundreds of times slower
 
