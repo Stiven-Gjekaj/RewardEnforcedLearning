@@ -402,11 +402,26 @@ $ python scripts/measure_control.py --env cartpole --episodes 600
 | random | -1000.0 | -1000 -1000 -1000 -1000 -1000 |
 | tile-sarsa | **-114.2** | -129 -109 -122 -105 -105 |
 | tile-q | -123.9 | -126 -106 -142 -129 -117 |
+| reinforce | -938.5 | -921 -1000 -1000 -771 -1000 |
+| actor-critic | -1000.0 | -1000 -1000 -1000 -1000 -1000 |
 
 The random policy never leaves the valley in a thousand steps, on any seed.
 That is the clearest separation in the project between an agent that learned
 and one that did not: the engine cannot climb the hill, so nothing but a policy
 that rocks the car gets out at all.
+
+The last two rows are the other end of that. The actor critic scores what the
+random policy scores, on every seed. REINFORCE gets out once in five. This is
+the environment the two of them are worst on, and it is worth saying why: the
+reward is -1 a step until the goal, so an agent that never reaches the goal
+sees one flat number for a thousand steps and has nothing to raise the
+probability of. A tile coded value function does not need to reach the goal to
+learn something, because a state it has left is worth what the state it moved
+to is worth. A policy gradient does.
+
+That is a claim about what these two methods need rather than about these
+implementations, and the cart pole below is the same two agents at the top of
+the table.
 
 **Cart pole**, 600 episodes, greedy return afterwards, out of a possible 500:
 
