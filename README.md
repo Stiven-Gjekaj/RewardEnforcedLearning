@@ -362,11 +362,12 @@ agents, all of them covered by a suite that runs in about five minutes with no
 browser, no display and no network.
 
 What is honestly weak is written down rather than left for a reader to find.
-On the cart pole, REINFORCE reaches the full 500 on five seeds of five and the
-actor critic here reaches 8 on two of them, which is a pole falling over.
-REINFORCE never reaches the goal on one seed of twelve on the cliff walk. All
-of it is measured in [docs/algorithms.md](docs/algorithms.md), with the number
-of seeds behind every claim.
+The actor critic here reaches 8 on two cart pole seeds of five, which is a pole
+falling over, and on the mountain car it scores what a random policy scores on
+every seed. REINFORCE gets out of the mountain car valley once in five, and
+never reaches the goal on one cliff walk seed of twelve. All of it is measured
+in [docs/algorithms.md](docs/algorithms.md), with the number of seeds behind
+every claim.
 
 ---
 
