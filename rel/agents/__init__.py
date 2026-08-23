@@ -107,11 +107,21 @@ def _optimal(rng: Rng, env: Env[Any], discount: float = 1.0) -> Agent[Any]:
     )
 
 
+#: Two steps and a step size of 0.2, where every other tabular agent in the
+#: registry uses 0.5. The two settings trade against each other and the sweep
+#: in `docs/algorithms.md` shows it: an n step return propagates a value n
+#: times faster and carries n times the spread. At 0.5 the table already moves
+#: fast, so the spread is all cost and one step wins on all five grids. At 0.1
+#: the one step agent has not carried the value far enough in five hundred
+#: episodes and four steps wins instead.
+#:
+#: At n=2 and 0.2 the count of seeds whose policy never reaches the goal, over
+#: thirty seeds of each of the five grids, falls from 47 to 10.
 def _n_step(
     rng: Rng,
     env: Env[Any],
-    n: int = 4,
-    step_size: float | Schedule = 0.5,
+    n: int = 2,
+    step_size: float | Schedule = 0.2,
     discount: float = 1.0,
     epsilon: float | Schedule = 0.1,
     optimism: float = 0.0,
