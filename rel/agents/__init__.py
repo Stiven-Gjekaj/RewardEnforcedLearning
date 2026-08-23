@@ -207,7 +207,7 @@ def _policy_gradient(cls: type[Reinforce[Any]]) -> AgentBuilder:
     #: At 0.01 REINFORCE loses three of twelve cliff walk seeds and reaches
     #: 356.5 of a possible 500 on the cart pole. At 0.05 it loses one seed and
     #: reaches 500 on all five. The cost is that the policies it does find are
-    #: 0.7 blunter on the cliff walk. `docs/algorithms.md` has both tables.
+    #: 0.51 blunter on the cliff walk. `docs/algorithms.md` has both tables.
     def build(
         rng: Rng,
         env: Env[Any],

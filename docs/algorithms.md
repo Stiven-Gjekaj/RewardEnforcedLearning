@@ -623,7 +623,7 @@ policy:
 
 So 0.05 is the default. On the cart pole it is the whole score against two
 thirds of it. On the cliff walk it is a trade rather than a win: it loses one
-seed instead of three, and the policies it does find are 0.7 blunter. An agent
+seed instead of three, and the policies it does find are 0.51 blunter. An agent
 that fails one run in four is worse than one that is a little short of optimal,
 so the trade is taken, and it is a trade rather than a free lunch.
 

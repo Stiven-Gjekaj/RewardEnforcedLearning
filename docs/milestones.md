@@ -150,7 +150,7 @@ registry default is 0.05 and [algorithms.md](algorithms.md) has both tables.
 
 One seed of twelve still never reaches the goal, and the trade is written down
 rather than tuned away: 0.05 loses one seed where 0.01 loses three, and the
-policies it does find are 0.7 blunter.
+policies it does find are 0.51 blunter.
 
 **Is the actor critic here wrong, or only untuned?** Measured, and the answer
 is neither on its own. The entropy bonus was swept on five seeds and six
