@@ -247,6 +247,9 @@ def grid_pictures(
     try:
         values = best_values(env, agent)
     except TypeError:
+        # An agent that keeps no value for an action, or one whose numbers are
+        # shares rather than returns. Both draw a policy and neither draws a
+        # value map.
         values = []
     if values:
         lines.append("")

@@ -101,6 +101,15 @@ class Agent(ABC, Generic[ObsT]):
         """
         return None
 
+    #: Whether `action_values` gives returns rather than something else.
+    #:
+    #: A value map is a picture of what the agent thinks each state is worth,
+    #: and it only means that for an agent whose numbers are values. A policy
+    #: gradient agent returns probabilities from the same method, and a map of
+    #: those carrying the label of a value map would be a picture of confidence
+    #: pretending to be a picture of value.
+    values_are_returns = True
+
     def knows(self, observation: ObsT) -> bool:
         """Whether this agent has ever been in this state.
 

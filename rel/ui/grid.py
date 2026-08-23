@@ -170,6 +170,13 @@ def best_values(env: GridWorld, agent: Agent[int]) -> list[float]:
     than inventing zeros. A map of zeros looks like a value map of a state
     nothing has learned, which is a different thing entirely.
     """
+    if not agent.values_are_returns:
+        raise TypeError(
+            f"{type(agent).__name__} gives shares rather than values, so a "
+            f"value map from it would be a picture of confidence with the "
+            f"label of a value map."
+        )
+
     values = []
     for state in range(env.observation_space.n):
         if not agent.knows(state):

@@ -133,6 +133,11 @@ class Reinforce(Agent[ObsT]):
             return self.actions.start + tied[0]
         return self.actions.start + tied[self.rng.below(len(tied))]
 
+    #: These are shares and not returns. `rel.ui.grid.best_values` refuses to
+    #: draw a value map from them, and the policy map is drawn as usual
+    #: because it only takes the largest.
+    values_are_returns = False
+
     def action_values(self, observation: ObsT) -> Sequence[float] | None:
         """The probabilities, which are not values and are not pretended to be.
 

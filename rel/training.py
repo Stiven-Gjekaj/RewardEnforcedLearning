@@ -32,7 +32,7 @@ half an answer, so `train` returns both.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -287,10 +287,6 @@ def evaluate(
         )
         record.add(episode)
     return record
-
-
-def returns_of(record: Record) -> Sequence[float]:
-    return record.returns
 
 
 __all__ = [
