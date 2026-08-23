@@ -42,6 +42,7 @@ class KArmedBandit(Env[int]):
         rng: Rng,
         arms: int = 10,
         spread: float = 1.0,
+        centre: float = 0.0,
         noise: float = 1.0,
         walk: float = 0.0,
         pulls: int = 1000,
@@ -57,6 +58,7 @@ class KArmedBandit(Env[int]):
 
         self.arms = arms
         self.spread = spread
+        self.centre = centre
         self.noise = noise
         self.walk = walk
 
@@ -84,9 +86,11 @@ class KArmedBandit(Env[int]):
         # equal instead, because there the interest is in following a target
         # that moves rather than in finding one that is fixed.
         if self.walk > 0.0:
-            self.values = [0.0] * self.arms
+            self.values = [self.centre] * self.arms
         else:
-            self.values = [self.rng.normal(0.0, self.spread) for _ in range(self.arms)]
+            self.values = [
+                self.rng.normal(self.centre, self.spread) for _ in range(self.arms)
+            ]
 
         self._chosen_best = 0
         self._pulls = 0
@@ -138,9 +142,19 @@ class KArmedBandit(Env[int]):
         return "\n".join(lines)
 
 
-def stationary_bandit(rng: Rng, arms: int = 10, pulls: int = 1000) -> KArmedBandit:
-    """The ten armed testbed. New true values every episode, and they stay put."""
-    return KArmedBandit(rng, arms=arms, pulls=pulls)
+def stationary_bandit(
+    rng: Rng, arms: int = 10, centre: float = 0.0, pulls: int = 1000
+) -> KArmedBandit:
+    """The ten armed testbed. New true values every episode, and they stay put.
+
+    `centre` moves every true value by the same amount. It changes nothing
+    about which lever is best and nothing about the gaps between them, so an
+    agent that reasons about differences is untouched by it. An agent that
+    reasons about the size of a reward is not, which is what figure 2.5 of the
+    chapter is about, and what `bandit-shifted` in the environment table is
+    for.
+    """
+    return KArmedBandit(rng, arms=arms, centre=centre, pulls=pulls)
 
 
 def drifting_bandit(
