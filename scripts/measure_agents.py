@@ -66,9 +66,11 @@ def measure(
     runs: int,
     first_seed: int,
     settings: dict[str, object] | None = None,
+    each_seed: bool = False,
 ) -> tuple[str, ...]:
     learned: list[float] = []
     exact: list[float] = []
+    each: list[str] = []
     stuck = 0
     started = time.perf_counter()
 
@@ -87,20 +89,23 @@ def measure(
             report = evaluate_policy(env, policy, discount=discount)
             if report.reaches_end:
                 exact.append(report.start_value)
+                each.append(f"{report.start_value:g}")
             else:
                 stuck += 1
+                each.append("never")
 
     seconds = time.perf_counter() - started
     while_learning = summarise(learned)
     greedy = f"{sum(exact) / len(exact):.2f}" if exact else "-"
 
-    return (
+    row = (
         name,
         f"{while_learning.mean:.2f} +/- {while_learning.error:.2f}",
         greedy,
         str(stuck) if stuck else "",
         f"{seconds:.1f}s",
     )
+    return (*row, " ".join(each)) if each_seed else row
 
 
 def main() -> int:
@@ -121,6 +126,11 @@ def main() -> int:
         dest="agent_set",
         metavar="NAME=VALUE",
         help="a setting for every agent measured, such as entropy=0.05",
+    )
+    parser.add_argument(
+        "--each-seed",
+        action="store_true",
+        help="add a column with the value of every seed, not only the mean",
     )
     args = parser.parse_args()
     settings = parse_settings(args.agent_set)
@@ -144,8 +154,18 @@ def main() -> int:
     print()
 
     headings = ("agent", "while learning", "greedy, exactly", "stuck", "time")
+    if args.each_seed:
+        headings = (*headings, "each seed")
     rows = [
-        measure(name, args.env, args.episodes, args.runs, args.seed, settings)
+        measure(
+            name,
+            args.env,
+            args.episodes,
+            args.runs,
+            args.seed,
+            settings,
+            args.each_seed,
+        )
         for name in args.agents
     ]
 
@@ -176,6 +196,11 @@ def main() -> int:
         "over the seeds whose policy reaches an ending."
     )
     print("'stuck' counts the seeds whose greedy policy never reaches one.")
+    if args.each_seed:
+        print(
+            "'each seed' is every value behind that mean. An agent that varies "
+            "a lot has a mean that says little on its own."
+        )
     return 0
 
 
