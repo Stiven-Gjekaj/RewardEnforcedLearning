@@ -189,6 +189,15 @@ def _dyna_plus(
 
 
 def _policy_gradient(cls: type[Reinforce[Any]]) -> AgentBuilder:
+    #: The entropy bonus here is 0.05 and the classes default to less. The
+    #: registry is where a default is chosen by measurement rather than by the
+    #: chapter a method came from, which is the same reason the tile agents
+    #: below carry an epsilon the mountain car chapter does not.
+    #:
+    #: At 0.01 REINFORCE loses three of twelve cliff walk seeds and reaches
+    #: 356.5 of a possible 500 on the cart pole. At 0.05 it loses one seed and
+    #: reaches 500 on all five. The cost is that the policies it does find are
+    #: 0.7 blunter on the cliff walk. `docs/algorithms.md` has both tables.
     def build(
         rng: Rng,
         env: Env[Any],
@@ -196,7 +205,7 @@ def _policy_gradient(cls: type[Reinforce[Any]]) -> AgentBuilder:
         step_size: float = 0.02,
         value_step_size: float = 0.05,
         discount: float = 0.99,
-        entropy: float = 0.01,
+        entropy: float = 0.05,
         normalise: bool = True,
         clip: float = 1.0,
     ) -> Agent[Any]:
