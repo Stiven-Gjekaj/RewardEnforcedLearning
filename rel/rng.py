@@ -267,8 +267,9 @@ class Rng:
         """`count` different indices below `population`, in the order drawn.
 
         This is a partial Fisher-Yates over a dictionary of moved entries, so
-        it costs what the sample costs and not what the population costs. Dyna
-        uses it to replay from a model that holds thousands of visited pairs.
+        it costs what the sample costs and not what the population costs.
+        Drawing `count` different indices out of a million by shuffling the
+        million would cost the million.
         """
         if count < 0:
             raise ValueError("The count must not be below zero.")

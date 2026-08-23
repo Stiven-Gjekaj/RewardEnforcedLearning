@@ -28,6 +28,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping, Sequence
 
+from rel.metrics import moving_average
 from rel.ui.colour import Palette
 
 #: The bit each dot sets, indexed by column then row inside one character.
@@ -332,22 +333,11 @@ def histogram(values: Sequence[float], buckets: int = 10, width: int = 24) -> li
 def smooth(values: Sequence[float], window: int) -> list[float]:
     """A moving mean, for a curve that is too noisy to read.
 
-    This is `rel.metrics.moving_average` and it is not imported from there,
-    because `rel.ui` is allowed to depend on the rest of the package and this
-    one line is not worth the import. It is worth saying so, because two copies
-    of a rule usually is a fault.
+    This is `rel.metrics.moving_average`. It was written out here once, with a
+    note saying that one line was not worth an import, and that was wrong: two
+    copies of a rule are two places for it to be changed.
     """
-    if window < 1:
-        raise ValueError("A window needs at least one value.")
-
-    smoothed = []
-    total = 0.0
-    for index, value in enumerate(values):
-        total += value
-        if index >= window:
-            total -= values[index - window]
-        smoothed.append(total / min(index + 1, window))
-    return smoothed
+    return moving_average(values, window)
 
 
 def spread_of(values: Sequence[float]) -> float:

@@ -290,7 +290,39 @@ $ python scripts/measure_control.py --env mountaincar --episodes 300
 $ python scripts/measure_control.py --env cartpole --episodes 600
 ```
 
-CONTROL_TABLES_GO_HERE
+**Mountain car**, 300 episodes, greedy return afterwards:
+
+| agent | mean | each seed |
+| --- | ---: | --- |
+| random | -1000.0 | -1000 -1000 -1000 -1000 -1000 |
+| tile-sarsa | **-114.2** | -129 -109 -122 -105 -105 |
+| tile-q | -123.9 | -126 -106 -142 -129 -117 |
+
+The random policy never leaves the valley in a thousand steps, on any seed.
+That is the clearest separation in the project between an agent that learned
+and one that did not: the engine cannot climb the hill, so nothing but a policy
+that rocks the car gets out at all.
+
+**Cart pole**, 600 episodes, greedy return afterwards, out of a possible 500:
+
+| agent | mean | each seed |
+| --- | ---: | --- |
+| random | 18.3 | 19 16 20 15 21 |
+| tile-sarsa | **498.2** | 500 500 500 500 491 |
+| tile-q | 418.8 | 500 500 500 500 94 |
+| reinforce | 220.7 | 198 181 77 500 148 |
+| actor-critic | 8.4 | **8 8 8 8 9** |
+
+A return of 8 is a pole that fell over: the policy has gone entirely
+deterministic and pushes the cart one way until it drops. Four of the five
+numbers in the last row are that.
+
+The order here is the opposite of what a reader who knows the field might
+expect. The oldest and simplest method on the list, a tile coded SARSA, solves
+the problem on five seeds of five. The two that learn a policy directly do
+worse, and one of them fails completely. Neither of those is a claim about the
+methods. It is a claim about these implementations, and the settings behind it
+are below.
 
 ### The exploration setting on a tile coder
 

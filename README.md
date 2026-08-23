@@ -362,9 +362,11 @@ agents, all of them covered by a suite that runs in about five minutes with no
 browser, no display and no network.
 
 What is honestly weak is written down rather than left for a reader to find.
-The actor critic here does not solve the cart pole, and REINFORCE never
-finishes on two seeds of six on the cliff walk. Both are measured in
-[docs/algorithms.md](docs/algorithms.md) with the settings that were tried.
+On the cart pole, a tile coded SARSA reaches 498 of a possible 500 across five
+seeds and the actor critic here reaches 8 on four of them, which is a pole
+falling over. REINFORCE never reaches the goal on two seeds of six on the cliff
+walk. All of it is measured in [docs/algorithms.md](docs/algorithms.md) with
+the settings that were tried.
 
 ---
 
