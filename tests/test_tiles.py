@@ -97,6 +97,45 @@ class TestBehaviour:
         assert len(seen) >= coder.grids
 
 
+class TestEveryGridKeepsItsResolution:
+    """A grid has to be able to reach all of its own cells.
+
+    Each grid is shifted by a fraction of a cell. The shift used to be taken
+    without a modulo, so the later grids were shifted by several whole cells,
+    and the cells they were shifted past did not exist. Those points were
+    clamped into the last cell instead, so a whole band of the box near one
+    edge shared a single weight in most of the grids.
+
+    Nothing about a run reports this. The agent still learns, and it learns
+    with a coder that has quietly lost most of its resolution.
+
+    This check is exhaustive rather than sampled: two dimensions with eight
+    cells has eighty one cells per grid, and a walk over the box at two
+    hundred steps a side reaches every one of them.
+    """
+
+    @staticmethod
+    def _cells_reached(coder: TileCoder) -> list[int]:
+        reached: list[set[int]] = [set() for _ in range(coder.grids)]
+        for i in range(201):
+            for j in range(201):
+                for grid, switch in enumerate(coder.active((i / 200, j / 200))):
+                    reached[grid].add(switch)
+        return [len(found) for found in reached]
+
+    def test_every_grid_reaches_every_cell_it_owns(self) -> None:
+        coder = TileCoder(UNIT, bins=8, grids=8)
+        counts = self._cells_reached(coder)
+        assert counts == [81] * 8, counts
+
+    def test_no_grid_is_smaller_than_the_unshifted_one(self) -> None:
+        # The claim that matters, stated so that it survives a change to the
+        # number of cells or grids.
+        coder = TileCoder(UNIT, bins=6, grids=8)
+        counts = self._cells_reached(coder)
+        assert min(counts) == max(counts), counts
+
+
 class TestABoxThatIsNotTheUnitSquare:
     def test_the_bounds_are_taken_from_the_box(self) -> None:
         box = Box([-1.2, -0.07], [0.6, 0.07])

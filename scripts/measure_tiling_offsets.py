@@ -96,8 +96,13 @@ def main() -> int:
 
     print(
         "\nA smaller spread is more even generalisation, which is what the odd\n"
-        "displacement rule is said to give. On this measurement it gives that\n"
-        "in two dimensions and not in four."
+        "displacement rule is for. It gives that in both.\n"
+        "\n"
+        "This script once reported the opposite in four dimensions. The cause\n"
+        "was a fault in TileCoder rather than in the rule: the grid shift was\n"
+        "not taken modulo one cell, so most of each later grid lay outside the\n"
+        "cells allocated to it and was clamped into one. See the note in\n"
+        "TileCoder.active."
     )
     return 0
 

@@ -22,24 +22,24 @@ the same width of cell.
 
 The grids are shifted by an odd number of units each, one odd number per
 dimension: 1, 3, 5 and so on. This is the rule from Sutton and Barto, section
-9.5.4, where it is credited to Miller and Glanz, and the reason given for it is
+9.5.4, where it is credited to Miller and Glanz. The reason given for it is
 that shifting every grid by the same amount in every dimension lines the
-boundaries up along a diagonal and generalises unevenly.
+boundaries up along a diagonal, so how much two points generalise to each other
+depends on the direction between them.
 
-That reason was measured here and it did not come out. Run
-`python scripts/measure_tiling_offsets.py` to see it. Two points a fixed
-distance apart share a number of switches, and how much that number changes
-with the direction between them is how uneven the generalisation is. In two
-dimensions the odd rule was more even: a spread of 0.60 against 0.90. In four
-dimensions, which is the cart pole, it was less even: a spread of 2.53 around a
-mean of 1.87, against 1.13 around a mean of 1.40 for the same shift
-everywhere.
+Run `python scripts/measure_tiling_offsets.py` to see it. Two points a fixed
+distance apart share a number of switches, and how far that number moves as the
+direction between them turns is how uneven the generalisation is. The odd rule
+gives a spread of 0.60 against 0.90 in two dimensions, and 0.97 against 1.13 in
+four, which is the cart pole.
 
-The rule is kept anyway, and the reason is not that the measurement is wrong.
-It is that this is the rule the literature uses, so a result from this project
-can be put next to a result from a paper. A different rule would be a second
-difference to argue about. What is not kept is the claim: the docstring says
-what was measured rather than what is usually said.
+The first time that script was run it reported the opposite in four dimensions:
+2.53 against 1.13, with the odd rule far worse. That was true of the code and
+not of the rule. The shift was not being taken modulo one cell, so the later
+grids were shifted several whole cells past the end of the space allocated for
+them, and the points out there were all being clamped together. The note in
+`active` has the numbers. The rule was right and this class was wrong, and the
+measurement said so before the cause was known.
 
 ## No hashing
 
@@ -82,7 +82,8 @@ class TileCoder:
         self.grids = grids
 
         # One extra cell along each dimension, because a shifted grid reaches
-        # one cell further than the box does.
+        # one cell further than the box does. The shift is taken modulo one
+        # cell in `active`, which is what keeps it to one and not more.
         self._cells = bins + 1
         self._per_grid = self._cells**box.dimensions
         self._displacement = _displacement(box.dimensions)
@@ -100,9 +101,30 @@ class TileCoder:
         for grid in range(self.grids):
             index = 0
             for dimension, value in enumerate(scaled):
-                shift = grid * self._displacement[dimension] / self.grids
-                cell = int(value * self.bins + shift)
-                cell = min(max(cell, 0), self._cells - 1)
+                # The shift is taken modulo one cell. Shifting a grid by a
+                # whole cell gives the same grid with its cells renumbered, so
+                # the modulo changes nothing about which points fall together.
+                #
+                # It changes a great deal about how many cells have to exist.
+                # The displacement of the last grid in the last dimension is
+                # 7 times 7 over 8, which is over six cells, so without the
+                # modulo a four dimensional coder would need fifteen cells
+                # along each dimension instead of nine.
+                #
+                # The first version of this class allocated nine and clamped
+                # the rest, which quietly threw away the resolution of the
+                # later grids near one end of the box. Measured over a four
+                # dimensional box, the cells each grid could reach ran
+                # 4096, 6374, 5151, 3983, 3023, 2149, 1506, 943 out of 6561.
+                # The last grid had lost six sevenths of itself and nothing
+                # said so. After the modulo they run 4096, 6374, 6466, 6369,
+                # 6554, 6382, 6463, 6384.
+                #
+                # This was found by a test that removed the clipping and still
+                # passed, which meant the clipping was doing nothing and
+                # something else was catching those points.
+                shift = (grid * self._displacement[dimension] / self.grids) % 1.0
+                cell = min(int(value * self.bins + shift), self._cells - 1)
                 index = index * self._cells + cell
             switches.append(grid * self._per_grid + index)
         return tuple(switches)
