@@ -72,7 +72,7 @@ Everything below is new.
 - **The tile coder threw away most of its resolution.** The shift of each grid
   was not taken modulo one cell, so the later grids were displaced several
   whole cells past the space allocated for them and every point out there was
-  clamped into one cell. The last of eight grids could reach 943 of its 6561
+  clamped into one cell. The last of eight grids could reach 945 of its 6561
   cells. Every agent still learned, and every curve still went up. Found by a
   test that removed the input clipping and still passed, which meant the
   clipping was doing nothing.

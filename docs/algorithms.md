@@ -349,10 +349,11 @@ The shift was not being taken modulo one cell. The last grid in the last
 dimension is displaced by seven times seven over eight, which is more than six
 whole cells, and the cells past the end of the space allocated for them did not
 exist. Every point out there was clamped into one cell. Measured over a four
-dimensional box, the number of cells each grid could reach ran:
+dimensional box, from two hundred thousand random points, the number of cells
+each grid could reach ran:
 
 ```
-4096, 6374, 5151, 3983, 3023, 2149, 1506, 943      out of 6561
+4096, 6477, 5166, 4015, 3024, 2155, 1510, 945      out of 6561
 ```
 
 The last grid had lost six sevenths of itself. Nothing about a run said so. The
@@ -362,8 +363,12 @@ away most of its resolution.
 After taking the shift modulo one cell:
 
 ```
-4096, 6374, 6466, 6369, 6554, 6382, 6463, 6384     out of 6561
+4096, 6477, 6515, 6465, 6560, 6469, 6526, 6477     out of 6561
 ```
+
+The count is of cells that at least one drawn point landed in, so it rises
+with the number of points. `python scripts/measure_tiling_offsets.py` prints
+both rows and says how many it drew.
 
 It was found by a mutation test. A test that removed the clipping from the
 input still passed, which meant the clipping was doing nothing and something
