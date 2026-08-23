@@ -171,9 +171,14 @@ Nothing here gets near 0.82 in six hundred episodes, and the ones that do worst
 are the ones whose assumptions the lake breaks. Dyna keeps one result for each
 state and action, and on a slippery lake it remembers the last slip and replays
 it as if it were certain. n-step SARSA carries several steps of a trajectory
-that the slipping made unrepresentative, and it carries two of them rather
-than four since its default was measured, which is most of the difference
-between 0.14 and 0.40 in that row.
+that the slipping made unrepresentative, which is why it sat at 0.14 here
+before its default was measured.
+
+Neither half of that default explains the 0.40 on its own. Over thirty seeds,
+dropping n from four to two is worth 0.061 and dropping the step size from 0.5
+to 0.2 is worth 0.043, and the two together are worth 0.218. That is the
+interaction in [how many steps, and how big a
+step](#how-many-steps-and-how-big-a-step), seen from a third grid.
 
 ---
 
