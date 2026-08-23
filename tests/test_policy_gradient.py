@@ -144,6 +144,65 @@ class TestTheReturns:
         ]
         assert agent._returns() == pytest.approx([1.0, 5.0])
 
+    def test_a_step_limit_does_not_stop_the_return_reaching_back(self) -> None:
+        # An episode that the step limit cut off has a future. Reading it as
+        # an ending is the fault that stopped REINFORCE reaching the goal on
+        # three seeds of six of the cliff walk.
+        from rel.agents.base import Transition
+
+        _, agent = build(Reinforce, discount=0.5)
+        assert agent.value is not None
+
+        cut_off = Transition(0, 0, 1.0, 7, False, True)
+        agent._episode = [cut_off]
+
+        ahead = agent.value(agent.encoder(7)).item()
+        assert agent._returns() == pytest.approx([1.0 + 0.5 * ahead])
+        assert ahead != 0.0
+
+    def test_a_cut_off_tail_without_a_baseline_is_the_mean_reward(self) -> None:
+        # There is no network to ask, so the estimate is the reward of the
+        # episode so far, paid for ever. On five steps of -1 with a discount
+        # of 0.9 that is -10, and every step of the episode is worth -10.
+        from rel.agents.base import Transition
+
+        _, agent = build(Reinforce, discount=0.9, baseline=False)
+        agent._episode = [
+            Transition(step, 0, -1.0, step + 1, False, step == 4) for step in range(5)
+        ]
+        assert agent._returns() == pytest.approx([-10.0] * 5)
+
+    def test_an_undiscounted_cut_off_episode_has_no_tail(self) -> None:
+        # The undiscounted return of an episode that never finishes is not a
+        # number. Zero is not right either, and it is what there is.
+        from rel.agents.base import Transition
+
+        _, agent = build(Reinforce, discount=1.0, baseline=False)
+        agent._episode = [
+            Transition(0, 0, -1.0, 1, False, False),
+            Transition(1, 0, -1.0, 2, False, True),
+        ]
+        assert agent._returns() == pytest.approx([-2.0, -1.0])
+
+    def test_a_uniformly_bad_episode_does_not_reward_its_own_last_steps(
+        self,
+    ) -> None:
+        # This is the fault itself, written as the property it broke. Every
+        # step of a cliff walk episode that never reaches the goal pays -1,
+        # so no step of it is better than any other, and the weights must say
+        # so. Under a zero tail the last steps drew about +3.2 and the first
+        # about -0.8, which told the agent to keep doing whatever the step
+        # limit stopped it doing.
+        from rel.agents.base import Transition
+
+        _, agent = build(Reinforce, discount=0.99, baseline=False)
+        agent._episode = [
+            Transition(step, 0, -1.0, step + 1, False, step == 499)
+            for step in range(500)
+        ]
+        weights = standardised(agent._returns())
+        assert max(weights) - min(weights) < 1e-6
+
 
 class TestActorCriticTargets:
     def test_a_target_is_one_step_of_reward_plus_the_value_after_it(self) -> None:

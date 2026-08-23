@@ -160,13 +160,54 @@ class Reinforce(Agent[ObsT]):
             self._episode.clear()
         super().end_episode()
 
+    def _tail(self, transition: Transition[ObsT]) -> float:
+        """What the rest of an episode that the step limit stopped is worth.
+
+        A cut off episode has a future. Calling that future zero is the fault
+        this project warns about everywhere else, and on the cliff walk it is
+        not a small one. See `_returns` for what it does to a run.
+
+        With a baseline there is a value network to ask. Without one there is
+        nothing that knows the state, so the estimate is the mean reward of the
+        episode paid for ever. That needs a discount below one. The return of
+        an undiscounted episode that never finishes is not a number, so that
+        case gives zero, and it is the one case this method cannot answer.
+        """
+        if self.value is not None:
+            return self.value(self.encoder(transition.next_observation)).item()
+        if self.discount >= 1.0:
+            return 0.0
+        mean = sum(step.reward for step in self._episode) / len(self._episode)
+        return mean / (1.0 - self.discount)
+
     def _returns(self) -> list[float]:
-        """The discounted return from each step to the end of the episode."""
+        """The discounted return from each step to the end of the episode.
+
+        The last step of an episode is one of two things, and the difference
+        decides what the return reaching back through it is. An episode that
+        ended has no future and the return stops. An episode that the step
+        limit cut off does have a future, and `_tail` estimates it.
+
+        Reading both as an ending is what this method did for a while, and it
+        is why REINFORCE never reached the goal on three seeds of six of the
+        cliff walk. A failed episode there is five hundred steps of -1. Under
+        a zero tail the return of the last step is -1 and the return of the
+        first is -99.34, so standardising hands the last steps a weight near
+        +3.2 and the first steps a weight near -0.8. The agent is told to
+        repeat whatever it was doing when the limit stopped it. It circles,
+        the circling is rewarded, and it circles harder.
+
+        The guess written down at the time was that standardising removes the
+        signal when every step is equally bad. The measurement says the
+        opposite: the signal was large, and it pointed the wrong way.
+        """
         running = 0.0
         backwards: list[float] = []
-        for transition in reversed(self._episode):
+        for index, transition in enumerate(reversed(self._episode)):
             if transition.terminated:
                 running = 0.0
+            elif index == 0:
+                running = self._tail(transition)
             running = transition.reward + self.discount * running
             backwards.append(running)
         backwards.reverse()
@@ -324,7 +365,7 @@ class ActorCritic(Reinforce[ObsT]):
                 # The last step of an episode that was cut off rather than
                 # ended. The state it stopped in has a future, and dropping it
                 # is the fault this project warns about everywhere else.
-                ahead = self.value(self.encoder(step.next_observation)).item()
+                ahead = self._tail(step)
             targets.append(step.reward + self.discount * ahead)
 
         return targets, [
