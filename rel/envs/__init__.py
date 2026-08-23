@@ -12,8 +12,15 @@ runs, and the table in the documentation.
 - `continuous` says the observation is real numbers. A table does not fit, and
   an agent needs a tile coder or a network.
 - `bandit` says there is one state. The whole problem is which lever to pull.
-- `gaming` says the reward the environment pays is not the thing it wants. See
-  `docs/specification-gaming.md`.
+- `gaming` says the reward the environment pays is not the thing it wants. Each
+  one carries a `reward` or a penalty setting that switches between the
+  specification that can be gamed and one that cannot, so the difference can be
+  run rather than argued about. See `docs/specification-gaming.md`.
+
+Two of the gaming environments never end. A discount below one is needed to
+solve or to learn them, because a run of them that goes on for ever is worth
+an unbounded amount and nothing converges. `value_iteration` says so rather
+than returning a number.
 """
 
 from __future__ import annotations
@@ -30,6 +37,14 @@ from rel.envs.classic import (
     windy_grid,
 )
 from rel.envs.control import CartPole, MountainCar
+from rel.envs.gaming import (
+    BoatRace,
+    Thermostat,
+    VaseRoom,
+    boat_race,
+    thermostat,
+    vase_room,
+)
 from rel.envs.gridworld import GridWorld
 from rel.registry import Entry, Registry
 
@@ -90,13 +105,34 @@ ENVIRONMENTS: Registry[Env[Any]] = Registry(
             MountainCar,
             tags=("continuous",),
         ),
+        Entry(
+            "boatrace",
+            "A boat paid for touching checkpoints, two of which sit side by side.",
+            boat_race,
+            tags=("tabular", "gaming"),
+        ),
+        Entry(
+            "vase",
+            "A room with a goal at the other end and a vase on the short way.",
+            vase_room,
+            tags=("tabular", "gaming"),
+        ),
+        Entry(
+            "thermostat",
+            "A room to keep warm, with a dial that makes the sensor report comfort.",
+            thermostat,
+            tags=("tabular", "gaming"),
+        ),
     ],
 )
 
 __all__ = [
     "ENVIRONMENTS",
+    "BoatRace",
     "CartPole",
     "GridWorld",
     "KArmedBandit",
     "MountainCar",
+    "Thermostat",
+    "VaseRoom",
 ]
