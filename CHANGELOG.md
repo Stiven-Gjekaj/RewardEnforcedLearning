@@ -61,6 +61,14 @@ Everything below is new.
 
 ### Faults found while building it, and fixed
 
+- **REINFORCE read the step limit as an ending.** The return of an episode
+  that was cut off reached back through it as if its future were worth zero. A
+  failed cliff walk episode is five hundred steps of -1, so standardising those
+  returns gave the last steps a weight near +3.2 and the first steps a weight
+  near -0.8. That tells the agent to repeat whatever the step limit stopped it
+  doing. Three seeds of six never reached the goal, and one does now. The
+  actor critic in the same file always estimated the tail correctly, which is
+  what made the difference visible.
 - **The tile coder threw away most of its resolution.** The shift of each grid
   was not taken modulo one cell, so the later grids were displaced several
   whole cells past the space allocated for them and every point out there was

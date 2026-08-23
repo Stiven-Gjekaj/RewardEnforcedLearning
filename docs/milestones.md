@@ -108,12 +108,20 @@ evaluation episodes ran out of steps. `optimism` is an argument, and
 the tables on four of the five grids and gets stuck most often. Four may simply
 be too many for grids this small. Nobody has swept it.
 
-**Why does REINFORCE fail on two seeds of six on the cliff walk?** Measured:
-seeds 1 and 3 never reach the goal at all, and the other four reach -13 or -17.
-The suspicion is that standardising the returns within an episode removes the
-signal when every step of an episode is equally bad, which is exactly the case
-for an episode that never finishes. That is a guess and it has not been
-measured.
+**Why does REINFORCE still fail on one seed of six on the cliff walk?** Three
+of those failures were one fault and it is fixed. `_returns` read an episode
+that the step limit cut off as an episode that ended, and
+[algorithms.md](algorithms.md) has what that did to the weights. The guess
+recorded here at the time was wrong, and the way it was wrong is worth keeping:
+it said standardising removes the signal when every step is equally bad, and
+the measurement says the signal was large and pointed backwards.
+
+What is left is seed 3, and it is a different question. That agent never
+reaches the goal once in four hundred episodes, before the fix or after it, so
+there is no return that reached the goal for any rule to share out. The entropy
+bonus is what holds the policy wide enough to find the goal, and the default of
+0.01 is not enough on this seed. Whether a larger one fixes it, or only slows
+every other seed down, is not swept.
 
 **Is the actor critic here wrong, or only untuned?** It finds the optimal
 policy on the cliff walk, which says the pieces are put together correctly. It

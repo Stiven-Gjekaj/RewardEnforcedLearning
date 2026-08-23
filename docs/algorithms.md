@@ -373,29 +373,74 @@ slower. That is reported here rather than tuned away.
 ### On the cliff walk
 
 ```console
-$ rel train reinforce --env cliff --seed 5
+$ python scripts/measure_agents.py --env cliff --agents reinforce --runs 6 --episodes 400
 ```
 
-Six seeds, four hundred episodes, greedy return afterwards:
+Six seeds, four hundred episodes, exact value of the greedy policy afterwards:
 
 ```
-REINFORCE:  -500  -13  -500  -13  -13  -17
+REINFORCE:  -15  -13  never  -13  -13  -13
 ```
 
-It finds the optimal policy on four seeds of six and never reaches the goal on
-the other two. Over five seeds the ones that finish average **-14.33**, against
-a best possible of -13.
+Four seeds of six find the optimal policy of -13. One reaches -15. One never
+reaches the goal at all. Over the five that finish the mean is **-13.40**,
+against a best possible of -13.
 
-**Why the two failures happen is not known.** The suspicion is that
-standardising the returns within an episode removes the signal when every step
-of the episode is equally bad, which is exactly the case for an episode that
-never reaches the goal, so the agent that has not yet found the goal has no
-gradient telling it where to look. That is a guess. It has not been measured
-and it is in [milestones.md](milestones.md) as an open question.
+#### The step limit is not an ending
+
+That last count used to be three, and this page used to say the cause was not
+known. It is known now, and the guess written here at the time was wrong in a
+way worth keeping.
+
+`Reinforce._returns` read an episode that the step limit cut off as an episode
+that ended. A cliff walk episode that never reaches the goal is five hundred
+steps of -1. With the tail read as zero, the return of the last step is -1 and
+the return of the first is -99.34. Standardising those returns gives:
+
+| step of the episode | weight |
+| --- | ---: |
+| the first three | -0.78, -0.78, -0.78 |
+| the last three | +3.16, +3.20, +3.24 |
+
+So the agent was told to repeat whatever the step limit stopped it doing, and
+to stop doing whatever it began the episode with. It circles, the circling is
+rewarded, and it circles harder.
+
+The guess on this page was that standardising **removes** the signal when every
+step of an episode is equally bad. The measurement says the opposite. The
+signal was large, its spread across the episode was 4.02, and it pointed
+backwards.
+
+The cart pole shows the same fault from the other side, because there reaching
+the step limit is the goal. Five hundred steps of +1 with a zero tail gives the
+first steps a weight of +0.78 and the last steps -3.24. An agent that held the
+pole up for the whole episode was told to stop doing whatever held it up at the
+end.
+
+The tail is estimated now. The value network answers if there is one, and the
+actor critic in the same file always did this, which is what made the fault
+visible. Six seeds of the cliff walk, before and after:
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| before | -17 | -13 | never | never | -13 | never |
+| after | -15 | -13 | never | -13 | -13 | -13 |
+
+The one that is left is a different fault. On seed 3 the agent never reaches
+the goal once in four hundred episodes, before the fix or after it. So no rule
+for sharing out a return can help: there is no return that reached the goal to
+share out. The entropy bonus is what keeps the policy wide enough to find the
+goal in the first place, and 0.01, which is the default, is not enough on this
+seed. That one is in [milestones.md](milestones.md) as an open question.
 
 ### On the cart pole
 
-REINFORCE, three seeds, a thousand episodes: **500, 500, 189**.
+```console
+$ python scripts/measure_control.py --env cartpole --episodes 600 --agents reinforce
+```
+
+REINFORCE, five seeds, six hundred episodes: **500, 143, 140, 500, 500**. The
+same command before the step limit fix above gave 198, 181, 77, 500, 148.
 
 The actor critic here does not solve the cart pole at any setting that was
 tried. Every seed collapses to a policy that drops the pole in eight steps.
