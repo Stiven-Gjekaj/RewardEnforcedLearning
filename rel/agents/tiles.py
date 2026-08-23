@@ -113,12 +113,17 @@ class TileCoder:
                 #
                 # The first version of this class allocated nine and clamped
                 # the rest, which quietly threw away the resolution of the
-                # later grids near one end of the box. Measured over a four
-                # dimensional box, the cells each grid could reach ran
-                # 4096, 6374, 5151, 3983, 3023, 2149, 1506, 943 out of 6561.
+                # later grids near one end of the box. Over a four dimensional
+                # box, from two hundred thousand random points, the cells each
+                # grid could reach ran
+                # 4096, 6477, 5166, 4015, 3024, 2155, 1510, 945 out of 6561.
                 # The last grid had lost six sevenths of itself and nothing
-                # said so. After the modulo they run 4096, 6374, 6466, 6369,
-                # 6554, 6382, 6463, 6384.
+                # said so. After the modulo they run 4096, 6477, 6515, 6465,
+                # 6560, 6469, 6526, 6477.
+                #
+                # `python scripts/measure_tiling_offsets.py` prints both rows.
+                # The count rises with the number of points drawn, so the
+                # draw count is part of the figure.
                 #
                 # This was found by a test that removed the clipping and still
                 # passed, which meant the clipping was doing nothing and

@@ -36,6 +36,12 @@ RADIUS_IN_TILES = 0.75
 DIRECTIONS = 200
 ORIGINS = 30
 
+#: How many random points the reach measurement draws. The count of cells a
+#: grid reaches is the count that at least one drawn point landed in, so it
+#: rises with this number. It is named here because a figure that moves with
+#: an unstated setting is not a figure a reader can check.
+REACH_DRAWS = 200_000
+
 
 class SameShift(TileCoder):
     """A tile coder that shifts every grid by the same amount everywhere."""
@@ -77,6 +83,36 @@ def spread(coder: TileCoder, dimensions: int, radius: float) -> tuple[float, flo
     return mean, max(per_direction) - min(per_direction)
 
 
+class NoModulo(TileCoder):
+    """The tile coder as it was before the shift was taken modulo one cell.
+
+    Kept here to measure what that fault cost, rather than describing it.
+    """
+
+    def active(self, observation: Sequence[float]) -> tuple[int, ...]:
+        scaled = self.box.scaled(self.box.clip(observation))
+        switches: list[int] = []
+        for grid in range(self.grids):
+            index = 0
+            for dimension, value in enumerate(scaled):
+                shift = grid * self._displacement[dimension] / self.grids
+                cell = min(int(value * self.bins + shift), self._cells - 1)
+                index = index * self._cells + cell
+            switches.append(grid * self._per_grid + index)
+        return tuple(switches)
+
+
+def reach(coder: TileCoder, dimensions: int, draws: int) -> list[int]:
+    """How many cells of each grid at least one drawn point lands in."""
+    rng = Rng(1)
+    seen: list[set[int]] = [set() for _ in range(coder.grids)]
+    for _ in range(draws):
+        point = [rng.uniform(0.0, 1.0) for _ in range(dimensions)]
+        for grid, switch in enumerate(coder.active(point)):
+            seen[grid].add(switch - grid * coder._per_grid)
+    return [len(cells) for cells in seen]
+
+
 def main() -> int:
     print(
         f"Shared switches between points {RADIUS_IN_TILES} tiles apart, "
@@ -103,6 +139,21 @@ def main() -> int:
         "not taken modulo one cell, so most of each later grid lay outside the\n"
         "cells allocated to it and was clamped into one. See the note in\n"
         "TileCoder.active."
+    )
+
+    box = Box([0.0] * 4, [1.0] * 4)
+    fixed = TileCoder(box, bins=8, grids=8)
+    broken = NoModulo(box, bins=8, grids=8)
+    print(
+        f"\nCells each grid reaches over a four dimensional box, from "
+        f"{REACH_DRAWS:,} random\npoints, out of {fixed._per_grid} per grid.\n"
+    )
+    for label, coder in (("without the modulo", broken), ("with it", fixed)):
+        counts = ", ".join(str(n) for n in reach(coder, 4, REACH_DRAWS))
+        print(f"  {label:<19} {counts}")
+    print(
+        "\nThe fault cost the last grid about six sevenths of itself, and every\n"
+        "agent still learned and every curve still went up."
     )
     return 0
 
