@@ -72,6 +72,11 @@ files = ["rel"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
+
+# Run the suite against the checkout, with no install step. The package has no
+# compiled part and no entry point that the tests need, so an install would add
+# a way for the tests and the source to disagree and would buy nothing.
+pythonpath = ["."]
 markers = [
   "slow: a test that trains for long enough to be worth skipping during a quick loop",
 ]
