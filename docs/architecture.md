@@ -191,6 +191,35 @@ machines, and a digest from the cart pole between two runs on one machine.
 
 Saying which is which is worth more than either.
 
+### Two digests, because there are two questions
+
+```
+digest, the path         0de6831e401c7ddd
+digest, what it learned  eee159db6cc3ec17
+```
+
+The path digest hashes the transitions. Two runs with the same one did the same
+thing, step for step. It cannot say whether the two agents came to the same
+conclusion, because two different learning rules fed the same steps walk the
+same path and end up believing different things.
+
+The second digest hashes what the agent learned: the table for a tabular agent,
+the weights for one over a tile coder, every parameter of every layer for a
+policy gradient. Q-learning and expected SARSA fed one identical step already
+differ in it.
+
+**They are kept apart rather than merged.** Merging them was the other way to
+answer this, and it would have changed what the path digest means. Every number
+in this documentation was compared against that one, and all of them would have
+silently stopped being comparable. A test pins the path digest of fifty cliff
+walk episodes to the value it had before the second digest existed.
+
+An agent that keeps nothing reports nothing rather than the hash of nothing.
+The hash of nothing is the same for every agent that keeps nothing, and printed
+in that row it would read as a fact about the agent.
+
+`--print digest` gives the path digest, and that has not changed either.
+
 ---
 
 ## Recording a run, and reading it later

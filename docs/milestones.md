@@ -126,14 +126,24 @@ and raising the default from 0.01 to 0.05 took the count from three seeds to
 one. Whether the last one wants more entropy, more episodes, or something that
 is not a knob at all is not measured.
 
-**Should the digest cover the agent as well as the environment?** It currently
-hashes the transitions, so two agents that happen to walk the same path get the
-same digest. That is arguably the right thing, because the digest is about the
-run and not about the learner, and arguably not.
-
 ---
 
 ## Questions that were open, and what the measurement said
+
+**Should the digest cover the agent as well as the environment?** Neither, and
+both. Merging the two would have changed what the existing digest means, and
+every number on the algorithms page was compared against it, so all of them
+would have silently stopped being comparable.
+
+There are now two digests. The path digest is unchanged and a test pins it to
+the value it had before any of this. Beside it sits a digest of what the agent
+learned: the table for a tabular agent, the weights for one over a tile coder,
+every parameter of every layer for a policy gradient. Q-learning and expected
+SARSA fed one identical step already differ in it, and the path digest cannot
+tell them apart. An agent that keeps nothing reports nothing rather than the
+hash of nothing.
+
+[docs/architecture.md](architecture.md) says what each covers.
 
 **Should `n-step-sarsa` default to a smaller `n`?** Swept, and the answer is
 that the question was half of one. `n` and the step size trade against each
