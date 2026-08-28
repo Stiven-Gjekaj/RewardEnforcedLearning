@@ -17,7 +17,15 @@ from rel.core import Env, EnvSpec, Outcome, Step, TabularEnv
 from rel.envs.classic import cliff_walk
 from rel.rng import Rng
 from rel.spaces import Discrete
-from rel.training import Digest, Episode, Record, evaluate, run_episode, train
+from rel.training import (
+    Digest,
+    Episode,
+    Record,
+    digest_line,
+    evaluate,
+    run_episode,
+    train,
+)
 
 
 class Corridor(TabularEnv):
@@ -334,3 +342,36 @@ def test_the_loop_hands_the_agent_the_action_it_returned() -> None:
     env: Env[int] = Corridor(Rng(1))
     run_episode(env, Recording(Rng(1), Discrete(2)))
     assert taken == [1, 1]
+
+
+class TestOneWayToSpellATransition:
+    """The line a digest hashes is built in one place.
+
+    `rel.recording` writes a file whose step lines come from the same pieces,
+    and reads them back without the transition they came from. Two ways of
+    spelling one transition would be two digests, and a recording would be
+    checkable against only one of them.
+    """
+
+    def test_a_line_holds_the_four_things_a_digest_covers(self) -> None:
+        line = digest_line(Transition(3, 1, -1.0, 4, terminated=True, truncated=False))
+        assert line == "3|1|-1|10\n"
+
+    def test_a_tuple_observation_is_written_out_in_order(self) -> None:
+        line = digest_line(
+            Transition(
+                (0.5, -1.25), 0, 2.0, (0.0, 0.0), terminated=False, truncated=True
+            )
+        )
+        assert line == "0.5,-1.25|0|2|01\n"
+
+    def test_adding_a_line_and_adding_a_transition_agree(self) -> None:
+        step = Transition(7, 2, 0.25, 8, terminated=False, truncated=False)
+
+        one = Digest()
+        one.add(step)
+        other = Digest()
+        other.add_line(digest_line(step))
+
+        assert other.hexdigest() == one.hexdigest()
+        assert other.steps == one.steps

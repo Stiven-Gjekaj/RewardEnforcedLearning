@@ -55,6 +55,22 @@ def _encode(value: Any) -> str:
     return str(value)
 
 
+def digest_line(transition: Transition[Any]) -> str:
+    """The one line of text that stands for a transition.
+
+    This is what the digest hashes, and `rel.recording` writes a file whose
+    step lines are built from the same pieces. Two ways of spelling one
+    transition would be two digests, and the file would be checkable against
+    only one of them.
+    """
+    return (
+        f"{_encode(transition.observation)}"
+        f"|{transition.action}"
+        f"|{transition.reward:.{DIGEST_FIGURES}g}"
+        f"|{int(transition.terminated)}{int(transition.truncated)}\n"
+    )
+
+
 class Digest:
     """A running hash of every transition of a run."""
 
@@ -66,12 +82,16 @@ class Digest:
 
     def add(self, transition: Transition[Any]) -> None:
         self._steps += 1
-        line = (
-            f"{_encode(transition.observation)}"
-            f"|{transition.action}"
-            f"|{transition.reward:.{DIGEST_FIGURES}g}"
-            f"|{int(transition.terminated)}{int(transition.truncated)}\n"
-        )
+        self._hash.update(digest_line(transition).encode("ascii"))
+
+    def add_line(self, line: str) -> None:
+        """Take a line that was built earlier, as a recording holds it.
+
+        Reading a file back has the pieces and not the transition they came
+        from, and going through `Transition` to get the line again would be a
+        second way of spelling it.
+        """
+        self._steps += 1
         self._hash.update(line.encode("ascii"))
 
     @property
@@ -294,6 +314,7 @@ __all__ = [
     "Digest",
     "Episode",
     "Record",
+    "digest_line",
     "evaluate",
     "run_episode",
     "train",
