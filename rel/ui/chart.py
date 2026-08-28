@@ -21,6 +21,18 @@ character takes the colour of whichever series put the most dots in it.
 With colour switched off the series still all appear, and which is which has to
 be read off the legend. That is a real limit, and the alternative of drawing
 each series in its own chart is offered by the caller rather than decided here.
+
+## Nothing decorative hides the run
+
+A reference mark and a band are both drawn behind the curves rather than merely
+before them: a cell holding any real series takes that series' colour, a cell
+holding only marks takes grey, and a cell holding only a band takes the band's
+colour dimmed.
+
+A band is its two edges rather than the filled area between them. Filled reads
+better in colour and it is the same braille dot as a curve, so with colour
+switched off it swallows the line it is the spread of. Two edges read the same
+either way, and the answer stays visible.
 """
 
 from __future__ import annotations
@@ -43,9 +55,12 @@ BLANK = 0x2800
 BLOCKS = " ▁▂▃▄▅▆▇█"
 
 #: The series number a reference mark is drawn under. Negative, so that it can
-#: never collide with a real series, and so that a cell shared between a mark
-#: and a curve goes to the curve unless the mark put more dots in it.
+#: never collide with a real series.
 MARK = -1
+
+#: Band `n` is drawn under `BAND - n`, so bands are -2 and below and never
+#: collide with a mark or a series either.
+BAND = -2
 
 
 def sparkline(values: Sequence[float], width: int = 40) -> str:
@@ -79,6 +94,7 @@ def line_chart(
     height: int = 12,
     palette: Palette | None = None,
     marks: Mapping[str, float] | None = None,
+    bands: Mapping[str, tuple[Sequence[float], Sequence[float]]] | None = None,
     label_width: int = 9,
     title: str = "",
     clip: float = 0.0,
@@ -87,6 +103,12 @@ def line_chart(
 
     `marks` draws a horizontal line at a value and names it, which is how the
     best possible return goes on the same picture as the run.
+
+    `bands` draws the spread of a series behind it, as a lowest and a highest
+    curve. A mean line on its own says nothing about how much the runs behind
+    it disagreed, and in this project that has been the wrong answer twice.
+    The two edges are drawn rather than the area between them, so the band
+    reads the same with colour switched off.
 
     `clip` is a share of the values, from 0 to 1, to leave off the bottom of
     the range. A learning curve usually starts far below where it ends, so a
@@ -98,12 +120,21 @@ def line_chart(
     """
     palette = palette or Palette(enabled=False)
     marks = marks or {}
+    bands = bands or {}
 
     drawn = {name: values for name, values in series.items() if values}
     if not drawn:
         return ["(nothing to draw)"]
 
-    low, high = _bounds(drawn, marks, clip)
+    # A band reaches further than the curve inside it, so the axis has to
+    # cover it or the band would be drawn flat against the top and bottom.
+    spread = {
+        f"{name} band {edge}": points
+        for name, pair in bands.items()
+        if name in drawn
+        for edge, points in zip(("low", "high"), pair, strict=True)
+    }
+    low, high = _bounds({**drawn, **spread}, marks, clip)
     below = any(value < low for points in drawn.values() for value in points)
     dot_columns = width * 2
     dot_rows = height * 4
@@ -115,7 +146,22 @@ def line_chart(
         [{} for _ in range(width)] for _ in range(height)
     ]
 
-    # The marks go on first so that a curve crossing one is drawn over it.
+    # The bands go on first and the curves last. What decides which colour a
+    # shared cell takes is `_winner` rather than this order, and drawing in
+    # this order keeps the two agreeing.
+    for index, name in enumerate(drawn):
+        pair = bands.get(name)
+        if pair is None:
+            continue
+        for edge in pair:
+            behind: int | None = None
+            for column, value in enumerate(_resample(edge, dot_columns)):
+                row = _dot_row(value, low, high, dot_rows)
+                for filled in _between(behind, row):
+                    _set(bits, owners, column, filled, BAND - index, width, height)
+                behind = row
+
+    # The marks go on next so that a curve crossing one is drawn over it.
     # A reference line that hides the run is worse than no reference line.
     for value in marks.values():
         row = _dot_row(value, low, high, dot_rows)
@@ -144,9 +190,11 @@ def line_chart(
             if character == chr(BLANK) or not counts:
                 cells.append(" ")
                 continue
-            winner = max(counts, key=lambda key: counts[key])
+            winner = _winner(counts)
             if winner == MARK:
                 cells.append(palette.paint(character, "grey"))
+            elif winner <= BAND:
+                cells.append(palette.faint_series(character, BAND - winner))
             else:
                 cells.append(palette.series(character, winner))
         lines.append(f"{axis[row]} |{''.join(cells)}")
@@ -162,6 +210,22 @@ def line_chart(
         lines.append(" " * (label_width + 2) + "   ".join(legend))
 
     return lines
+
+
+def _winner(counts: Mapping[int, int]) -> int:
+    """Which series a shared cell belongs to.
+
+    A real series first, then a mark, then a band. Most dots decides only
+    within one of those, because a band fills a whole column of dots and a
+    curve fills one or two, and a picture of how sure the answer is must not
+    cover the answer.
+    """
+    real = {key: count for key, count in counts.items() if key >= 0}
+    if real:
+        return max(real, key=lambda key: real[key])
+    if MARK in counts:
+        return MARK
+    return max(counts, key=lambda key: counts[key])
 
 
 def _bounds(

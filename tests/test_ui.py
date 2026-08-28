@@ -14,8 +14,24 @@ from rel.agents.dp import value_iteration
 from rel.agents.td import QLearning
 from rel.envs.classic import cliff_walk
 from rel.rng import Rng
-from rel.ui.chart import bar, histogram, line_chart, smooth, sparkline
-from rel.ui.colour import Palette, pad, palette_for, terminal_wants_colour, width_of
+from rel.ui.chart import (
+    BAND,
+    MARK,
+    _winner,
+    bar,
+    histogram,
+    line_chart,
+    smooth,
+    sparkline,
+)
+from rel.ui.colour import (
+    CODES,
+    Palette,
+    pad,
+    palette_for,
+    terminal_wants_colour,
+    width_of,
+)
 from rel.ui.grid import best_values, difference_map, policy_map, value_map
 from rel.ui.live import CLEAR, HIDE, SHOW, Live
 from rel.ui.table import pairs, table
@@ -143,6 +159,79 @@ class TestLineChart:
         values = [-1000.0] + [1.0] * 100
         lines = line_chart({"a": values}, width=20, height=6, clip=0.0)
         assert not any("<" in line for line in lines)
+
+
+class TestTheBand:
+    """The spread of a run, drawn behind the mean of it.
+
+    A mean line on its own says nothing about how much the runs behind it
+    disagreed, and in this project that has been the wrong answer twice.
+    """
+
+    MEAN = tuple(float(index) for index in range(40))
+
+    def _drawn(self, width: float, **extra: object) -> list[str]:
+        low = [value - width for value in self.MEAN]
+        high = [value + width for value in self.MEAN]
+        return line_chart(
+            {"run": self.MEAN},
+            bands={"run": (low, high)},
+            width=40,
+            height=10,
+            **extra,  # type: ignore[arg-type]
+        )
+
+    def test_the_band_reaches_the_axis(self) -> None:
+        # A band drawn outside the range would be flattened against the top
+        # and the bottom, and the picture would understate the spread.
+        top = self._drawn(10.0)[0].split("|")[0].strip()
+        assert float(top) >= 49.0
+
+    def test_the_band_widens_with_the_spread(self) -> None:
+        narrow = float(self._drawn(1.0)[0].split("|")[0].strip())
+        wide = float(self._drawn(20.0)[0].split("|")[0].strip())
+        assert wide > narrow
+
+    def test_it_is_drawn_with_no_terminal(self) -> None:
+        lines = self._drawn(5.0)
+        assert len(lines) >= 10
+        assert all("\x1b" not in line for line in lines)
+        assert any(character != " " for line in lines for character in line)
+
+    def test_a_series_with_no_band_is_drawn_anyway(self) -> None:
+        lines = line_chart(
+            {"a": [1.0, 2.0, 3.0], "b": [3.0, 2.0, 1.0]},
+            bands={"a": ([0.0, 1.0, 2.0], [2.0, 3.0, 4.0])},
+            width=20,
+            height=6,
+        )
+        assert len(lines) >= 6
+
+    def test_a_band_for_a_series_that_is_not_drawn_is_ignored(self) -> None:
+        lines = line_chart(
+            {"a": [1.0, 2.0, 3.0]},
+            bands={"gone": ([0.0], [100.0])},
+            width=20,
+            height=6,
+        )
+        top = float(lines[0].split("|")[0].strip())
+        assert top < 100.0
+
+    def test_the_curve_keeps_a_cell_the_band_also_wants(self) -> None:
+        # A band fills a column of dots and a curve fills one or two, so most
+        # dots wins would put the band over the line it is the spread of.
+        assert _winner({0: 1, BAND: 8}) == 0
+        assert _winner({MARK: 1, BAND: 8}) == MARK
+        assert _winner({BAND: 8}) == BAND
+
+    def test_a_band_is_painted_in_its_own_colour_dimmed(self) -> None:
+        painted = Palette(enabled=True).faint_series("x", 0)
+        assert painted.startswith(CODES["dim"])
+        assert CODES["cyan"] in painted
+
+    def test_an_unknown_colour_is_refused_when_dimmed_too(self) -> None:
+        with pytest.raises(KeyError, match="no colour named"):
+            Palette(enabled=True).faint("x", "puce")
 
 
 class TestBarsAndHistograms:

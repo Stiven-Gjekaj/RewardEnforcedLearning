@@ -712,6 +712,7 @@ def command_compare(args: argparse.Namespace) -> int:
     env_settings = parse_settings(args.env_set)
 
     curves: dict[str, list[float]] = {}
+    spread: dict[str, tuple[list[float], list[float]]] = {}
     rows = []
     marks: dict[str, float] = {}
 
@@ -745,6 +746,22 @@ def command_compare(args: argparse.Namespace) -> int:
             sum(values[index] for values in totals) / len(totals)
             for index in range(args.episodes)
         ]
+        if args.band and len(totals) > 1:
+            # The spread is taken after smoothing, not before. A band drawn
+            # from raw returns on the cliff walk is the height of one fall,
+            # every episode, and says nothing about how the seeds differed.
+            window = _window(args, args.episodes)
+            smoothed = [smooth(values, window) for values in totals]
+            spread[name] = (
+                [
+                    min(curve[index] for curve in smoothed)
+                    for index in range(args.episodes)
+                ],
+                [
+                    max(curve[index] for curve in smoothed)
+                    for index in range(args.episodes)
+                ],
+            )
 
         learned = summarise(finals)
         exact_text = "-"
@@ -771,9 +788,13 @@ def command_compare(args: argparse.Namespace) -> int:
         height=args.height,
         palette=palette,
         marks=marks,
+        bands=spread,
         clip=args.clip,
         title=palette.paint(
-            f"{args.env}, mean of {args.runs} seeds, smoothed over {window}", "bold"
+            f"{args.env or args.env_file}, mean of {args.runs} seeds, "
+            f"smoothed over {window}"
+            + (", faint edges are the best and worst seed" if spread else ""),
+            "bold",
         ),
     ):
         print(line)
@@ -1008,6 +1029,16 @@ def build_parser() -> argparse.ArgumentParser:
     comparing.add_argument("--episodes", type=int, default=DEFAULT_EPISODES)
     comparing.add_argument("--runs", type=int, default=5, help="how many seeds")
     comparing.add_argument("--set", action="append", metavar="NAME=VALUE")
+    comparing.add_argument(
+        "--band",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "draw the best and worst seed behind the mean. On by default: "
+            "a mean line on its own says nothing about how much the runs "
+            "behind it disagreed."
+        ),
+    )
     _add_common(comparing)
     _add_chart(comparing)
     comparing.set_defaults(run=command_compare)

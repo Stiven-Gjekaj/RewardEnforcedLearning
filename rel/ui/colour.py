@@ -72,9 +72,26 @@ class Palette:
             raise KeyError(f"There is no colour named {colour!r}.")
         return f"{code}{text}{RESET}"
 
+    def faint(self, text: str, colour: str) -> str:
+        """The colour, dimmed.
+
+        A band showing the spread of a run is drawn behind the curve of it,
+        and the curve has to stay the thing the eye finds first.
+        """
+        if not self.enabled or not text:
+            return text
+        code = CODES.get(colour)
+        if code is None:
+            raise KeyError(f"There is no colour named {colour!r}.")
+        return f"{CODES['dim']}{code}{text}{RESET}"
+
     def series(self, text: str, index: int) -> str:
         """Paint the text in the colour that belongs to series `index`."""
         return self.paint(text, SERIES[index % len(SERIES)])
+
+    def faint_series(self, text: str, index: int) -> str:
+        """The series colour, dimmed."""
+        return self.faint(text, SERIES[index % len(SERIES)])
 
     def __bool__(self) -> bool:
         return self.enabled

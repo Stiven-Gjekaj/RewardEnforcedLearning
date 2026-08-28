@@ -341,6 +341,65 @@ class TestSweeping:
         )
 
 
+class TestTheBandOnTheCompareChart:
+    def test_the_band_is_on_by_default(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert (
+            main(
+                [
+                    "compare",
+                    "q-learning",
+                    "--env",
+                    "cliff",
+                    "--episodes",
+                    "20",
+                    "--runs",
+                    "3",
+                    "--no-colour",
+                ]
+            )
+            == 0
+        )
+        assert "best and worst seed" in capsys.readouterr().out
+
+    def test_it_can_be_switched_off(self, capsys: pytest.CaptureFixture[str]) -> None:
+        main(
+            [
+                "compare",
+                "q-learning",
+                "--env",
+                "cliff",
+                "--episodes",
+                "20",
+                "--runs",
+                "3",
+                "--no-band",
+                "--no-colour",
+            ]
+        )
+        assert "best and worst seed" not in capsys.readouterr().out
+
+    def test_one_seed_has_no_spread_to_draw(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # A band around a single run would be the run.
+        main(
+            [
+                "compare",
+                "q-learning",
+                "--env",
+                "cliff",
+                "--episodes",
+                "20",
+                "--runs",
+                "1",
+                "--no-colour",
+            ]
+        )
+        assert "best and worst seed" not in capsys.readouterr().out
+
+
 class TestRecordingARun:
     """`--out` on `rel train`, and `rel replay` reading it back."""
 
