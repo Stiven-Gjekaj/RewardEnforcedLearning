@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-1139_passing-427819?style=for-the-badge" alt="1139 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-1220_passing-427819?style=for-the-badge" alt="1220 tests passing"/>
 </p>
 
 <p align="center">
@@ -36,7 +36,7 @@ environments where the reward is not the point_
 **A reinforcement learning laboratory that runs in a terminal and needs
 nothing installed.**
 
-Twelve environments, twenty three agents, a gradient engine, a dynamic programming
+Twelve environments, twenty four agents, a gradient engine, a dynamic programming
 solver that says what the best possible policy is worth, and a command line
 that draws a learning curve out of braille dots.
 
@@ -210,6 +210,8 @@ rather than an estimate.
   and n-step tree backup, which asks the same question and never divides.
 - **Planning.** Dyna-Q, Dyna-Q+, and prioritised sweeping, which replays the
   step that matters rather than a random one.
+- **Options.** Q-learning whose choices can last several steps, over hallway
+  options read off the layout rather than written down.
 - **Approximation.** Semi-gradient SARSA and Q-learning over a tile coder.
 - **Networks.** REINFORCE with a baseline and an actor critic, on a reverse
   mode gradient engine written out in this repository.
@@ -292,11 +294,13 @@ an agent when it is fifty times too large.
 rel/core.py         the contract: what an environment is, what a step is
 rel/rng.py          PCG written out, with named independent streams
 rel/envs/           twelve environments. Never import an agent.
-rel/agents/         twenty three agents. Never import an environment.
+rel/agents/         twenty four agents. Never import an environment.
   dp.py             value iteration, policy iteration, exact policy values
   td.py             SARSA, Q-learning, Expected SARSA, Double Q, n-step
   tiles.py          tile coding, worked out exactly rather than hashed
   policy.py         REINFORCE and an actor critic
+rel/options.py      an action that lasts several steps, built from a model
+rel/pressure.py     following a fixed policy with a dial on how hard it tries
 rel/nn/             reverse mode gradients, two networks, SGD and Adam
 rel/training.py     the loop, the record and the run digest
 rel/ui/             braille charts, grid pictures, tables. Draws only.
@@ -306,16 +310,16 @@ scripts/            the scripts that produce the numbers in the documentation
 
 | Area | Files | Lines |
 | --- | ---: | ---: |
-| Core | 4 | 874 |
-| Environments | 6 | 1855 |
-| Agents | 15 | 3836 |
+| Core | 5 | 887 |
+| Environments | 6 | 1891 |
+| Agents | 17 | 4431 |
 | Network | 4 | 672 |
-| Running | 3 | 506 |
-| Interface | 6 | 921 |
+| Running | 4 | 654 |
+| Interface | 6 | 937 |
 | Command line | 3 | 1241 |
-| **Total** | **41** | **9905** |
+| **Total** | **45** | **10713** |
 
-Not counting 7565 lines of tests and 1187 of measurement scripts. Run
+Not counting 8195 lines of tests and 1376 of measurement scripts. Run
 `python scripts/lines.py` for the current numbers.
 
 Three rules about who may import whom are enforced by a test that reads the
@@ -336,7 +340,7 @@ import statements of every module:
 $ pytest
 ```
 
-1139 tests. Some of what they cover, and why each one is there rather than the
+1220 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A
@@ -383,7 +387,7 @@ what it was for.
 
 ## Status
 
-Alpha, and complete enough to be useful. Twelve environments and twenty three
+Alpha, and complete enough to be useful. Twelve environments and twenty four
 agents, all of them covered by a suite that runs in about five minutes with no
 browser, no display and no network.
 
