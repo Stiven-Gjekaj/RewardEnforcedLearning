@@ -44,9 +44,16 @@ SHADES = " .:-=+*%@"
 def policy_map(
     env: GridWorld, agent: Agent[int], palette: Palette | None = None
 ) -> str:
-    """The grid with the agent's greedy action drawn in each cell."""
+    """The grid with the agent's greedy action drawn in each cell.
+
+    A cell where the agent's choice runs for several steps is drawn in
+    magenta, and a line under the picture counts them. Without that mark the
+    picture of an agent that chooses options is misleading: it shows one
+    action per cell and the agent does not follow one action per cell.
+    """
     palette = palette or Palette(enabled=False)
     lines = []
+    lasting = 0
 
     for row in range(env.height):
         drawn = []
@@ -63,11 +70,20 @@ def policy_map(
             else:
                 action = agent.greedy(state)
                 mark = ARROWS.get(env.moves[action - env.action_space.start], "?")
-                if tile == START:
+                if agent.choice_lasts(state):
+                    lasting += 1
+                    drawn.append(palette.paint(mark, "magenta"))
+                elif tile == START:
                     drawn.append(palette.paint(mark, "cyan"))
                 else:
                     drawn.append(mark)
         lines.append("".join(drawn))
+
+    if lasting:
+        lines.append(
+            f"  {lasting} cells where the choice runs on rather than "
+            f"stopping after a step"
+        )
 
     return "\n".join(lines)
 

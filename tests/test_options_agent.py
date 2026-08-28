@@ -306,3 +306,22 @@ class TestCountingWhatItChose:
         agent.observe(go(0, 1, 0.0, 1))
         assert agent.steps_in_options / agent.finished == 1.0
         assert agent.long_chosen == 1
+
+
+class TestSayingWhatTheChoiceIs:
+    def test_a_cell_where_a_long_option_is_best_says_so(self) -> None:
+        agent = an_agent(CORRIDOR)
+        agent.values(0)[4] = 1.0
+        assert agent.choice_lasts(0)
+
+    def test_a_cell_where_an_action_is_best_does_not(self) -> None:
+        agent = an_agent(CORRIDOR)
+        agent.values(0)[1] = 1.0
+        assert not agent.choice_lasts(0)
+
+    def test_a_cell_no_option_covers_does_not(self) -> None:
+        assert not an_agent().choice_lasts(99)
+
+    def test_an_agent_that_only_takes_actions_never_says_so(self) -> None:
+        agent = an_agent()
+        assert not any(agent.choice_lasts(state) for state in STATES)

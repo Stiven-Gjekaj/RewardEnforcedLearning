@@ -174,6 +174,10 @@ class OptionsQ(TabularAgent[int]):
             return self.moves.start
         return self.options[chosen].act(observation)
 
+    def choice_lasts(self, observation: int) -> bool:
+        chosen = self.best_option(observation)
+        return chosen is not None and not self.options[chosen].is_primitive
+
     # -- Learning ------------------------------------------------------------
 
     def start_episode(self) -> None:

@@ -110,6 +110,22 @@ class Agent(ABC, Generic[ObsT]):
     #: pretending to be a picture of value.
     values_are_returns = True
 
+    def choice_lasts(self, observation: ObsT) -> bool:
+        """Whether what this agent would choose here runs for several steps.
+
+        Almost every agent chooses one action and is told what happened, and
+        for those the answer is no. An agent that chooses options answers yes
+        where it would pick one that keeps going, and the grid picture draws
+        those cells differently.
+
+        This is worth drawing because the picture of such an agent is
+        misleading without it. `greedy` gives one action per cell, and an agent
+        over options does not follow one action per cell: it commits to an
+        option and runs it. The cells this marks are the ones where the picture
+        and the behaviour part company.
+        """
+        return False
+
     def knows(self, observation: ObsT) -> bool:
         """Whether this agent has ever been in this state.
 

@@ -228,6 +228,40 @@ class TestGridPictures:
         assert len(lines) == env.height  # type: ignore[attr-defined]
         assert all(len(line) == env.width for line in lines)  # type: ignore[attr-defined]
 
+    def test_a_map_of_an_agent_that_only_takes_actions_has_no_extra_line(
+        self,
+    ) -> None:
+        env, agent = self._trained()
+        lines = policy_map(env, agent).splitlines()  # type: ignore[arg-type]
+        assert "runs on" not in lines[-1]
+
+    def test_a_choice_that_runs_on_is_marked_and_counted(self) -> None:
+        # The picture of an agent over options is misleading without this. It
+        # draws one action per cell and the agent does not follow one action
+        # per cell: it commits to an option and runs it.
+        from rel.agents.options import OptionsQ
+        from rel.envs.classic import four_rooms
+        from rel.options import hallway_options, primitives
+        from rel.training import train
+
+        rng = Rng(1)
+        env = four_rooms(rng.stream("env"))
+        agent = OptionsQ(
+            rng.stream("agent"),
+            env.action_space,
+            [
+                *primitives(env.action_space, range(env.observation_space.n)),
+                *hallway_options(env, env.gaps()),
+            ],
+            step_size=0.5,
+            discount=0.95,
+        )
+        train(env, agent, 200, discount=0.95)
+
+        lines = policy_map(env, agent).splitlines()
+        assert "cells where the choice runs on" in lines[-1]
+        assert len(lines) == env.height + 1
+
     def test_the_walls_and_the_goal_are_drawn_as_themselves(self) -> None:
         env, agent = self._trained()
         drawn = policy_map(env, agent)  # type: ignore[arg-type]
