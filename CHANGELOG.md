@@ -50,6 +50,11 @@ Everything below is new.
 
 **Agents**
 
+- **Eligibility traces**, on SARSA and on Watkins' Q, in accumulating,
+  replacing and dutch flavours. One dial from one step learning to crediting
+  the whole episode, in place of n-step SARSA's whole number. At a decay of
+  zero each is the one step agent it was built on, cell for cell, and a test
+  holds it to exactly that.
 - Four bandit agents, six tabular ones, Dyna and Dyna-Q+, semi-gradient SARSA
   and Q-learning over a tile coder, REINFORCE and an actor critic over a
   gradient engine written out here, a random baseline, and the exact optimal
@@ -113,6 +118,15 @@ Everything below is new.
   naive alternative in four dimensions, 2.53 against 1.13. It was measuring the
   clamping fault above. With that fixed the rule is better in both, 0.97
   against 1.13.
+- **Four agents made a table row for a cell they never stand in.** Every one of
+  them computes its target from the value of the state it is moving to, and
+  read through `values` that lookup makes the row. After two hundred episodes
+  of the cliff walk the table held 38 states where the agent had acted in 37,
+  and the extra one is the goal. `knows` then said yes for a cell the agent can
+  only arrive at. This is the second time this project has had this fault, and
+  the first is why `peek` exists. Found by a test written for something else:
+  Watkins' Q with no decay has to be one step Q-learning cell for cell, and it
+  was not, by exactly one row.
 - **The n of n-step SARSA was measuring the step size.** The agent took four
   steps at a step size of 0.5, and it got stuck more often than any other agent
   on four grids of five. The obvious reading is that four is too many. It is not: at a step size

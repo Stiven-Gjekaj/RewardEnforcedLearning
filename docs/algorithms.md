@@ -314,6 +314,35 @@ measurement on its own. What reaching back buys is propagation, what it costs
 is spread, and a large step size is already propagating fast enough that the
 spread is all cost.
 
+### The default, and the third point on one line
+
+Four settings, four grids, thirty seeds each:
+
+| decay | step size | sarsa-lambda, stuck of 120 | q-lambda, stuck of 120 |
+| ---: | ---: | ---: | ---: |
+| 0.8 | 0.2 | 10 | 0 |
+| 0.8 | 0.1 | **0** | 0 |
+| 0.0 | 0.2 | 9 | 1 |
+| **0.6** | **0.1** | 1 | **0** |
+
+The registry takes 0.6 at a step size of 0.1. It is better than the 0.8 and 0.2
+this started at on all four grids for SARSA with traces, and on two of four for
+Watkins' Q with the other two unchanged. The one row with nothing stuck at all
+is 0.8 at 0.1, and it is not the pick: one stuck policy in 240 runs is not a
+difference worth 0.87 of return on the cliff walk.
+
+That makes three settings in this project on one line:
+
+| method | how far back it reaches | step size |
+| --- | --- | ---: |
+| SARSA, Q-learning, the rest | one step | 0.5 |
+| n-step SARSA | two steps | 0.2 |
+| SARSA and Q with traces | a decay of 0.6 | 0.1 |
+
+**The further back a method reaches, the smaller the step size it wants.** That
+was not designed. Each of the three was swept on its own and the pattern is
+what the three answers turned out to have in common.
+
 ### Watkins' Q almost never leaves a policy stuck
 
 Over six decays, four grids and thirty seeds, which is 720 runs of each agent:
