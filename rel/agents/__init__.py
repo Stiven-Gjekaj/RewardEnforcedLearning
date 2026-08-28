@@ -52,6 +52,7 @@ from rel.agents.features import encoder_for
 from rel.agents.linear import SemiGradientQ, SemiGradientSarsa
 from rel.agents.monte_carlo import MonteCarloControl
 from rel.agents.off_policy import Estimator, OffPolicyMonteCarlo
+from rel.agents.options import OptionsQ
 from rel.agents.policy import ActorCritic, Reinforce
 from rel.agents.sweeping import PrioritisedSweeping
 from rel.agents.td import DoubleQ, ExpectedSarsa, NStepSarsa, QLearning, Sarsa
@@ -59,6 +60,7 @@ from rel.agents.tiles import TileCoder
 from rel.agents.traces import Kind, SarsaLambda, WatkinsQLambda
 from rel.agents.tree import Target, TreeBackup
 from rel.core import Env, TabularEnv
+from rel.options import Option, hallway_options, primitives
 from rel.registry import Entry, Registry
 from rel.rng import Rng
 from rel.schedules import Schedule
@@ -304,6 +306,55 @@ def _sweeping(
     )
 
 
+def _doorways(env: TabularEnv) -> list[int]:
+    """The doorways of a grid, asked for without naming what a grid is.
+
+    A builder may read an environment and this file is the only one under
+    `rel/agents/` allowed to know environments exist at all. It still may not
+    import one, and `tests/test_layering.py` says so, so this asks whether the
+    environment can describe its own doorways rather than checking its type.
+    An environment that cannot has none.
+    """
+    describe = getattr(env, "gaps", None)
+    return list(describe()) if callable(describe) else []
+
+
+def _options(
+    rng: Rng,
+    env: Env[Any],
+    hallways: bool = True,
+    step_size: float | Schedule = 0.5,
+    discount: float = 0.95,
+    epsilon: float | Schedule = 0.1,
+    optimism: float = 0.0,
+) -> Agent[Any]:
+    #: `hallways=False` leaves the agent with its primitive actions only, which
+    #: is Q-learning. That is the comparison the whole method is measured by,
+    #: so it is a setting rather than a second entry: both sides of it are then
+    #: the same code and any difference is the options.
+    if not isinstance(env, TabularEnv):
+        raise TypeError(
+            f"{env.spec.name} keeps no model, so its rooms cannot be worked "
+            f"out. An agent over options needs an environment tagged 'tabular'."
+        )
+
+    built: list[Option] = list(
+        primitives(env.action_space, range(env.observation_space.n))
+    )
+    if hallways:
+        built.extend(hallway_options(env, _doorways(env)))
+
+    return OptionsQ(
+        rng,
+        env.action_space,
+        built,
+        step_size=step_size,
+        discount=discount,
+        epsilon=epsilon,
+        optimism=optimism,
+    )
+
+
 def _policy_gradient(cls: type[Reinforce[Any]]) -> AgentBuilder:
     #: The entropy bonus here is 0.05 and the classes default to less. The
     #: registry is where a default is chosen by measurement rather than by the
@@ -499,6 +550,12 @@ AGENTS: Registry[Agent[Any]] = Registry(
             "prioritised-sweeping",
             "Dyna that replays the step that matters rather than a random one.",
             _sweeping,
+            tags=("tabular", "planning", "off-policy"),
+        ),
+        Entry(
+            "options-q",
+            "Q-learning that can choose to walk to a doorway and stop there.",
+            _options,
             tags=("tabular", "planning", "off-policy"),
         ),
         Entry(
