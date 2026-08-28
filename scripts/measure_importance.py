@@ -15,12 +15,15 @@ Three numbers are reported for each estimator.
 `value` is the exact value of the greedy policy from the model, averaged over
 the seeds whose policy reaches an ending.
 
-`estimate` is what the agent itself believes the best action at the start is
-worth, and `spread` is how far the worst seed's belief sits from the mean of
-them. That pair is what the two estimators really differ on. The variance
-importance sampling is famous for is variance in the estimate, so measuring the
-spread of the finished policy instead would be measuring a downstream
-consequence of it and calling it the thing.
+`spread` is the number the two estimators really differ on. For every cell the
+agents credited, it takes how far apart the ten seeds' estimates of that cell
+are, and reports the mean of that over cells. The variance importance sampling
+is known for is variance in the estimate, so the spread of the finished policy
+would be a downstream consequence of it rather than the thing itself.
+
+The start state is not the cell to measure. This method credits only the tail
+of an episode after the last step the behaviour policy explored, and the start
+is the furthest cell from that, so its estimate never moves off zero at all.
 
 `stuck` counts the seeds whose greedy policy never reaches an ending at all.
 """
@@ -54,7 +57,7 @@ def measure(
     discount = probe.spec.suggested_discount
 
     values: list[float] = []
-    beliefs: list[float] = []
+    tables: list[dict[int, float]] = []
     stuck = 0
 
     for seed in range(1, runs + 1):
@@ -69,10 +72,14 @@ def measure(
         )
         train(env, agent, episodes, discount=discount)
 
-        # What the agent believes the start is worth. This is the estimate
-        # importance sampling corrects, and the one whose spread is the lesson.
-        start = next(iter(env.start_states()))
-        beliefs.append(max(agent.peek(start)))
+        # What this seed came to believe about every cell it credited.
+        tables.append(
+            {
+                state: max(row)
+                for state, row in agent.q.items()
+                if any(value != 0.0 for value in row)
+            }
+        )
 
         policy = [agent.greedy(state) for state in range(env.observation_space.n)]
         report = evaluate_policy(env, policy, discount=discount)
@@ -81,13 +88,20 @@ def measure(
         else:
             stuck += 1
 
-    centre = sum(beliefs) / len(beliefs)
-    spread = max(abs(belief - centre) for belief in beliefs)
+    shared = set(tables[0]).intersection(*tables[1:]) if tables else set()
+    spreads = [
+        max(table[state] for table in tables) - min(table[state] for table in tables)
+        for state in shared
+    ]
+
+    spread = f"{sum(spreads) / len(spreads):.3f}" if spreads else "-"
+    widest = f"{max(spreads):.3f}" if spreads else "-"
     value = f"{sum(values) / len(values):.3f}" if values else "-"
     return (
         estimator,
-        f"{centre:.3f}",
-        f"{spread:.3f}",
+        str(len(shared)),
+        spread,
+        widest,
         value,
         str(stuck) if stuck else "",
     )
@@ -116,14 +130,14 @@ def main() -> int:
             measure(grid, estimator, args.episodes, args.runs, args.epsilon)
             for estimator in ESTIMATORS
         ]
-        headings = ["estimator", "estimate", "spread", "policy value", "stuck"]
-        for line in table(headings, rows, align=["left"] + ["right"] * 4):
+        headings = ["estimator", "cells", "spread", "widest", "policy", "stuck"]
+        for line in table(headings, rows, align=["left"] + ["right"] * 5):
             print(f"  {line}")
 
     print(
-        "\n'estimate' is what the agent believes the start is worth and 'spread'\n"
-        "is how far the worst seed's belief sits from the mean. That pair is the\n"
-        "lesson. 'policy value' is the exact value of what it ended up doing."
+        "\n'cells' is how many every seed credited, and 'spread' is how far apart\n"
+        "the seeds' estimates of one are, averaged over them. 'widest' is the\n"
+        "worst single cell. 'policy' is the exact value of what it ended up doing."
     )
     return 0
 
