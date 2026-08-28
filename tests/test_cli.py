@@ -993,3 +993,43 @@ def test_the_version_is_printed(capsys: pytest.CaptureFixture[str]) -> None:
         main(["--version"])
     assert stopped.value.code == 0
     assert __version__ in capsys.readouterr().out
+
+
+class TestBothDigests:
+    def test_the_report_gives_the_path_and_what_was_learned(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        main(
+            ["train", "q-learning", "--env", "cliff", "--episodes", "20", "--no-colour"]
+        )
+        printed = capsys.readouterr().out
+        assert "digest, the path" in printed
+        assert "digest, what it learned" in printed
+
+    def test_an_agent_that_learns_nothing_shows_only_the_path(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        main(["train", "random", "--env", "cliff", "--episodes", "10", "--no-colour"])
+        printed = capsys.readouterr().out
+        assert "digest, the path" in printed
+        assert "what it learned" not in printed
+
+    def test_print_digest_still_gives_the_path_one(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # Every number in the documentation was compared against this one, so
+        # what --print digest means cannot change.
+        main(
+            [
+                "train",
+                "q-learning",
+                "--env",
+                "cliff",
+                "--episodes",
+                "50",
+                "--quiet",
+                "--print",
+                "digest",
+            ]
+        )
+        assert capsys.readouterr().out.strip() == "0de6831e401c7ddd"

@@ -48,11 +48,11 @@ agents do, and it is why `rel.nn.autograd` is not built to hold a long graph.
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 
 from rel.agents.base import Agent, Transition
 from rel.agents.features import Encoder
-from rel.core import ObsT
+from rel.core import DIGEST_FIGURES, ObsT
 from rel.nn.autograd import (
     Tensor,
     add,
@@ -285,6 +285,18 @@ class Reinforce(Agent[ObsT]):
                 difference = add(predicted, scale(Tensor([target]), -1.0))
                 total(square(difference)).backward()
             self.value_optimiser.step()
+
+    def learned(self) -> Iterator[str]:
+        # Every weight of every layer, the baseline included. A network keeps
+        # no table of states, so what it learned is its parameters, and two
+        # runs that walked the same path can still have moved these apart.
+        nets = [("policy", self.policy)] + (
+            [("value", self.value)] if self.value is not None else []
+        )
+        for name, net in nets:
+            for index, tensor in enumerate(net.parameters()):
+                row = ",".join(f"{value:.{DIGEST_FIGURES}g}" for value in tensor.data)
+                yield f"{name}.{index}|{row}"
 
     def __repr__(self) -> str:
         return f"Reinforce({self.policy!r}, baseline={self.value is not None})"

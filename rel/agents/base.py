@@ -28,14 +28,30 @@ agent avoids.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Generic
+from typing import Any, Generic
 
-from rel.core import ObsT
+from rel.core import DIGEST_FIGURES, ObsT, encoded
 from rel.rng import Rng
 from rel.schedules import Schedule, as_schedule
 from rel.spaces import Discrete
+
+
+def rows_of(table: Mapping[Any, Sequence[float]], prefix: str = "") -> Iterator[str]:
+    """One line per row of a table, in a fixed order.
+
+    Sorted by the text of the observation rather than by the observation
+    itself, because an observation is anything hashable and two of them need
+    not be comparable. The text is what the digest sees anyway.
+
+    `prefix` names the table for an agent that keeps more than one. Without it
+    the rows of two tables run together, and an agent that had learned a thing
+    in the first table would match one that had learned it in the second.
+    """
+    for key in sorted(table, key=encoded):
+        row = ",".join(f"{value:.{DIGEST_FIGURES}g}" for value in table[key])
+        yield f"{prefix}{encoded(key)}|{row}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +125,24 @@ class Agent(ABC, Generic[ObsT]):
     #: those carrying the label of a value map would be a picture of confidence
     #: pretending to be a picture of value.
     values_are_returns = True
+
+    def learned(self) -> Iterator[str]:
+        """What this agent has learned, as lines of text, for a digest.
+
+        The run digest hashes the transitions, so two agents that happen to
+        walk the same path get the same one. That is the right answer to
+        "did these two runs do the same thing" and the wrong answer to "did
+        these two agents come to the same conclusion". This is the second
+        question, and the two are kept apart rather than merged.
+
+        Empty by default. An agent that keeps nothing has nothing to hash, and
+        the report says so rather than printing the hash of an empty run and
+        letting it look like a fact about the agent.
+
+        The lines have to come out in the same order every time, whatever
+        order the states were first seen in.
+        """
+        return iter(())
 
     def choice_lasts(self, observation: ObsT) -> bool:
         """Whether what this agent would choose here runs for several steps.
@@ -231,6 +265,9 @@ class TabularAgent(Agent[ObsT]):
     def knows(self, observation: ObsT) -> bool:
         return observation in self.q
 
+    def learned(self) -> Iterator[str]:
+        return rows_of(self.q)
+
     def action_scores(self, observation: ObsT) -> Sequence[float]:
         """The numbers the policy ranks actions by.
 
@@ -320,4 +357,4 @@ class TabularAgent(Agent[ObsT]):
         )
 
 
-__all__ = ["Agent", "RandomAgent", "TabularAgent", "Transition"]
+__all__ = ["Agent", "RandomAgent", "TabularAgent", "Transition", "rows_of"]

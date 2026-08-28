@@ -32,9 +32,9 @@ tabular agents, and the division happens inside.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 
-from rel.agents.base import Agent, Transition
+from rel.agents.base import Agent, Transition, rows_of
 from rel.agents.tiles import TileCoder
 from rel.rng import Rng
 from rel.schedules import Schedule, as_schedule
@@ -71,6 +71,12 @@ class LinearAgent(Agent[Observation]):
         self.weights: list[list[float]] = [
             [share] * coder.features for _ in range(actions.n)
         ]
+
+    def learned(self) -> Iterator[str]:
+        # The weights, one line per action. There is no table of states here:
+        # a tile coder turns a state into switches and the weights are per
+        # switch, so what this agent knows is the weights and nothing else.
+        return rows_of(dict(enumerate(self.weights)))
 
     def current_epsilon(self) -> float:
         return self.epsilon(self.episodes)

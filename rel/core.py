@@ -39,7 +39,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from rel.rng import Rng
 from rel.spaces import Discrete, Space
@@ -104,6 +104,27 @@ class EnvSpec:
     #: anything. Saying so here means a caller who gives no discount gets one
     #: that works rather than a failure to explain.
     suggested_discount: float = 1.0
+
+
+#: How many significant figures of a float are written down for a digest.
+#: Twelve is far more than enough to catch a change in behaviour and short
+#: enough that the text stays small.
+DIGEST_FIGURES = 12
+
+
+def encoded(value: Any) -> str:
+    """One value, as text that does not depend on how Python prints it.
+
+    This is here rather than beside the digest that uses it because both sides
+    write values down: a run hashes the observations an environment produced,
+    and an agent hashes the table it learned. One spelling means the two agree
+    and neither has to know about the other.
+    """
+    if isinstance(value, tuple):
+        return ",".join(encoded(item) for item in value)
+    if isinstance(value, float):
+        return f"{value:.{DIGEST_FIGURES}g}"
+    return str(value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,6 +281,7 @@ class TabularEnv(Env[int], ABC):
 
 
 __all__ = [
+    "DIGEST_FIGURES",
     "NO_INFO",
     "Env",
     "EnvSpec",
@@ -267,4 +289,5 @@ __all__ = [
     "Outcome",
     "Step",
     "TabularEnv",
+    "encoded",
 ]

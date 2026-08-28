@@ -50,7 +50,7 @@ from rel.envs.gridworld import GridWorld
 from rel.metrics import summarise
 from rel.recording import Recorder, read_run, save_run
 from rel.rng import Rng
-from rel.training import Episode, Record, evaluate, train
+from rel.training import Episode, Record, digest_of, evaluate, train
 from rel.ui.chart import line_chart, smooth, sparkline
 from rel.ui.colour import Palette, palette_for
 from rel.ui.grid import best_values, difference_map, policy_map, value_map
@@ -244,10 +244,18 @@ def report_lines(
             )
         )
 
+    # Two digests, because they answer two questions. The path says whether
+    # two runs did the same thing, and it is what every number in the
+    # documentation was compared against. What it learned says whether two
+    # agents came to the same conclusion, which two runs down the same path can
+    # still disagree about. Merging them would have changed the first one.
+    digests = [("digest, the path", palette.paint(learning.digest.hexdigest(), "grey"))]
+    learned = digest_of(agent)
+    if learned is not None:
+        digests.append(("digest, what it learned", palette.paint(learned, "grey")))
+
     lines.append("")
-    lines.extend(
-        pairs([("digest", palette.paint(learning.digest.hexdigest(), "grey"))], palette)
-    )
+    lines.extend(pairs(digests, palette))
     return lines
 
 

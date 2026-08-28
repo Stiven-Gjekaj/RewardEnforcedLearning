@@ -37,26 +37,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from rel.agents.base import Agent, Transition
-from rel.core import Env
+from rel.core import DIGEST_FIGURES, Env, encoded
 from rel.metrics import Summary, last_mean, summarise
-
-#: How many significant figures of a float go into the digest. Twelve is far
-#: more than enough to catch a change in behaviour and short enough that the
-#: text stays small.
-DIGEST_FIGURES = 12
-
-
-def encoded(value: Any) -> str:
-    """One observation, as text that does not depend on how Python prints it.
-
-    Public because a recording writes the same text to a file and reads it
-    back. An observation spelled two ways would be two digests.
-    """
-    if isinstance(value, tuple):
-        return ",".join(encoded(item) for item in value)
-    if isinstance(value, float):
-        return f"{value:.{DIGEST_FIGURES}g}"
-    return str(value)
 
 
 def digest_line(transition: Transition[Any]) -> str:
@@ -107,6 +89,29 @@ class Digest:
 
     def __str__(self) -> str:
         return self.hexdigest()
+
+
+def digest_of(agent: Agent[Any]) -> str | None:
+    """A hash of what this agent has learned, or `None` if it says nothing.
+
+    The run digest hashes the transitions, so two agents that happen to walk
+    the same path get the same one. That answers "did these two runs do the
+    same thing" and not "did these two agents come to the same conclusion".
+
+    The two are kept apart rather than merged. Merging them would change what
+    the run digest means, and every number in the documentation that was
+    compared against one would silently stop being comparable.
+
+    `None` rather than the hash of nothing, because the hash of nothing is the
+    same for every agent that keeps nothing and would read as a fact about the
+    agent.
+    """
+    running = hashlib.blake2b(digest_size=8)
+    empty = True
+    for line in agent.learned():
+        empty = False
+        running.update(f"{line}\n".encode("ascii"))
+    return None if empty else running.hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
@@ -325,6 +330,7 @@ __all__ = [
     "Episode",
     "Record",
     "digest_line",
+    "digest_of",
     "encoded",
     "evaluate",
     "run_episode",

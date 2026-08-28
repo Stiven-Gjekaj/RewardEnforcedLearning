@@ -12,7 +12,7 @@ from collections.abc import Mapping, Sequence
 import pytest
 
 from rel.agents.base import Agent, RandomAgent, Transition
-from rel.agents.td import QLearning
+from rel.agents.td import DoubleQ, ExpectedSarsa, QLearning
 from rel.core import Env, EnvSpec, Outcome, Step, TabularEnv
 from rel.envs.classic import cliff_walk
 from rel.rng import Rng
@@ -22,6 +22,7 @@ from rel.training import (
     Episode,
     Record,
     digest_line,
+    digest_of,
     evaluate,
     run_episode,
     train,
@@ -375,3 +376,91 @@ class TestOneWayToSpellATransition:
 
         assert other.hexdigest() == one.hexdigest()
         assert other.steps == one.steps
+
+
+class TestTheDigestOfWhatAnAgentLearned:
+    """The second digest, kept beside the first rather than merged into it.
+
+    The path digest hashes the transitions, so two agents that happen to walk
+    the same path get the same one. That answers "did these two runs do the
+    same thing" and not "did these two agents come to the same conclusion".
+    """
+
+    @staticmethod
+    def _fed(agent: Agent[int]) -> Agent[int]:
+        for step in (
+            Transition(0, 0, -1.0, 1, terminated=False, truncated=False),
+            Transition(1, 1, -1.0, 2, terminated=False, truncated=False),
+            Transition(2, 0, 10.0, 3, terminated=True, truncated=False),
+        ):
+            agent.observe(step)
+        agent.end_episode()
+        return agent
+
+    def test_two_agents_on_one_path_give_different_digests(self) -> None:
+        # The whole reason for having it. Q-learning takes the largest value
+        # at the next state and expected SARSA takes the average over its
+        # policy, so one step is enough to separate them, and the path they
+        # walked is the same path.
+        step = Transition(0, 0, -1.0, 1, terminated=False, truncated=False)
+
+        one: QLearning[int] = QLearning(
+            Rng(1), Discrete(2), step_size=0.5, discount=0.9, epsilon=0.1
+        )
+        other: ExpectedSarsa[int] = ExpectedSarsa(
+            Rng(1), Discrete(2), step_size=0.5, discount=0.9, epsilon=0.1
+        )
+        for agent in (one, other):
+            agent.values(1)[:] = [0.0, 10.0]
+            agent.observe(step)
+
+        walk = Digest()
+        walk.add(step)
+        before = walk.hexdigest()
+        walk_again = Digest()
+        walk_again.add(step)
+
+        assert digest_of(one) != digest_of(other)
+        # Both walked the same path, and the path digest cannot say so.
+        assert walk_again.hexdigest() == before
+
+    def test_two_agents_that_learned_the_same_thing_agree(self) -> None:
+        one = self._fed(QLearning(Rng(1), Discrete(2), step_size=0.5, discount=0.9))
+        other = self._fed(QLearning(Rng(9), Discrete(2), step_size=0.5, discount=0.9))
+        assert digest_of(one) == digest_of(other)
+
+    def test_an_agent_that_learns_nothing_says_nothing(self) -> None:
+        # Not the hash of nothing. That is the same for every agent that keeps
+        # nothing and would read as a fact about the agent.
+        assert digest_of(RandomAgent(Rng(1), Discrete(2))) is None
+
+    def test_the_order_the_states_were_seen_in_does_not_change_it(self) -> None:
+        one: QLearning[int] = QLearning(Rng(1), Discrete(2), step_size=1.0)
+        one.values(9)[0] = 1.0
+        one.values(2)[1] = 2.0
+
+        other: QLearning[int] = QLearning(Rng(1), Discrete(2), step_size=1.0)
+        other.values(2)[1] = 2.0
+        other.values(9)[0] = 1.0
+
+        assert digest_of(one) == digest_of(other)
+
+    def test_it_covers_both_of_a_double_q_agent_s_tables(self) -> None:
+        # Either one alone would call two agents that split their coin
+        # differently the same agent.
+        one: DoubleQ[int] = DoubleQ(Rng(1), Discrete(2))
+        one.values(0)[0] = 1.0
+        other: DoubleQ[int] = DoubleQ(Rng(1), Discrete(2))
+        other.other_values(0)[0] = 1.0
+        assert digest_of(one) != digest_of(other)
+
+    def test_the_path_digest_is_unchanged_by_any_of_this(self) -> None:
+        # Every number in the documentation was compared against this one. It
+        # is pinned to a value written down before the second digest existed.
+        rng = Rng(1)
+        env = cliff_walk(rng.stream("env"))
+        agent: QLearning[int] = QLearning(
+            rng.stream("agent"), env.action_space, step_size=0.5, epsilon=0.1
+        )
+        record = train(env, agent, 50)
+        assert record.digest.hexdigest() == "0de6831e401c7ddd"

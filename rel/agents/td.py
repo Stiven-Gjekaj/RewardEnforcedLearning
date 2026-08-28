@@ -21,9 +21,9 @@ which question it asked cannot be read.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 
-from rel.agents.base import TabularAgent, Transition
+from rel.agents.base import TabularAgent, Transition, rows_of
 from rel.core import ObsT
 from rel.rng import Rng
 from rel.schedules import Schedule
@@ -191,6 +191,13 @@ class DoubleQ(TabularAgent[ObsT]):
             optimism=optimism,
         )
         self.q_other: dict[ObsT, list[float]] = {}
+
+    def learned(self) -> Iterator[str]:
+        # Both tables, and each says which it is. Run together, an agent that
+        # had learned a thing in the first would match one that had learned it
+        # in the second.
+        yield from rows_of(self.q, "chooser.")
+        yield from rows_of(self.q_other, "valuer.")
 
     def other_values(self, observation: ObsT) -> list[float]:
         row = self.q_other.get(observation)
