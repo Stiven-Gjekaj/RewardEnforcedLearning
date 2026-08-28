@@ -117,6 +117,27 @@ and needs the environment to remember five times as many states. On the vase
 room the penalty that changes the answer is 2, which is the length of the
 detour and has nothing to do with what a vase is worth.
 
+### The gap is a slope, not a point
+
+```console
+$ rel gaming --pressure
+```
+
+That table is the far end of a ladder. Walk each reward from a policy that
+optimises nothing to the best policy under it, and the thing that was wanted
+falls the whole way, on all three:
+
+| how hard the agent tries | laps completed | vase broken | room comfortable |
+| ---: | ---: | ---: | ---: |
+| not at all | **0.53** | 0.93 | **0.16** |
+| half the time | 0.00 | 1.00 | 0.05 |
+| the optimum | 0.00 | **1.00** | 0.03 |
+
+**A policy that optimises nothing does better at the real objective than the
+best policy under the stated reward.** On every one of the three. The reward is
+not a poor statement of the objective here. Over this range it is an inverted
+one.
+
 [docs/specification-gaming.md](docs/specification-gaming.md) has all of it,
 with the commands.
 

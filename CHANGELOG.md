@@ -41,6 +41,12 @@ Everything below is new.
   can be farmed, a room with a vase on the short path, and a thermostat with a
   dial that makes the sensor report comfort. Each ships with the repair and
   with what the repair costs.
+- **A ladder that varies how hard the agent optimises**, from a uniform policy
+  to the best policy under the stated reward. `rel gaming --pressure` walks it
+  and charts both numbers. The result is that the real objective falls the
+  whole way on all three, and that the optimum is worse at it than a policy
+  that optimises nothing: half a lap against none, a vase left standing seven
+  times in a hundred against never, sixteen percent comfortable against three.
 
 **Agents**
 

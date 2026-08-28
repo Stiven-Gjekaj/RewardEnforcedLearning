@@ -212,6 +212,89 @@ definition leaving normal behaviour.
 
 ---
 
+## The gap is not a point, it is a slope
+
+Everything above is measured at two policies: the best one under the stated
+reward, and the best one under the reward repaired. That is what lets this page
+say "this is the optimum" rather than "this is what happened", and it is why
+these environments are solved rather than learned.
+
+It also leaves out the middle. The paragraph above says the proxy stops
+standing in for the thing **where the maximum is**. That was an assertion.
+Here it is measured.
+
+```console
+$ python scripts/measure_pressure.py
+$ rel gaming --pressure
+```
+
+Pressure is one dial. Follow the best policy under the stated reward with
+probability one minus epsilon, and act uniformly otherwise. At pressure zero
+the agent optimises nothing. At pressure one it is the optimum. Nothing is
+learned along the ladder, so the only thing that changes from rung to rung is
+how hard the agent optimises.
+
+Six rungs, forty episodes at each, on seed 1. These are the audited numbers, in
+their own units:
+
+| pressure | laps completed | vase broken | room comfortable |
+| ---: | ---: | ---: | ---: |
+| 0.0 | **0.53** | 0.93 | **0.16** |
+| 0.2 | 0.33 | 0.93 | 0.09 |
+| 0.5 | 0.00 | 1.00 | 0.05 |
+| 0.7 | 0.00 | 1.00 | 0.03 |
+| 0.9 | 0.00 | 1.00 | 0.03 |
+| 1.0 | 0.00 | **1.00** | 0.03 |
+
+Every column moves the wrong way for the whole distance, and not one of them
+turns back.
+
+### The optimum is worse than doing nothing
+
+The first row is a policy that optimises nothing at all. The last row is the
+best policy there is under the stated reward. On all three environments the
+first row is better at the real objective than the last one.
+
+A uniform policy completes half a lap on average and the optimum completes
+none. A uniform policy leaves the vase standing about seven times in a hundred
+and the optimum never leaves it standing. A uniform policy keeps the room
+comfortable for sixteen percent of the episode and the optimum manages three.
+
+So the reward is not only a poor statement of the objective. Over this range it
+is an inverted one, and the inversion is not a cliff at the end: it runs the
+whole way from one end of the ladder to the other.
+
+Four seeds were run and all four say the same thing. The last row is the same
+on every one of them, because a policy with no noise in a model with no noise
+has nothing left to vary. Only the first row moves, between 0.53 and 0.60 laps,
+0.85 and 0.93 vases, and 0.14 and 0.16 comfortable.
+
+### The same shape, as a gap
+
+Both numbers written as a share of what each can reach, and subtracted. The
+reward share rises to one because that is what the policy was solved for. The
+objective share is the one nothing optimises.
+
+| pressure | boat race | vase room | thermostat |
+| ---: | ---: | ---: | ---: |
+| 0.0 | -0.04 | -0.07 | -0.16 |
+| 0.2 | +0.15 | +0.38 | +0.35 |
+| 0.5 | +0.53 | +0.85 | +0.84 |
+| 0.7 | +0.74 | +0.95 | +0.87 |
+| 0.9 | +0.92 | +0.96 | +0.95 |
+| 1.0 | **+1.00** | **+1.00** | **+0.97** |
+
+The negative first row is the honest part. An agent that optimises nothing is
+very slightly ahead on the objective, because the objective is the only thing
+left when nothing is being pursued. Everything after it is the reward pulling
+away.
+
+**This is the argument of the whole page in one shape.** Three rows of a table
+can be read as three unlucky specifications. A slope that runs the same way on
+all three, over the entire range of how hard an agent tries, cannot.
+
+---
+
 ## The measurement that carries all of it
 
 Each environment reports an `audit`: laps completed, vases broken, the share of
