@@ -193,6 +193,71 @@ Saying which is which is worth more than either.
 
 ---
 
+## Recording a run, and reading it later
+
+A digest alone cannot say what happened, only whether it happened twice. Two
+people with the same digest know they got the same run. Neither can look at it.
+
+```console
+$ rel train q-learning --env cliff --episodes 500 --out run.txt.gz
+$ rel replay run.txt.gz
+```
+
+`--out` writes the steps themselves. The digest at the top of the file is then
+a claim the file makes about its own contents, and `rel replay` checks that
+claim rather than trusting it: a file changed since it was written is refused
+rather than drawn.
+
+```
+rel-run 1
+env: cliff
+agent: q-learning
+seed: 1
+episodes: 50
+discount: 1
+steps: 2579
+digest: 0de6831e401c7ddd
+
+36|0|-1|00|24
+24|0|-1|00|12
+```
+
+**The first four fields of a step line are exactly what the digest hashes, in
+the order it hashes them.** So checking a file is re-hashing a prefix of each
+line, and no part of the reader has its own idea of how a transition is
+spelled. Two spellings would be two digests, and the file would be checkable
+against only one of them. The state the step landed in is what the digest does
+not cover, so it goes on the end where it changes nothing.
+
+The check works on the lines and not on the numbers read out of them. Writing a
+parsed reward out again would make `-1` and `-1.00` the same file.
+
+A run being recorded hands the loop a `Recorder` in place of its digest. A
+`Recorder` is a digest that also keeps what it hashed, so recording costs the
+run nothing but the memory of what it did, and a recorded run and an
+unrecorded one on the same seed have the same digest. A test checks that rather
+than assuming it.
+
+A name ending in `.gz` is compressed. Fifty episodes of the cliff walk go from
+34822 bytes to 2525. Reading decides which it is by looking at the first two
+bytes rather than at the name, so a file renamed by a browser still reads.
+
+### What a recording cannot give back
+
+The audit is not in it. That is a set of numbers an environment keeps about
+what was really wanted, it is different for each environment, and a file of
+steps is not the place to invent a format for it.
+
+The observations come back as the text they were written as. Nothing turns
+`0.5,-1.25` back into a pair of floats, because doing so needs to know which
+environment wrote it, and a recording that could only be read with the
+environment to hand would not be worth writing.
+
+What a replay does give back is the returns, the lengths, the discounted
+returns and which episodes ended, which is what a chart of a run is drawn from.
+
+---
+
 ## Reading and writing are not the same
 
 `TabularAgent.values` makes a row if there is not one. `TabularAgent.peek`
@@ -217,6 +282,9 @@ negative, an untouched entry of zero is the highest number in the table.
 | The generator and its streams | [`rel/rng.py`](../rel/rng.py) |
 | The contract | [`rel/core.py`](../rel/core.py) |
 | A grid, and the presets built from one | [`rel/envs/gridworld.py`](../rel/envs/gridworld.py) |
+| A grid written in a text file | [`rel/envs/gridfile.py`](../rel/envs/gridfile.py) |
+| An action that lasts several steps | [`rel/options.py`](../rel/options.py) |
+| A run written down and read back | [`rel/recording.py`](../rel/recording.py) |
 | Solving exactly | [`rel/agents/dp.py`](../rel/agents/dp.py) |
 | The one step learners | [`rel/agents/td.py`](../rel/agents/td.py) |
 | The gradient engine | [`rel/nn/autograd.py`](../rel/nn/autograd.py) |
