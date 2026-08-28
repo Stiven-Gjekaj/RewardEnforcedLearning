@@ -8,6 +8,8 @@ mistake was.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from rel.cli import main, parse_settings, parse_value
@@ -45,6 +47,108 @@ class TestParsingASetting:
     def test_a_setting_with_no_equals_sign_says_so(self) -> None:
         with pytest.raises(SystemExit, match="no equals sign"):
             parse_settings(["epsilon"])
+
+
+class TestAGridFromAFile:
+    """`--env-file` in place of `--env`."""
+
+    LAYOUT = (
+        "# The cliff walk of Sutton and Barto, example 6.6.\n"
+        "name: cliff\n"
+        "summary: Twelve by four.\n"
+        "step_reward: -1\n"
+        "pit_reward: -100\n"
+        "max_episode_steps: 500\n"
+        "\n"
+        "............\n"
+        "............\n"
+        "............\n"
+        "SXXXXXXXXXXG\n"
+    )
+
+    def _written(self, tmp_path: Path) -> str:
+        path = tmp_path / "cliff.txt"
+        path.write_text(self.LAYOUT, encoding="utf-8")
+        return str(path)
+
+    def test_it_builds_a_grid_from_a_file(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert (
+            main(["solve", "--env-file", self._written(tmp_path), "--no-colour"]) == 0
+        )
+        assert "best possible return  -13.0000" in capsys.readouterr().out
+
+    def test_the_file_and_the_built_in_grid_agree(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # The same layout and the same rewards, so the same exact answer.
+        main(["solve", "--env-file", self._written(tmp_path), "--no-colour"])
+        from_file = capsys.readouterr().out
+        main(["solve", "--env", "cliff", "--no-colour"])
+        built_in = capsys.readouterr().out
+
+        def numbers(text: str) -> list[str]:
+            return [
+                line.split()[-1]
+                for line in text.splitlines()
+                if line.startswith(("states", "actions", "sweeps", "best possible"))
+            ]
+
+        assert numbers(from_file) == numbers(built_in)
+
+    def test_an_agent_can_be_trained_on_one(self, tmp_path: Path) -> None:
+        assert (
+            main(
+                [
+                    "train",
+                    "q-learning",
+                    "--env-file",
+                    self._written(tmp_path),
+                    "--episodes",
+                    "20",
+                    "--quiet",
+                ]
+            )
+            == 0
+        )
+
+    def test_a_setting_on_the_command_line_wins_over_the_file(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        main(
+            [
+                "solve",
+                "--env-file",
+                self._written(tmp_path),
+                "--env-set",
+                "step_reward=-2",
+                "--no-colour",
+            ]
+        )
+        assert "best possible return  -26.0000" in capsys.readouterr().out
+
+    def test_naming_both_is_refused(self, tmp_path: Path) -> None:
+        with pytest.raises(SystemExit):
+            main(["solve", "--env", "cliff", "--env-file", self._written(tmp_path)])
+
+    def test_naming_neither_is_refused(self) -> None:
+        with pytest.raises(SystemExit):
+            main(["solve"])
+
+    def test_a_bad_header_names_the_line(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        path = tmp_path / "wrong.txt"
+        path.write_text("name: x\ngravity: 9.8\n\nSG\n", encoding="utf-8")
+        assert main(["solve", "--env-file", str(path), "--no-colour"]) == 2
+        assert "line 2" in capsys.readouterr().err
+
+    def test_a_file_that_is_not_there_says_so(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert main(["solve", "--env-file", "nowhere.txt", "--no-colour"]) == 2
+        assert "cannot be read" in capsys.readouterr().err
 
 
 class TestList:

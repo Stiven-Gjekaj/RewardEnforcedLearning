@@ -45,6 +45,7 @@ from rel.agents.base import Agent
 from rel.agents.dp import DidNotSettleError, evaluate_policy, value_iteration
 from rel.core import Env, TabularEnv
 from rel.envs import ENVIRONMENTS
+from rel.envs.gridfile import read as read_grid
 from rel.envs.gridworld import GridWorld
 from rel.metrics import summarise
 from rel.rng import Rng
@@ -99,20 +100,30 @@ def parse_settings(pairs_given: Sequence[str] | None) -> dict[str, Any]:
 
 
 def build(
-    environment: str,
+    environment: str | None,
     agent_name: str | None,
     seed: int,
     env_settings: dict[str, Any],
     agent_settings: dict[str, Any],
+    env_file: str | None = None,
 ) -> tuple[Env[Any], Agent[Any] | None]:
     """Build the environment and the agent from one seed.
 
     They take different streams of the same seed. That is what lets two agents
     meet the same environment: the number of times one of them draws does not
     move what the other one faces.
+
+    `env_file` is a grid written in a text file rather than named in the
+    registry. It takes the same settings, so a reader can start from somebody
+    else's grid and change one number without editing the file.
     """
     root = Rng(seed)
-    env = ENVIRONMENTS.make(environment, root.stream("env"), **env_settings)
+    if env_file is not None:
+        env: Env[Any] = read_grid(env_file).build(root.stream("env"), **env_settings)
+    elif environment is not None:
+        env = ENVIRONMENTS.make(environment, root.stream("env"), **env_settings)
+    else:
+        raise ValueError("An environment is named with --env or --env-file.")
 
     agent = None
     if agent_name is not None:
@@ -344,7 +355,9 @@ def _settings_text(options: dict[str, Any]) -> str:
 
 def command_solve(args: argparse.Namespace) -> int:
     palette = palette_for(forced=args.colour)
-    env, _ = build(args.env, None, args.seed, parse_settings(args.env_set), {})
+    env, _ = build(
+        args.env, None, args.seed, parse_settings(args.env_set), {}, args.env_file
+    )
 
     if not isinstance(env, TabularEnv):
         print(
@@ -408,6 +421,7 @@ def command_train(args: argparse.Namespace) -> int:
         args.seed,
         parse_settings(args.env_set),
         parse_settings(args.set),
+        args.env_file,
     )
     assert agent is not None
     discount = resolve_discount(args, env)
@@ -439,7 +453,7 @@ def command_train(args: argparse.Namespace) -> int:
     seconds = time.perf_counter() - started
 
     watch_env, _ = build(
-        args.env, None, args.seed + 1, parse_settings(args.env_set), {}
+        args.env, None, args.seed + 1, parse_settings(args.env_set), {}, args.env_file
     )
     watched = evaluate(watch_env, agent, args.watch, discount=discount)
     exact = exact_report(env, agent, discount)
@@ -500,7 +514,9 @@ def command_compare(args: argparse.Namespace) -> int:
 
         for run in range(args.runs):
             seed = args.seed + run
-            env, agent = build(args.env, name, seed, env_settings, settings)
+            env, agent = build(
+                args.env, name, seed, env_settings, settings, args.env_file
+            )
             assert agent is not None
 
             discount = resolve_discount(args, env)
@@ -580,6 +596,7 @@ def command_demo(args: argparse.Namespace) -> int:
         args.seed,
         parse_settings(args.env_set),
         parse_settings(args.set),
+        args.env_file,
     )
     assert agent is not None
 
@@ -587,7 +604,7 @@ def command_demo(args: argparse.Namespace) -> int:
         train(env, agent, args.episodes, discount=resolve_discount(args, env))
 
     watch_env, _ = build(
-        args.env, None, args.seed + 1, parse_settings(args.env_set), {}
+        args.env, None, args.seed + 1, parse_settings(args.env_set), {}, args.env_file
     )
     observation = watch_env.reset()
     agent.start_episode()
@@ -650,7 +667,22 @@ def command_gaming(args: argparse.Namespace) -> int:
 # -- Wiring ------------------------------------------------------------------
 
 
-def _add_common(parser: argparse.ArgumentParser) -> None:
+def _add_common(parser: argparse.ArgumentParser, *, one_env: bool = True) -> None:
+    # One environment, named or written down. A grid in a file takes the same
+    # `--env-set` overrides as a built in one, so a reader can start from
+    # somebody else's file and change one number without editing it.
+    #
+    # `rel gaming` runs all three gaming environments and names none, which is
+    # why this is a choice rather than always added.
+    if one_env:
+        source = parser.add_mutually_exclusive_group(required=True)
+        source.add_argument("--env", help="the name of a built in environment")
+        source.add_argument(
+            "--env-file",
+            metavar="PATH",
+            help="a grid written in a text file, in place of --env",
+        )
+
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument(
         "--env-set",
@@ -723,13 +755,11 @@ def build_parser() -> argparse.ArgumentParser:
     solving = commands.add_parser(
         "solve", help="the best possible policy, worked out from the model"
     )
-    solving.add_argument("--env", required=True)
     _add_common(solving)
     solving.set_defaults(run=command_solve)
 
     training = commands.add_parser("train", help="train one agent and report")
     training.add_argument("agent")
-    training.add_argument("--env", required=True)
     training.add_argument("--episodes", type=int, default=DEFAULT_EPISODES)
     training.add_argument(
         "--watch",
@@ -761,7 +791,6 @@ def build_parser() -> argparse.ArgumentParser:
         "compare", help="run several agents on one environment"
     )
     comparing.add_argument("agents", nargs="+")
-    comparing.add_argument("--env", required=True)
     comparing.add_argument("--episodes", type=int, default=DEFAULT_EPISODES)
     comparing.add_argument("--runs", type=int, default=5, help="how many seeds")
     comparing.add_argument("--set", action="append", metavar="NAME=VALUE")
@@ -771,7 +800,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     watching = commands.add_parser("demo", help="watch an agent play, step by step")
     watching.add_argument("agent")
-    watching.add_argument("--env", required=True)
     watching.add_argument("--episodes", type=int, default=300)
     watching.add_argument("--steps", type=int, default=200)
     watching.add_argument("--delay", type=float, default=0.12)
@@ -801,7 +829,7 @@ def build_parser() -> argparse.ArgumentParser:
         dest="pressure_episodes",
         help="episodes at each rung of that walk",
     )
-    _add_common(gaming)
+    _add_common(gaming, one_env=False)
     gaming.set_defaults(run=command_gaming)
 
     return parser
