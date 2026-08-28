@@ -1,0 +1,216 @@
+"""Q-learning whose choices are options rather than primitive actions.
+
+An option lasts several steps, so the return collected while one runs covers
+several rewards and the state it hands back in is several steps away. The
+update is the same shape as Q-learning with that substituted in:
+
+    Q(s, o) += step * (R + discount^k * max Q(s', o') - Q(s, o))
+
+`R` is the discounted reward collected over the k steps the option ran, and
+`s'` is where it stopped. At k of one this is Q-learning exactly, which is what
+makes an agent holding only primitive options the agent it came from.
+
+## The table is over options, not actions
+
+`self.actions` here is the space of options and `self.moves` is the space of
+primitive actions the environment takes. Everything inherited from
+`TabularAgent` then works on the option table without changing: a row is one
+number per option, and the exploring policy explores over options.
+
+What is not inherited is `act` and `greedy`, because the environment takes a
+primitive action. `act` runs the option it chose until the option stops.
+`greedy` does not: it reports the action of the best option available here and
+keeps no running state at all, because the renderer asks it about every cell of
+a grid in any order, and an evaluation run that carried a half finished option
+into an unrelated cell would report a policy nobody followed.
+
+## Not every option can start everywhere
+
+A hallway option covers one room. So the best value of a state is the best over
+the options that can start there, and an option that cannot is not a choice
+that was passed over. Reading the whole row instead would let an untouched
+entry for an option belonging to another room win the maximum, and on a grid
+where every step costs something that entry is the largest number in the table.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+
+from rel.agents.base import TabularAgent, Transition
+from rel.options import Option
+from rel.rng import Rng
+from rel.schedules import Schedule
+from rel.spaces import Discrete
+
+
+class OptionsQ(TabularAgent[int]):
+    """Q-learning over a fixed set of options."""
+
+    def __init__(
+        self,
+        rng: Rng,
+        actions: Discrete,
+        options: Sequence[Option],
+        *,
+        step_size: float | Schedule = 0.1,
+        discount: float = 0.95,
+        epsilon: float | Schedule = 0.1,
+        optimism: float = 0.0,
+    ) -> None:
+        if not options:
+            raise ValueError("An agent over options needs at least one option.")
+
+        super().__init__(
+            rng,
+            Discrete(len(options)),
+            step_size=step_size,
+            discount=discount,
+            epsilon=epsilon,
+            optimism=optimism,
+        )
+        #: The primitive actions the environment takes. `self.actions` is the
+        #: space of options, which is what the table is over.
+        self.moves = actions
+        self.options = list(options)
+
+        #: The option running now, where it started, what it has collected and
+        #: how long it has been going.
+        self.running: int | None = None
+        self.began_at = 0
+        self.collected = 0.0
+        self.length = 0
+
+        #: How many options have run to the end, and how many steps they took
+        #: between them. Their ratio is what says whether the agent is using
+        #: the long options or only the primitive ones.
+        self.finished = 0
+        self.steps_in_options = 0
+
+    # -- Which options are on offer -----------------------------------------
+
+    def available(self, observation: int) -> list[int]:
+        """The options that can start here, by their place in the list."""
+        return [
+            index
+            for index, option in enumerate(self.options)
+            if option.can_start(observation)
+        ]
+
+    def best_option(self, observation: int) -> int | None:
+        """The best option that can start here, ties broken by drawing."""
+        choices = self.available(observation)
+        if not choices:
+            return None
+
+        row = self.peek(observation)
+        best = max(row[index] for index in choices)
+        tied = [index for index in choices if row[index] == best]
+        if len(tied) == 1:
+            return tied[0]
+        return tied[self.rng.below(len(tied))]
+
+    def best_value(self, observation: int) -> float:
+        """The best value over the options that can start here.
+
+        A state no option can start in is worth nothing, which is the right
+        answer for the goal cell and the only state that happens in.
+        """
+        choices = self.available(observation)
+        if not choices:
+            return 0.0
+        row = self.peek(observation)
+        return max(row[index] for index in choices)
+
+    def action_values(self, observation: int) -> Sequence[float] | None:
+        choices = self.available(observation)
+        if not choices:
+            return None
+        row = self.peek(observation)
+        return [row[index] for index in choices]
+
+    # -- Acting --------------------------------------------------------------
+
+    def act(self, observation: int) -> int:
+        if self.running is None:
+            self.running = self._choose(observation)
+            self.began_at = observation
+            self.collected = 0.0
+            self.length = 0
+        return self.options[self.running].act(observation)
+
+    def _choose(self, observation: int) -> int:
+        choices = self.available(observation)
+        if not choices:
+            raise ValueError(
+                f"No option of this agent can start in state {observation}."
+            )
+
+        if self.rng.chance(self.current_epsilon()):
+            return choices[self.rng.below(len(choices))]
+
+        chosen = self.best_option(observation)
+        assert chosen is not None
+        return chosen
+
+    def greedy(self, observation: int) -> int:
+        """The action of the best option here, with no running state.
+
+        This is one step of the best option rather than the option run to the
+        end. An evaluation asks again at every step and gets the same answer
+        while the option stays the best one, and the renderer can ask about any
+        cell in any order without disturbing a run.
+        """
+        chosen = self.best_option(observation)
+        if chosen is None:
+            return self.moves.start
+        return self.options[chosen].act(observation)
+
+    # -- Learning ------------------------------------------------------------
+
+    def start_episode(self) -> None:
+        self.running = None
+
+    def observe(self, transition: Transition[int]) -> None:
+        super().observe(transition)
+        if self.running is None:
+            return
+
+        option = self.options[self.running]
+        self.collected += self.discount**self.length * transition.reward
+        self.length += 1
+
+        if transition.done or option.stops_at(transition.next_observation):
+            self._learn(transition)
+            self.running = None
+
+    def _learn(self, transition: Transition[int]) -> None:
+        assert self.running is not None
+
+        # A cut off episode is not a finished one. The state the option was
+        # stopped in still has a future, and the option gets credit for it.
+        target = self.collected
+        if not transition.terminated:
+            target += self.discount**self.length * self.best_value(
+                transition.next_observation
+            )
+
+        row = self.values(self.began_at)
+        row[self.running] += self.current_step_size() * (target - row[self.running])
+
+        self.finished += 1
+        self.steps_in_options += self.length
+
+    def end_episode(self) -> None:
+        super().end_episode()
+        self.running = None
+
+    def __repr__(self) -> str:
+        return (
+            f"{type(self).__name__}({len(self.options)} options, "
+            f"step_size={self.current_step_size():g}, "
+            f"epsilon={self.current_epsilon():g})"
+        )
+
+
+__all__ = ["OptionsQ"]
