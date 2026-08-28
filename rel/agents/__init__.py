@@ -54,6 +54,7 @@ from rel.agents.monte_carlo import MonteCarloControl
 from rel.agents.policy import ActorCritic, Reinforce
 from rel.agents.td import DoubleQ, ExpectedSarsa, NStepSarsa, QLearning, Sarsa
 from rel.agents.tiles import TileCoder
+from rel.agents.traces import Kind, SarsaLambda, WatkinsQLambda
 from rel.core import Env, TabularEnv
 from rel.registry import Entry, Registry
 from rel.rng import Rng
@@ -135,6 +136,38 @@ def _n_step(
         epsilon=epsilon,
         optimism=optimism,
     )
+
+
+def _traced(cls: type[SarsaLambda[Any]]) -> AgentBuilder:
+    """A builder for the two agents that keep traces.
+
+    The step size is 0.2 rather than the 0.5 the other tabular agents use. A
+    trace writes one error into many cells at once, so the same step size moves
+    a great deal more of the table per step than it does without one.
+    """
+
+    def build(
+        rng: Rng,
+        env: Env[Any],
+        trace_decay: float = 0.8,
+        traces: Kind = "replacing",
+        step_size: float | Schedule = 0.2,
+        discount: float = 1.0,
+        epsilon: float | Schedule = 0.1,
+        optimism: float = 0.0,
+    ) -> Agent[Any]:
+        return cls(
+            rng,
+            env.action_space,
+            trace_decay=trace_decay,
+            traces=traces,
+            step_size=step_size,
+            discount=discount,
+            epsilon=epsilon,
+            optimism=optimism,
+        )
+
+    return build
 
 
 def _monte_carlo(
@@ -346,6 +379,18 @@ AGENTS: Registry[Agent[Any]] = Registry(
             "SARSA that waits n steps before deciding what a step was worth.",
             _n_step,
             tags=("tabular", "on-policy"),
+        ),
+        Entry(
+            "sarsa-lambda",
+            "SARSA with a trace on every cell, which fades rather than stops.",
+            _traced(SarsaLambda),
+            tags=("tabular", "on-policy"),
+        ),
+        Entry(
+            "q-lambda",
+            "Q-learning with traces, cut whenever the agent leaves its policy.",
+            _traced(WatkinsQLambda),
+            tags=("tabular", "off-policy"),
         ),
         Entry(
             "monte-carlo",
