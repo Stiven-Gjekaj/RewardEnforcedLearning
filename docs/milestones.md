@@ -134,16 +134,27 @@ evaluation episodes ran out of steps. `optimism` is an argument, and
 
 ## Open questions
 
-**Why does one cliff walk seed of twelve still never reach the goal?** The
-agent never sees the goal on that seed, so no rule for sharing out a return
-can help. The entropy bonus is what holds the policy wide enough to find it,
-and raising the default from 0.01 to 0.05 took the count from three seeds to
-one. Whether the last one wants more entropy, more episodes, or something that
-is not a knob at all is not measured.
+None at the moment. The two that were here are below, with what the
+measurement said.
 
 ---
 
 ## Questions that were open, and what the measurement said
+
+**Why does one cliff walk seed of twelve still never reach the goal?** It does,
+at episode 784. The measurement that called it lost runs for four hundred, and
+by a thousand every seed of the twelve has reached the goal.
+
+The three possibilities were more entropy, more episodes, or something that is
+not a knob at all. It is more episodes. Entropy does move that seed, and a long
+way: it first reaches the goal at 784 at the default of 0.05, at 172 at 0.1, at
+92 at 0.2 and at 25 at 0.4. But over all twelve seeds raising the default buys
+nothing reliable. At 0.1 the one seed whose greedy policy never finishes goes
+away and at 0.2 it comes back, so the dial does not control that, and both
+settings cost 8 and 27 return while learning and leave the finished policy no
+better. The default stays at 0.05 and
+[algorithms.md](algorithms.md#the-seed-that-never-reached-the-goal-reaches-it-at-episode-784)
+has the tables.
 
 **Should the digest cover the agent as well as the environment?** Neither, and
 both. Merging the two would have changed what the existing digest means, and

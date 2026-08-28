@@ -1021,6 +1021,56 @@ Nothing went wrong in the first measurement. It is what six samples of a noisy
 thing look like, and the mistake would have been to publish it. The number of
 seeds behind a claim on this page is now part of the claim.
 
+#### The seed that never reached the goal reaches it at episode 784
+
+```console
+$ python scripts/measure_lost_seed.py --entropies 0.05 0.1 0.2 --ladder-all
+```
+
+The table above says one seed of twelve does not reach the goal. It says that
+about four hundred episodes.
+
+| episodes | not there yet | which seeds |
+| ---: | ---: | --- |
+| 500 | 1 | 10 |
+| 1000 | 0 | |
+| 2000 | 0 | |
+
+*Twelve seeds at the default entropy. Each is run for 2000 episodes once and
+read at every budget.*
+
+Seed 10 reaches the goal at episode 784 and ends at -20.2 by episode 2000. It
+is not a seed that cannot learn. It is a seed the budget was too short for.
+
+The milestones left three possibilities open: more entropy, more episodes, or
+something that is not a knob at all. On seed 10 the entropy bonus moves it a
+long way, because that is the dial that holds the policy wide enough to wander
+as far as the goal. First reached at episode 784 at the default of 0.05, 172 at
+0.1, 92 at 0.2 and 25 at 0.4. Past 0.1 the policy it ends with gets worse
+instead: -17.8 at 0.1, -26.0 at 0.2 and -173.9 at 0.4.
+
+So the interesting question is not what rescues seed 10 but what the default
+should be, and that is a question about all twelve:
+
+| entropy | first goal, median | last 100 | exact value | stuck |
+| ---: | ---: | ---: | ---: | ---: |
+| **0.05** | 48 | **-20.0** | **-13.18** | 1 |
+| 0.1 | **35** | -27.9 | -13.67 | **0** |
+| 0.2 | 37 | -46.6 | -13.55 | 1 |
+
+*Twelve seeds, a thousand episodes. Every seed reaches the goal at every
+setting, so the first column is a median over all twelve. `stuck` counts the
+seeds whose greedy policy never reaches an ending.*
+
+**The default stays at 0.05.** Raising it to 0.1 removes the one stuck seed and
+0.2 brings it back, so the stuck column is not something the dial controls, and
+both settings cost 8 and 27 return while learning and leave the finished policy
+no better. This is the same trade as the 0.01 to 0.05 move above, one notch
+further along, and past 0.05 the trade stops paying.
+
+The answer to the open question is the dull one: **that seed wants more
+episodes.** The measurement that called it lost runs for four hundred.
+
 ### They are hundreds of times slower
 
 Two hundred episodes of the cliff walk, seed 1:
@@ -1096,6 +1146,7 @@ it off.
 | The tile coder offsets | `python scripts/measure_tiling_offsets.py` |
 | What importance sampling costs | `python scripts/measure_importance.py` |
 | Ordered replay against uniform | `python scripts/measure_sweeping.py --episodes 400` |
+| The seed that gets lost | `python scripts/measure_lost_seed.py --ladder-all` |
 | What an option costs | `python scripts/measure_options.py --runs 20` |
 | Any one or two settings | `rel sweep <agent> --env <env> --over name=a,b,c` |
 | Specification gaming | `rel gaming` |
