@@ -30,21 +30,32 @@ from __future__ import annotations
 import argparse
 import statistics
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from rel.agents import AGENTS
+from rel.agents.dp import evaluate_policy
 from rel.envs import ENVIRONMENTS
 from rel.rng import Rng
 from rel.training import train
 from rel.ui.table import table
 
 
-def run(
-    seed: int, episodes: int, entropy: float | None
-) -> tuple[int | None, int, float]:
-    """When this seed first reached the goal, how often, and what it ended at."""
+@dataclass(frozen=True, slots=True)
+class Run:
+    """What one seed did."""
+
+    #: The episode the goal was first reached in, or `None` if it never was.
+    first_goal: int | None
+    #: The mean return of the last hundred episodes.
+    final: float
+    #: The exact value of the greedy policy, or `None` if it never finishes.
+    exact: float | None
+
+
+def run(seed: int, episodes: int, entropy: float | None) -> Run:
     root = Rng(seed)
     env = ENVIRONMENTS.make("cliff", root.stream("env"))
     settings = {} if entropy is None else {"entropy": entropy}
@@ -54,10 +65,14 @@ def run(
     first = next(
         (number for number, ended in enumerate(record.terminated) if ended), None
     )
-    return (
-        None if first is None else first + 1,
-        sum(record.terminated),
-        record.final(100),
+
+    policy = [agent.greedy(state) for state in range(env.observation_space.n)]
+    report = evaluate_policy(env, policy, discount=1.0)
+
+    return Run(
+        first_goal=None if first is None else first + 1,
+        final=record.final(100),
+        exact=report.start_value if report.reaches_end else None,
     )
 
 
@@ -89,7 +104,7 @@ def main() -> int:
 
     first_goal: dict[int, int | None] = {}
     for seed in range(1, args.runs + 1):
-        first_goal[seed], _, _ = run(seed, longest, None)
+        first_goal[seed] = run(seed, longest, None).first_goal
 
     rows = []
     for budget in args.budgets:
@@ -129,30 +144,42 @@ def main() -> int:
     ladder = []
     for entropy in args.entropies:
         results = [run(seed, args.ladder_episodes, entropy) for seed in seeds]
-        arrived = [first for first, _, _ in results if first is not None]
+        arrived = [got.first_goal for got in results if got.first_goal is not None]
+        exact = [got.exact for got in results if got.exact is not None]
         lost = len(results) - len(arrived)
-        finals = [final for _, _, final in results]
+        stuck = len(results) - len(exact)
+
         ladder.append(
             (
                 f"{entropy:g}",
                 f"{statistics.median(arrived):.0f}" if arrived else "never",
                 str(lost) if lost else "",
-                f"{statistics.mean(finals):.1f}",
+                f"{statistics.mean(got.final for got in results):.1f}",
+                f"{statistics.mean(exact):.2f}" if exact else "-",
+                str(stuck) if stuck else "",
             )
         )
     print()
     for line in table(
-        ["entropy", "first goal", "never got there", "last 100"],
+        [
+            "entropy",
+            "first goal",
+            "never got there",
+            "last 100",
+            "exact value",
+            "stuck",
+        ],
         ladder,
-        align=["right", "right", "right", "right"],
+        align=["right"] * 6,
     ):
         print(f"  {line}")
 
     print(
         f"\n'first goal' is the median episode the goal was first reached in, "
         f"over\n{args.ladder_episodes} episodes, and 'last 100' is the mean "
-        f"return of the last hundred.\nA seed that never got there is left "
-        f"out of the first and counted in the second."
+        f"return of the last hundred.\n'exact value' is the value of the "
+        f"greedy policy from the model, over the seeds\nwhose policy reaches "
+        f"an ending, and 'stuck' counts the rest."
     )
     return 0
 
