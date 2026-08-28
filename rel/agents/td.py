@@ -356,8 +356,11 @@ class NStepSarsa(TabularAgent[ObsT]):
         row[index] += self.current_step_size() * (total - row[index])
 
     def _value_at(self, index: int) -> float:
+        # `peek` rather than `values`. The last entry of the buffer can be the
+        # state a step limit stopped in, which the agent arrives at and never
+        # chooses an action from, and a writer here would give it a row.
         offset = self._actions[index] - self.actions.start
-        return self.values(self._states[index])[offset]
+        return self.peek(self._states[index])[offset]
 
 
 __all__ = ["DoubleQ", "ExpectedSarsa", "NStepSarsa", "QLearning", "Sarsa"]
