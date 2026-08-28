@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-1330_passing-427819?style=for-the-badge" alt="1330 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-1355_passing-427819?style=for-the-badge" alt="1355 tests passing"/>
 </p>
 
 <p align="center">
@@ -166,13 +166,19 @@ Then:
 $ rel list                                       # every environment and agent
 $ rel train q-learning --env cliff --seed 7      # train one, and report
 $ rel compare sarsa q-learning --env cliff       # several, side by side
+$ rel sweep n-step-sarsa --env cliff \
+      --over n=1,2,4 --over step_size=0.1,0.5    # vary settings, print the table
 $ rel solve --env cliff                          # the best possible policy
 $ rel demo tile-sarsa --env mountaincar          # watch one play
 $ rel gaming                                     # the demonstration above
+$ rel train q-learning --env cliff --out run.gz  # write the run down
+$ rel replay run.gz                              # and read it back
 ```
 
 Every run is reproducible from its seed, and every run prints a digest of its
 own transitions so that two runs can be compared without comparing prose.
+`--out` writes the transitions themselves, and `rel replay` checks them against
+that digest rather than trusting it.
 
 ---
 
@@ -318,11 +324,11 @@ scripts/            the scripts that produce the numbers in the documentation
 | Agents | 17 | 4431 |
 | Network | 4 | 672 |
 | Running | 5 | 1020 |
-| Interface | 6 | 937 |
-| Command line | 3 | 1370 |
-| **Total** | **47** | **11396** |
+| Interface | 6 | 1018 |
+| Command line | 3 | 1551 |
+| **Total** | **47** | **11658** |
 
-Not counting 9032 lines of tests and 1377 of measurement scripts. Run
+Not counting 9370 lines of tests and 1377 of measurement scripts. Run
 `python scripts/lines.py` for the current numbers.
 
 Three rules about who may import whom are enforced by a test that reads the
@@ -343,7 +349,7 @@ import statements of every module:
 $ pytest
 ```
 
-1330 tests. Some of what they cover, and why each one is there rather than the
+1355 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A

@@ -1035,6 +1035,54 @@ a network in pure Python.
 
 ---
 
+## Sweeping without writing a script
+
+Every table on this page began as a script. `rel sweep` varies one or two
+settings and prints the table directly.
+
+```console
+$ rel sweep n-step-sarsa --env cliff --over n=1,2,4 --over step_size=0.1,0.5 \
+      --episodes 500 --runs 10
+```
+
+```
+n  step_size  last 100  error     exact value  stuck
+-  ---------  --------  --------  -----------  -----
+1        0.1    -21.84  +/- 0.74       -15.20
+1        0.5    -26.89  +/- 1.77       -17.00      2
+2        0.1    -22.13  +/- 0.68       -16.00
+2        0.5    -30.10  +/- 2.74       -17.00      5
+4        0.1    -22.53  +/- 1.14       -17.00      1
+4        0.5    -49.79  +/- 8.73       -18.67      4
+```
+
+Two settings give every pair, and that is the point of sweeping two rather than
+one at a time. The trade in [How many steps, and how big a step](#how-many-steps-and-how-big-a-step)
+is only visible in the grid: at a step size of 0.1 the three values of `n` are
+within noise of each other, and at 0.5 reaching further back costs more with
+every step it reaches.
+
+`--each-seed` prints the number from every seed behind each row. A mean over
+runs that vary a great deal has been the wrong answer twice on this page.
+
+## The band on the compare chart
+
+```console
+$ rel compare sarsa q-learning --env cliff --runs 10
+```
+
+The chart draws the mean over the seeds, and behind it the best and the worst
+seed at each point. On the cliff walk that line is smooth while the runs under
+it swing by a hundred and fifty, and the band is the only thing on the picture
+that says so.
+
+The band is its two edges rather than the filled area between them. Filled
+reads better in colour and it is the same braille dot as a curve, so with
+colour switched off it swallows the line it is the spread of. `--no-band` turns
+it off.
+
+---
+
 ## Where the numbers on this page can be checked
 
 | Table | Command |
@@ -1047,6 +1095,7 @@ a network in pure Python.
 | What importance sampling costs | `python scripts/measure_importance.py` |
 | Ordered replay against uniform | `python scripts/measure_sweeping.py --episodes 400` |
 | What an option costs | `python scripts/measure_options.py --runs 20` |
+| Any one or two settings | `rel sweep <agent> --env <env> --over name=a,b,c` |
 | Specification gaming | `rel gaming` |
 | One run in detail | `rel train q-learning --env cliff --seed 7` |
 | Two agents side by side | `rel compare sarsa q-learning --env cliff` |
