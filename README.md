@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-1287_passing-427819?style=for-the-badge" alt="1287 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-1330_passing-427819?style=for-the-badge" alt="1330 tests passing"/>
 </p>
 
 <p align="center">
@@ -302,6 +302,7 @@ rel/agents/         twenty four agents. Never import an environment.
   policy.py         REINFORCE and an actor critic
 rel/options.py      an action that lasts several steps, built from a model
 rel/pressure.py     following a fixed policy with a dial on how hard it tries
+rel/recording.py    a run written down step by step, and read back
 rel/nn/             reverse mode gradients, two networks, SGD and Adam
 rel/training.py     the loop, the record and the run digest
 rel/ui/             braille charts, grid pictures, tables. Draws only.
@@ -316,12 +317,12 @@ scripts/            the scripts that produce the numbers in the documentation
 | Environments | 7 | 2079 |
 | Agents | 17 | 4431 |
 | Network | 4 | 672 |
-| Running | 4 | 654 |
+| Running | 5 | 1020 |
 | Interface | 6 | 937 |
-| Command line | 3 | 1269 |
-| **Total** | **46** | **10929** |
+| Command line | 3 | 1370 |
+| **Total** | **47** | **11396** |
 
-Not counting 8572 lines of tests and 1376 of measurement scripts. Run
+Not counting 9032 lines of tests and 1377 of measurement scripts. Run
 `python scripts/lines.py` for the current numbers.
 
 Three rules about who may import whom are enforced by a test that reads the
@@ -342,7 +343,7 @@ import statements of every module:
 $ pytest
 ```
 
-1287 tests. Some of what they cover, and why each one is there rather than the
+1330 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A
