@@ -90,7 +90,7 @@ class MonteCarloControl(TabularAgent[ObsT]):
             # The tail the step limit took away, filled in with what the agent
             # believes. See the note in the class docstring.
             shares = self.policy_probabilities(last.next_observation)
-            row = self.values(last.next_observation)
+            row = self.peek(last.next_observation)
             total = sum(share * value for share, value in zip(shares, row, strict=True))
 
         first_seen: dict[tuple[ObsT, int], int] = {}
