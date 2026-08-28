@@ -46,6 +46,7 @@ from __future__ import annotations
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 
+from rel.core import TabularEnv
 from rel.spaces import Discrete
 
 
@@ -107,4 +108,91 @@ def primitives(actions: Discrete, states: Collection[int]) -> list[Option]:
     return [primitive(action, states) for action in actions]
 
 
-__all__ = ["Option", "primitive", "primitives"]
+# -- Reading the rooms off a model -------------------------------------------
+
+
+def steps_between(env: TabularEnv) -> dict[int, set[int]]:
+    """Which states each state can reach in one step, ignoring itself.
+
+    Built from the model rather than from a layout, so nothing here has to
+    know what shape the environment is. A branch that lands where it started
+    is dropped, because walking into a wall is not a way to somewhere.
+    """
+    edges: dict[int, set[int]] = {}
+    terminal = env.terminal_states()
+
+    for state in range(env.observation_space.n):
+        if state in terminal:
+            continue
+        landings = {
+            outcome.observation
+            for action in env.action_space
+            for outcome in env.transitions(state, action)
+            if outcome.observation != state and outcome.observation not in terminal
+        }
+        if landings:
+            edges[state] = landings
+
+    return edges
+
+
+def reachable(env: TabularEnv) -> set[int]:
+    """Every state the agent can actually be in, walking out from the start.
+
+    Not every state in the model is one of these. Walking into the cliff sends
+    the agent back to the start, so the eleven cliff cells are described by the
+    model and never stood in, and counting each of them as a room of its own
+    would be counting places nobody goes.
+    """
+    edges = steps_between(env)
+    found = {state for _, state in env.start_states()}
+    stack = list(found)
+
+    while stack:
+        state = stack.pop()
+        for landed in edges.get(state, ()):
+            if landed not in found:
+                found.add(landed)
+                stack.append(landed)
+
+    return found
+
+
+def rooms(env: TabularEnv, doors: Collection[int]) -> list[frozenset[int]]:
+    """What the model falls into when the doors are taken out of it.
+
+    The pieces come back in the order of their lowest numbered state, so two
+    runs on the same grid name the same room the same way.
+    """
+    edges = steps_between(env)
+    inside = (set(edges) & reachable(env)) - set(doors)
+
+    found: list[frozenset[int]] = []
+    seen: set[int] = set()
+
+    for start in sorted(inside):
+        if start in seen:
+            continue
+        piece: set[int] = set()
+        stack = [start]
+        seen.add(start)
+        while stack:
+            state = stack.pop()
+            piece.add(state)
+            for landed in edges[state]:
+                if landed in inside and landed not in seen:
+                    seen.add(landed)
+                    stack.append(landed)
+        found.append(frozenset(piece))
+
+    return found
+
+
+__all__ = [
+    "Option",
+    "primitive",
+    "primitives",
+    "reachable",
+    "rooms",
+    "steps_between",
+]

@@ -11,7 +11,15 @@ from __future__ import annotations
 
 import pytest
 
-from rel.options import Option, primitive, primitives
+from rel.envs.classic import (
+    cliff_walk,
+    dyna_maze,
+    four_rooms,
+    frozen_lake,
+    windy_grid,
+)
+from rel.options import Option, primitive, primitives, reachable, rooms, steps_between
+from rel.rng import Rng
 from rel.spaces import Discrete
 
 
@@ -81,3 +89,56 @@ class TestAnOptionThatStopsAfterOneStepIsAnAction:
     def test_an_action_space_that_does_not_start_at_zero_is_followed(self) -> None:
         built = primitives(Discrete(3, start=5), [0])
         assert [option.act(0) for option in built] == [5, 6, 7]
+
+
+class TestReadingTheRoomsOffAModel:
+    def test_a_step_that_lands_where_it_started_is_not_a_way_somewhere(self) -> None:
+        # Walking into a wall. The cell is not a neighbour of itself, and
+        # counting it as one would join every room to itself.
+        env = four_rooms(Rng(1))
+        edges = steps_between(env)
+        assert all(state not in landings for state, landings in edges.items())
+
+    def test_the_cliff_cells_are_described_and_never_stood_in(self) -> None:
+        # Walking into the cliff sends the agent back to the start, so the
+        # model has these cells and no run ever holds one. Counting each as a
+        # room of its own would be counting places nobody goes.
+        env = cliff_walk(Rng(1))
+        stood_in = reachable(env)
+        assert len(stood_in) == 37
+        assert env.state_of(3, 5) not in stood_in
+
+    def test_the_four_rooms_grid_falls_into_four(self) -> None:
+        env = four_rooms(Rng(1))
+        assert sorted(len(part) for part in rooms(env, env.gaps())) == [20, 25, 25, 29]
+
+    def test_no_room_holds_a_doorway(self) -> None:
+        env = four_rooms(Rng(1))
+        doors = set(env.gaps())
+        assert all(not (part & doors) for part in rooms(env, env.gaps()))
+
+    def test_every_cell_is_in_a_room_or_a_doorway(self) -> None:
+        env = four_rooms(Rng(1))
+        doors = set(env.gaps())
+        held = set().union(*rooms(env, env.gaps())) | doors
+        assert held == reachable(env)
+
+    def test_taking_no_doors_out_leaves_one_piece(self) -> None:
+        env = four_rooms(Rng(1))
+        assert len(rooms(env, [])) == 1
+
+    @pytest.mark.parametrize(
+        "builder",
+        [cliff_walk, windy_grid, frozen_lake, dyna_maze],
+        ids=lambda b: b.__name__,
+    )
+    def test_a_grid_with_no_doors_between_rooms_is_one_room(self, builder) -> None:  # type: ignore[no-untyped-def]
+        # The maze is the interesting one here. It has four gaps and they are
+        # passages inside one room rather than doors between two, so taking
+        # them out leaves the grid in one piece and it gets no options.
+        env = builder(Rng(1))
+        assert len(rooms(env, env.gaps())) == 1
+
+    def test_the_rooms_come_back_in_a_stable_order(self) -> None:
+        env = four_rooms(Rng(1))
+        assert rooms(env, env.gaps()) == rooms(four_rooms(Rng(2)), env.gaps())
