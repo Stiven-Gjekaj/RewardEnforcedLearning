@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from rel.cli import main, parse_settings, parse_value
+from rel.cli import main, parse_over, parse_settings, parse_value, sweep_settings
 
 
 class TestParsingASetting:
@@ -149,6 +149,196 @@ class TestAGridFromAFile:
     ) -> None:
         assert main(["solve", "--env-file", "nowhere.txt", "--no-colour"]) == 2
         assert "cannot be read" in capsys.readouterr().err
+
+
+class TestSweeping:
+    """`rel sweep`, which varies one or two settings and prints the table."""
+
+    def test_the_values_go_through_the_same_reader_as_set(self) -> None:
+        # A sweep that handed an agent the string "0.1" would fail somewhere
+        # far away from here.
+        assert parse_over(["step_size=0.1,0.5"]) == [("step_size", [0.1, 0.5])]
+        assert parse_over(["n=1,2,4"]) == [("n", [1, 2, 4])]
+        assert parse_over(["hallways=on,off"]) == [("hallways", [True, False])]
+
+    def test_spaces_around_the_values_are_dropped(self) -> None:
+        assert parse_over([" n = 1, 2 "]) == [("n", [1, 2])]
+
+    def test_naming_no_values_is_refused(self) -> None:
+        with pytest.raises(SystemExit, match="names no values"):
+            parse_over(["step_size="])
+
+    def test_one_setting_gives_one_run_for_each_value(self) -> None:
+        assert sweep_settings([("n", [1, 2, 3])]) == [{"n": 1}, {"n": 2}, {"n": 3}]
+
+    def test_two_settings_give_every_pair(self) -> None:
+        # The point of sweeping two. The settings in this project trade
+        # against each other, and varying them one at a time misses that.
+        assert sweep_settings([("n", [1, 2]), ("step_size", [0.1, 0.5])]) == [
+            {"n": 1, "step_size": 0.1},
+            {"n": 1, "step_size": 0.5},
+            {"n": 2, "step_size": 0.1},
+            {"n": 2, "step_size": 0.5},
+        ]
+
+    def test_the_first_setting_varies_slowest(self) -> None:
+        pairs = sweep_settings([("a", [1, 2]), ("b", [1, 2])])
+        assert [chosen["a"] for chosen in pairs] == [1, 1, 2, 2]
+
+    def test_no_setting_at_all_gives_one_empty_run(self) -> None:
+        assert sweep_settings([]) == [{}]
+
+    def test_it_builds_one_agent_for_each_value(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert (
+            main(
+                [
+                    "sweep",
+                    "q-learning",
+                    "--env",
+                    "cliff",
+                    "--over",
+                    "step_size=0.1,0.5",
+                    "--episodes",
+                    "20",
+                    "--runs",
+                    "2",
+                    "--no-colour",
+                ]
+            )
+            == 0
+        )
+        printed = capsys.readouterr().out
+        rows = [
+            line
+            for line in printed.splitlines()
+            if line.lstrip().startswith(("0.1 ", "0.5 "))
+        ]
+        assert len(rows) == 2
+
+    def test_the_table_names_every_setting_it_swept(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        main(
+            [
+                "sweep",
+                "n-step-sarsa",
+                "--env",
+                "cliff",
+                "--over",
+                "n=1,2",
+                "--over",
+                "step_size=0.5",
+                "--episodes",
+                "20",
+                "--runs",
+                "1",
+                "--no-colour",
+            ]
+        )
+        printed = capsys.readouterr().out
+        heading = next(
+            line for line in printed.splitlines() if line.startswith("n  step_size")
+        )
+        assert "last 100" in heading
+        assert "exact value" in heading
+
+    def test_two_settings_give_a_row_for_every_pair(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        main(
+            [
+                "sweep",
+                "n-step-sarsa",
+                "--env",
+                "cliff",
+                "--over",
+                "n=1,2",
+                "--over",
+                "step_size=0.1,0.5",
+                "--episodes",
+                "20",
+                "--runs",
+                "1",
+                "--no-colour",
+            ]
+        )
+        printed = capsys.readouterr().out
+        rows = [
+            line
+            for line in printed.splitlines()
+            if line.lstrip().startswith(("1  ", "2  "))
+        ]
+        assert len(rows) == 4
+
+    def test_every_seed_can_be_shown(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # A mean over runs that vary a great deal has been the wrong answer
+        # twice in this project already.
+        main(
+            [
+                "sweep",
+                "q-learning",
+                "--env",
+                "cliff",
+                "--over",
+                "step_size=0.5",
+                "--episodes",
+                "20",
+                "--runs",
+                "3",
+                "--each-seed",
+                "--no-colour",
+            ]
+        )
+        printed = capsys.readouterr().out
+        assert "every seed" in printed
+        row = next(
+            line for line in printed.splitlines() if line.lstrip().startswith("0.5 ")
+        )
+        # The setting, four columns of summary, then one number per seed.
+        assert len(row.split()) >= 3 + 3
+
+    def test_a_setting_both_fixed_and_swept_is_refused(self) -> None:
+        with pytest.raises(SystemExit, match="both fixed with --set"):
+            main(
+                [
+                    "sweep",
+                    "q-learning",
+                    "--env",
+                    "cliff",
+                    "--over",
+                    "step_size=0.1",
+                    "--set",
+                    "step_size=0.5",
+                ]
+            )
+
+    def test_sweeping_nothing_is_refused(self) -> None:
+        with pytest.raises(SystemExit, match="at least one --over"):
+            main(["sweep", "q-learning", "--env", "cliff"])
+
+    def test_it_works_on_a_grid_from_a_file(self, tmp_path: Path) -> None:
+        path = tmp_path / "cliff.txt"
+        path.write_text(TestAGridFromAFile.LAYOUT, encoding="utf-8")
+        assert (
+            main(
+                [
+                    "sweep",
+                    "q-learning",
+                    "--env-file",
+                    str(path),
+                    "--over",
+                    "step_size=0.5",
+                    "--episodes",
+                    "20",
+                    "--runs",
+                    "1",
+                    "--no-colour",
+                ]
+            )
+            == 0
+        )
 
 
 class TestRecordingARun:

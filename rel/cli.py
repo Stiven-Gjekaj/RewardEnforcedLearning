@@ -579,6 +579,133 @@ def command_train(args: argparse.Namespace) -> int:
     return 0
 
 
+def parse_over(given: Sequence[str] | None) -> list[tuple[str, list[Any]]]:
+    """`--over name=a,b,c` as a setting and the values to try for it.
+
+    The values go through the same reader as `--set`, so `0.1` is a float,
+    `4` is an integer and `off` is false. A sweep that handed an agent the
+    string "0.1" would fail somewhere far away from here.
+    """
+    swept: list[tuple[str, list[Any]]] = []
+    for item in given or ():
+        name, _, values = item.partition("=")
+        if not values.strip():
+            raise SystemExit(
+                f"A sweep looks like name=a,b,c. {item!r} names no values."
+            )
+        swept.append(
+            (name.strip(), [parse_value(part.strip()) for part in values.split(",")])
+        )
+    return swept
+
+
+def sweep_settings(
+    swept: Sequence[tuple[str, list[Any]]],
+) -> list[dict[str, Any]]:
+    """Every combination of the values, in the order the settings were given.
+
+    Two settings give every pair. That is the point of sweeping two: the ones
+    in this project trade against each other, and a sweep that varied them one
+    at a time would miss exactly that.
+    """
+    combinations: list[dict[str, Any]] = [{}]
+    for name, values in swept:
+        combinations = [
+            {**chosen, name: value} for chosen in combinations for value in values
+        ]
+    return combinations
+
+
+def command_sweep(args: argparse.Namespace) -> int:
+    palette = palette_for(forced=args.colour)
+    swept = parse_over(args.over)
+    if not swept:
+        raise SystemExit("A sweep needs at least one --over name=a,b,c.")
+
+    fixed = parse_settings(args.set)
+    env_settings = parse_settings(args.env_set)
+    overlap = sorted(set(fixed) & {name for name, _ in swept})
+    if overlap:
+        raise SystemExit(
+            f"{', '.join(overlap)} is both fixed with --set and swept with "
+            f"--over. One of the two has to go."
+        )
+
+    rows = []
+    for chosen in sweep_settings(swept):
+        finals: list[float] = []
+        exact_values: list[float] = []
+        stuck = 0
+
+        for run in range(args.runs):
+            env, agent = build(
+                args.env,
+                args.agent,
+                args.seed + run,
+                env_settings,
+                {**fixed, **chosen},
+                args.env_file,
+            )
+            assert agent is not None
+
+            discount = resolve_discount(args, env)
+            learning = train(env, agent, args.episodes, discount=discount)
+            finals.append(learning.final(100))
+
+            exact = exact_report(env, agent, discount)
+            if exact is not None:
+                if exact["reaches_end"]:
+                    exact_values.append(exact["learned"])
+                else:
+                    stuck += 1
+
+        learned = summarise(finals)
+        exact_text = "-"
+        if exact_values:
+            exact_text = f"{sum(exact_values) / len(exact_values):.2f}"
+
+        row = [
+            f"{chosen[name]:g}"
+            if isinstance(chosen[name], float)
+            else str(chosen[name])
+            for name, _ in swept
+        ]
+        row.extend(
+            [
+                f"{learned.mean:.2f}",
+                f"+/- {learned.error:.2f}",
+                exact_text,
+                str(stuck) if stuck else "",
+            ]
+        )
+        if args.each_seed:
+            row.append(" ".join(f"{value:.1f}" for value in finals))
+        rows.append(row)
+
+    headings = [name for name, _ in swept]
+    headings.extend(["last 100", "error", "exact value", "stuck"])
+    aligns = ["right"] * len(swept) + ["right", "left", "right", "right"]
+    if args.each_seed:
+        headings.append("every seed")
+        aligns.append("left")
+
+    print(
+        f"{args.agent} on {args.env or args.env_file}, {args.episodes} episodes, "
+        f"seeds {args.seed} to {args.seed + args.runs - 1}"
+    )
+    print()
+    for line in table(headings, rows, align=aligns, palette=palette):
+        print(line)
+
+    print(
+        "\n'last 100' is the mean return of the last hundred episodes, averaged\n"
+        "over the seeds, with the standard error of that mean. 'exact value' is\n"
+        "the value of the greedy policy from the model, over the seeds whose\n"
+        "policy reaches an ending."
+    )
+    return 0
+
+
 def command_compare(args: argparse.Namespace) -> int:
     palette = palette_for(forced=args.colour)
     settings = parse_settings(args.set)
@@ -893,6 +1020,29 @@ def build_parser() -> argparse.ArgumentParser:
     watching.add_argument("--set", action="append", metavar="NAME=VALUE")
     _add_common(watching)
     watching.set_defaults(run=command_demo)
+
+    sweeping = commands.add_parser(
+        "sweep", help="vary one or two settings and print the table"
+    )
+    sweeping.add_argument("agent")
+    sweeping.add_argument(
+        "--over",
+        action="append",
+        metavar="NAME=A,B,C",
+        help="a setting to vary and the values to try, repeatable",
+    )
+    sweeping.add_argument("--episodes", type=int, default=DEFAULT_EPISODES)
+    sweeping.add_argument("--runs", type=int, default=5, help="how many seeds")
+    sweeping.add_argument(
+        "--set", action="append", metavar="NAME=VALUE", help="a setting held fixed"
+    )
+    sweeping.add_argument(
+        "--each-seed",
+        action="store_true",
+        help="show the number from every seed behind each row",
+    )
+    _add_common(sweeping)
+    sweeping.set_defaults(run=command_sweep)
 
     replaying = commands.add_parser(
         "replay", help="read a recorded run out of a file and draw it"
