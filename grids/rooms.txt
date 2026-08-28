@@ -1,0 +1,18 @@
+# The four rooms of Sutton, Precup and Singh, 1999.
+name: rooms
+summary: Eleven by eleven, cut into four rooms with one gap between each pair.
+max_episode_steps: 1000
+
+#############
+#     #    G#
+#     #     #
+#           #
+#     #     #
+#     #     #
+## ####     #
+#     ### ###
+#     #     #
+#     #     #
+#           #
+#S    #     #
+#############

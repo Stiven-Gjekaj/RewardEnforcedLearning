@@ -1,0 +1,15 @@
+# The frozen lake. Every move happens one time in three and each
+# move at right angles to it happens one time in three as well.
+name: lake4
+summary: 4 by 4, slippery. A hole ends the episode and pays nothing.
+step_reward: 0.0
+goal_reward: 1.0
+pit_reward: 0.0
+pit_ends_episode: true
+slip: 0.6666666666666666
+max_episode_steps: 200
+
+S...
+.X.X
+...X
+X..G

@@ -1,0 +1,9 @@
+# The cliff walk of Sutton and Barto, example 6.6.
+name: cliff
+summary: Four by twelve. The short path runs along a cliff that pays -100.
+max_episode_steps: 500
+
+............
+............
+............
+SXXXXXXXXXXG
