@@ -214,6 +214,42 @@ class GridWorld(TabularEnv):
             if self.tile(state) in _PASSABLE
         ]
 
+    def gaps(self) -> list[int]:
+        """Every cell that is a gap in a wall, in reading order.
+
+        A gap is a cell you can only pass straight through: it has exactly two
+        walkable neighbours and they are on opposite sides of it. A corner has
+        two neighbours as well and they are at right angles, so it is not one.
+
+        This is a fact about the layout rather than a name somebody wrote down.
+        On the four rooms grid it finds the four doorways of the paper the grid
+        comes from, and on the cliff walk, the windy grid and the frozen lake
+        it finds nothing at all, because none of them has a wall to have a gap
+        in. `rel.options` builds the hallway options from this.
+
+        Neighbours are the four cells that share a side, whether or not this
+        grid moves diagonally. A gap in a wall is a shape, and a king move can
+        cross it without changing what it is.
+        """
+        found: list[int] = []
+        for state in self.walkable():
+            row, column = self.cell_of(state)
+            up = self._open(row - 1, column)
+            down = self._open(row + 1, column)
+            left = self._open(row, column - 1)
+            right = self._open(row, column + 1)
+            if up + down + left + right != 2:
+                continue
+            if (up and down) or (left and right):
+                found.append(state)
+        return found
+
+    def _open(self, row: int, column: int) -> bool:
+        """Whether this cell is inside the grid and can be stood on."""
+        if not (0 <= row < self.height and 0 <= column < self.width):
+            return False
+        return self.tile(self.state_of(row, column)) in _PASSABLE
+
     # -- The contract -------------------------------------------------------
 
     def _reset(self) -> int:

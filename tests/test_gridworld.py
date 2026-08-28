@@ -74,6 +74,51 @@ class TestTheLayout:
             GridWorld(Rng(1), ["S.G"], slip=1.5)
 
 
+class TestTheGaps:
+    """A gap is a cell you can only pass straight through.
+
+    The four rooms case is the one that matters, because the four cells it has
+    to find are named in the paper the grid comes from. The rest of these pin
+    the shape rather than the grid.
+    """
+
+    def test_it_finds_the_gap_in_a_wall(self) -> None:
+        # The room has one wall, at row 1 column 3, and the cell below it at
+        # row 2 column 3 is a pit. So the only gap is where the wall stops.
+        grid = a_room()
+        assert grid.gaps() == [grid.state_of(2, 3)]
+
+    def test_a_corner_is_not_a_gap(self) -> None:
+        # Two neighbours, at right angles. A corner is a place you turn, and
+        # nothing is on the far side of it.
+        grid = GridWorld(Rng(1), ("S.#", "..#", "#G#"))
+        assert grid.state_of(0, 0) not in grid.gaps()
+
+    def test_a_cell_in_the_open_is_not_a_gap(self) -> None:
+        grid = GridWorld(Rng(1), ("S..", "...", "..G"))
+        assert grid.gaps() == []
+
+    def test_a_dead_end_is_not_a_gap(self) -> None:
+        # One neighbour rather than two. There is nothing to pass through to.
+        grid = GridWorld(Rng(1), ("#S#", "#.#", "#G#", "###"))
+        assert grid.state_of(0, 1) not in grid.gaps()
+
+    def test_the_four_rooms_grid_has_four_doorways(self) -> None:
+        # Sutton, Precup and Singh, 1999. The four hallways of that paper,
+        # found from the layout rather than written down here.
+        grid = four_rooms(Rng(1))
+        cells = [grid.cell_of(state) for state in grid.gaps()]
+        assert cells == [(3, 6), (6, 2), (7, 9), (10, 6)]
+
+    @pytest.mark.parametrize(
+        "builder", [cliff_walk, windy_grid, frozen_lake], ids=lambda b: b.__name__
+    )
+    def test_a_grid_with_no_walls_in_it_has_no_gaps(self, builder) -> None:  # type: ignore[no-untyped-def]
+        # None of these has an interior wall, so none of them has a gap in one.
+        # An options agent on them has nothing but its primitive actions.
+        assert builder(Rng(1)).gaps() == []
+
+
 class TestMoving:
     def test_it_starts_on_the_start_cell(self) -> None:
         grid = a_room()
