@@ -384,12 +384,12 @@ what it was for.
 
 ## Documentation
 
-- [Writing a grid](docs/grids.md) - a new environment as a text file, with
-  no Python in it.
 - [Architecture](docs/architecture.md) - the layers, the streams, and which
   decisions the rest rests on
 - [Algorithms and measurements](docs/algorithms.md) - every table, with the
   command that produced it
+- [Writing a grid](docs/grids.md) - a new environment as a text file, with no
+  Python in it
 - [Specification gaming](docs/specification-gaming.md) - what the name of the
   project is about
 - [Milestones](docs/milestones.md) - what is not built, and what was looked at
