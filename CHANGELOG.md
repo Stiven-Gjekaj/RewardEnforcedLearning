@@ -50,6 +50,24 @@ Everything below is new.
 
 **Agents**
 
+- **Prioritised sweeping**, Dyna that replays the step that matters rather than
+  one drawn at random. Work follows the change backwards through the model: it
+  takes the largest change off a queue and then asks which steps lead into the
+  cell it just moved. A median of 880 updates to solve the Dyna maze against
+  `dyna-q`'s 8520, and its worst seed costs less than the uniform planner's
+  median one. It also stops. Once nothing in the model would move, the queue
+  empties and it makes about one update every thousand steps where `dyna-q`
+  keeps making six a step forever, and that is also its weakness: one seed of
+  ten settles two steps off the shortest route and never looks again.
+- **Options**, as `options-q`: Q-learning whose choices last several steps. The
+  eight hallway options of the four rooms grid are read off the layout rather
+  than written down, and the same construction finds none on the Dyna maze and
+  none on the cliff walk. An option that stops after every step is a primitive
+  action, so the agent holding only those is Q-learning, to the last two
+  decimal places on a whole grid. The measured result is not the expected one:
+  the hallway options cost 2.57 return while learning, and a ladder of
+  exploration rates says the cost is the price of exploring rather than
+  anything about what was learned.
 - **n-step tree backup**, which asks the same off-policy question as the entry
   below and never multiplies by a ratio. At n of one it is Q-learning cell for
   cell with a greedy target and expected SARSA with the exploring one, and both
@@ -73,12 +91,37 @@ Everything below is new.
   of any fixed policy, which says outright when a policy never finishes rather
   than returning a large negative number.
 
+**Writing down what happened**
+
+- **Two digests rather than one.** The path digest hashes the transitions and
+  says whether two runs did the same thing. Beside it sits a digest of what the
+  agent learned, which says whether two agents came to the same conclusion.
+  Merging them would have changed what the first one means, and every number in
+  the documentation was compared against it.
+- **Recording a run**, with `rel train --out`. The digest at the top of the
+  file is a claim the file makes about its own contents, and `rel replay`
+  checks that claim rather than trusting it. The first four fields of a step
+  line are exactly what the digest hashes, so no part of the reader has its own
+  idea of how a transition is spelled. A name ending in `.gz` is compressed:
+  fifty episodes of the cliff walk go from 34822 bytes to 2525.
+
 **The command line**
 
 - `rel train`, `rel compare`, `rel solve`, `rel demo`, `rel list` and
   `rel gaming`, with learning curves drawn out of braille dots, grid policies
   drawn as arrows, and a value map that says which cells the agent has never
   stood in.
+- `rel sweep` varies one or two settings and prints the table. Two settings
+  give every pair, which is the point of sweeping two: the settings here trade
+  against each other, and varying them one at a time misses that.
+- `rel replay` reads a recorded run back and draws it.
+- **A grid can be written in a text file** and given to any command with
+  `--env-file`, so a new environment needs no Python at all. Every built in
+  grid ships as one, checked against the environment it names on its model
+  rather than on its text.
+- **The compare chart draws the best and the worst seed** behind the mean. On
+  the cliff walk that line is smooth while the runs under it swing by a hundred
+  and fifty.
 
 ### Faults found while building it, and fixed
 
