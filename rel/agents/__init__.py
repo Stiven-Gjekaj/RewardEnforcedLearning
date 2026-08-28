@@ -138,20 +138,25 @@ def _n_step(
     )
 
 
+#: A decay of 0.6 at a step size of 0.1, where the other tabular agents use a
+#: step size of 0.5 and n-step SARSA uses 0.2. The three are the same finding
+#: at three points: reaching further back buys propagation and costs spread,
+#: and a large step size is already propagating fast enough that the spread is
+#: all cost.
+#:
+#: Measured over four grids and thirty seeds each. Against the 0.8 and 0.2 this
+#: started at, SARSA with traces is better on all four grids and leaves 1 policy
+#: stuck rather than 10, and Watkins' Q is better on two and the same on two.
+#: `docs/algorithms.md` has the sweep.
 def _traced(cls: type[SarsaLambda[Any]]) -> AgentBuilder:
-    """A builder for the two agents that keep traces.
-
-    The step size is 0.2 rather than the 0.5 the other tabular agents use. A
-    trace writes one error into many cells at once, so the same step size moves
-    a great deal more of the table per step than it does without one.
-    """
+    """A builder for the two agents that keep traces."""
 
     def build(
         rng: Rng,
         env: Env[Any],
-        trace_decay: float = 0.8,
+        trace_decay: float = 0.6,
         traces: Kind = "replacing",
-        step_size: float | Schedule = 0.2,
+        step_size: float | Schedule = 0.1,
         discount: float = 1.0,
         epsilon: float | Schedule = 0.1,
         optimism: float = 0.0,
