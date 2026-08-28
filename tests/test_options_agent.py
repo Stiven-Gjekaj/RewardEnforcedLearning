@@ -282,3 +282,27 @@ class TestItLearns:
         # The option credits the state it started in, which is one the agent
         # stood in, so nothing outside that set gets a row.
         assert set(agent.q) - stood_in == set()
+
+
+class TestCountingWhatItChose:
+    def test_choosing_a_long_option_is_counted(self) -> None:
+        agent = an_agent(CORRIDOR)
+        agent.values(0)[4] = 1.0
+        agent.act(0)
+        assert agent.long_chosen == 1
+
+    def test_choosing_a_primitive_one_is_not(self) -> None:
+        agent = an_agent()
+        agent.act(0)
+        assert agent.long_chosen == 0
+
+    def test_the_mean_length_alone_cannot_say_it(self) -> None:
+        # A run that never chose a long option and one that chose a long
+        # option which stopped after one step give the same mean length.
+        short = Option(name="to next", policy={0: 1}, stops=frozenset({1}))
+        agent = an_agent(short)
+        agent.values(0)[4] = 1.0
+        agent.act(0)
+        agent.observe(go(0, 1, 0.0, 1))
+        assert agent.steps_in_options / agent.finished == 1.0
+        assert agent.long_chosen == 1

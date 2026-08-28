@@ -86,6 +86,12 @@ class OptionsQ(TabularAgent[int]):
         #: the long options or only the primitive ones.
         self.finished = 0
         self.steps_in_options = 0
+        #: How many of those choices were an option that lasts. A measurement
+        #: that wants to know what the abstraction cost needs this and cannot
+        #: get it from the mean length alone, because a run that never chose a
+        #: long option and one that chose a one step long option look the same
+        #: in that number.
+        self.long_chosen = 0
 
     # -- Which options are on offer -----------------------------------------
 
@@ -137,6 +143,8 @@ class OptionsQ(TabularAgent[int]):
             self.began_at = observation
             self.collected = 0.0
             self.length = 0
+            if not self.options[self.running].is_primitive:
+                self.long_chosen += 1
         return self.options[self.running].act(observation)
 
     def _choose(self, observation: int) -> int:

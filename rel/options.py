@@ -82,6 +82,16 @@ class Option:
         """
         return state not in self.policy or state in self.stops
 
+    @property
+    def is_primitive(self) -> bool:
+        """Whether this option stops after every step, so it is an action.
+
+        The collapse in the class docstring, made checkable. An agent that
+        holds only these is the agent it came from, and a measurement that
+        wants to know whether the long options are being used can ask.
+        """
+        return all(state in self.stops for state in self.policy)
+
     def __len__(self) -> int:
         """How many states this option can start from."""
         return len(self.policy)

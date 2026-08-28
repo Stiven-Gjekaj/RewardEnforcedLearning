@@ -208,3 +208,17 @@ class TestTheHallwayOptions:
             option.name for option in hallway_options(four_rooms(Rng(9)), env.gaps())
         ]
         assert names == again
+
+
+class TestAnOptionCanSayWhatShapeItIs:
+    def test_one_that_stops_everywhere_is_a_primitive_action(self) -> None:
+        assert primitive(1, range(5)).is_primitive
+
+    def test_one_that_keeps_going_is_not(self) -> None:
+        assert not a_corridor().is_primitive
+
+    def test_a_hallway_option_is_not(self) -> None:
+        env = four_rooms(Rng(1))
+        assert not any(
+            option.is_primitive for option in hallway_options(env, env.gaps())
+        )
