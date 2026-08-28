@@ -11,7 +11,8 @@ from __future__ import annotations
 import pytest
 
 from rel.agents.base import Transition
-from rel.agents.dp import evaluate_policy
+from rel.agents.dp import evaluate_policy, value_iteration
+from rel.agents.dyna import DynaQ
 from rel.agents.sweeping import CAP, PrioritisedSweeping
 from rel.envs.classic import cliff_walk, dyna_maze
 from rel.rng import Rng
@@ -205,3 +206,48 @@ class TestItLearns:
         agent.observe = observe  # type: ignore[method-assign]
         train(env, agent, 20)
         assert set(agent.q) - stood_in == set()
+
+
+class TestAgainstUniformReplay:
+    """The claim the method exists for, counted in updates rather than episodes.
+
+    An update is one application of the learning rule to one cell. `dyna-q`
+    makes one for the real step and its full quota after it, every step. This
+    makes one for every entry it takes off the queue, and none when the queue
+    is empty.
+    """
+
+    @staticmethod
+    def updates_to_solve(builder: type[DynaQ[int]], seed: int) -> int:
+        planning = 5
+        rng = Rng(seed)
+        env = dyna_maze(rng.stream("env"))
+        best = value_iteration(env, discount=0.95).start_value
+        agent = builder(
+            rng.stream("agent"),
+            env.action_space,
+            planning_steps=planning,
+            step_size=0.5,
+            discount=0.95,
+            epsilon=0.1,
+        )
+
+        for _ in range(60):
+            train(env, agent, 1)
+            policy = [agent.greedy(state) for state in range(env.observation_space.n)]
+            report = evaluate_policy(env, policy, discount=0.95)
+            if report.reaches_end and report.start_value >= best - 1e-9:
+                if isinstance(agent, PrioritisedSweeping):
+                    return agent.replays
+                return agent.steps * (1 + planning)
+
+        raise AssertionError(f"{builder.__name__} did not solve seed {seed}.")
+
+    @pytest.mark.parametrize("seed", [3, 4, 8])
+    def test_it_needs_fewer_updates_than_dyna_q_on_the_maze(self, seed: int) -> None:
+        # Measured over ten seeds by `scripts/measure_sweeping.py`: a median of
+        # 668 updates against 7626. The margin asserted here is three, which is
+        # well inside the narrowest of the three seeds below.
+        uniform = self.updates_to_solve(DynaQ, seed)
+        ordered = self.updates_to_solve(PrioritisedSweeping, seed)
+        assert ordered * 3 < uniform
