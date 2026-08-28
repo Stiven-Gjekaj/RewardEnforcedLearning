@@ -53,6 +53,7 @@ from rel.agents.linear import SemiGradientQ, SemiGradientSarsa
 from rel.agents.monte_carlo import MonteCarloControl
 from rel.agents.off_policy import Estimator, OffPolicyMonteCarlo
 from rel.agents.policy import ActorCritic, Reinforce
+from rel.agents.sweeping import PrioritisedSweeping
 from rel.agents.td import DoubleQ, ExpectedSarsa, NStepSarsa, QLearning, Sarsa
 from rel.agents.tiles import TileCoder
 from rel.agents.traces import Kind, SarsaLambda, WatkinsQLambda
@@ -280,6 +281,29 @@ def _dyna_plus(
     )
 
 
+def _sweeping(
+    rng: Rng,
+    env: Env[Any],
+    planning_steps: int = 5,
+    threshold: float = 1e-4,
+    step_size: float | Schedule = 0.5,
+    discount: float = 0.95,
+    epsilon: float | Schedule = 0.1,
+) -> Agent[Any]:
+    #: Five planning steps where the other two planners take twenty. Ordering
+    #: the replays is what buys the reach, so the quota does not have to, and
+    #: `docs/algorithms.md` counts what each of them costs in updates.
+    return PrioritisedSweeping(
+        rng,
+        env.action_space,
+        planning_steps=planning_steps,
+        threshold=threshold,
+        step_size=step_size,
+        discount=discount,
+        epsilon=epsilon,
+    )
+
+
 def _policy_gradient(cls: type[Reinforce[Any]]) -> AgentBuilder:
     #: The entropy bonus here is 0.05 and the classes default to less. The
     #: registry is where a default is chosen by measurement rather than by the
@@ -469,6 +493,12 @@ AGENTS: Registry[Agent[Any]] = Registry(
             "dyna-q-plus",
             "Dyna-Q that pays a bonus for a step it has not tried in a while.",
             _dyna_plus,
+            tags=("tabular", "planning", "off-policy"),
+        ),
+        Entry(
+            "prioritised-sweeping",
+            "Dyna that replays the step that matters rather than a random one.",
+            _sweeping,
             tags=("tabular", "planning", "off-policy"),
         ),
         Entry(
