@@ -13,14 +13,29 @@ questions. Everything here that has a number behind it says what was measured.
 
 | | What it would add | Why it is not here |
 | --- | --- | --- |
-| Prioritised sweeping | Dyna that replays the steps that matter rather than a random one | A queue and a predecessor table. Straightforward, and it would make the maze results far better |
 | Replay and a target network | The two pieces that make a value network stable | Needs a network over Q rather than over a policy, and the honest version needs more compute than pure Python has |
 | Continuous actions | Half of control, and everything about robotics | The whole action interface here is `Discrete`. This is a large change and it should be a large change |
-| Options | Temporally extended actions, on the grid the literature uses for them | Four rooms is in the project waiting for this |
+| Intra-option learning | Credit for every state an option passed through, not only the one it started in | The measurement that would justify it is in [algorithms.md](algorithms.md#an-action-that-lasts-several-steps): plain options cost 2.57 return on four rooms, and this is the standard answer to why |
 
 ---
 
 ## Built since that table was written
+
+**Prioritised sweeping**, as `prioritised-sweeping`. It needs a median of 880
+updates to solve the Dyna maze where `dyna-q` needs 8520, and its worst seed
+costs less than the uniform planner's median one. It also stops: once nothing
+in the model would move, the queue empties and it makes about one update every
+thousand steps where `dyna-q` keeps making six a step forever. That is also its
+weakness, and one seed of ten settles two steps off the shortest route and
+never looks again.
+
+**Options**, as `options-q`, on the four rooms grid the literature uses for
+them. The eight hallway options are read off the layout rather than written
+down, and the same construction finds none on the Dyna maze and none on the
+cliff walk. The result is not the expected one: they cost 2.57 return while
+learning, and a ladder of exploration rates says the cost is the price of
+exploring. An exploratory choice that lands on a long option commits several
+steps in one direction and is paid for several times over.
 
 **Eligibility traces**, as `sarsa-lambda` and `q-lambda`. One dial rather than
 a whole number of steps. The sweep found the same interaction with the step
