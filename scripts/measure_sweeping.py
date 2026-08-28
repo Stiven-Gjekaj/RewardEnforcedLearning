@@ -43,6 +43,22 @@ PLANNERS = ("dyna-q", "prioritised-sweeping")
 TAIL = 20
 
 
+def greedy_policy(agent: Agent[int], states: int) -> list[int]:
+    """The agent's greedy policy, without spending its source of chance.
+
+    `greedy` breaks a tie by drawing, and an untouched row is all ties, so
+    asking for the policy after every episode changes the run being measured.
+    Measured on seed 5 of the maze: probing every episode moved the point
+    where prioritised sweeping first held the optimal policy from episode 68 to
+    episode 258, and the updates it took from 6590 to 10964. The draws are put
+    back.
+    """
+    before = agent.rng.snapshot()
+    policy = [agent.greedy(state) for state in range(states)]
+    agent.rng = Rng.restore(*before)
+    return policy
+
+
 def updates_of(agent: Agent[int], planning: int) -> int:
     """How many times this agent has applied the learning rule to a cell."""
     if isinstance(agent, PrioritisedSweeping):
@@ -86,9 +102,7 @@ def measure(
                 tail_steps += agent.steps - before_steps
 
             if first is None:
-                policy = [
-                    agent.greedy(state) for state in range(env.observation_space.n)
-                ]
+                policy = greedy_policy(agent, env.observation_space.n)
                 report = evaluate_policy(env, policy, discount=discount)
                 if report.reaches_end and report.start_value >= best - 1e-9:
                     first = updates_of(agent, planning)

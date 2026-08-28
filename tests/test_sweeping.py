@@ -234,7 +234,14 @@ class TestAgainstUniformReplay:
 
         for _ in range(60):
             train(env, agent, 1)
+
+            # `greedy` breaks a tie by drawing, and an untouched row is all
+            # ties, so asking for the policy after every episode would change
+            # the run being measured. The draws are put back.
+            before = agent.rng.snapshot()
             policy = [agent.greedy(state) for state in range(env.observation_space.n)]
+            agent.rng = Rng.restore(*before)
+
             report = evaluate_policy(env, policy, discount=0.95)
             if report.reaches_end and report.start_value >= best - 1e-9:
                 if isinstance(agent, PrioritisedSweeping):
