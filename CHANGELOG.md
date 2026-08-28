@@ -50,6 +50,11 @@ Everything below is new.
 
 **Agents**
 
+- **n-step tree backup**, which asks the same off-policy question as the entry
+  below and never multiplies by a ratio. At n of one it is Q-learning cell for
+  cell with a greedy target and expected SARSA with the exploring one, and both
+  are checked exactly. On the cliff walk it reaches -15.00 with nothing stuck,
+  where importance sampling is stuck on all ten seeds.
 - **Off-policy Monte Carlo**, learning the greedy policy from episodes an
   exploring one collected, with both the ordinary and the weighted estimator.
   The variance the first is known for is measured rather than described: its

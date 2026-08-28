@@ -415,6 +415,42 @@ one, so the huge spread is measured over almost nothing. And it never reached
 the goal on the maze on any of the ten seeds, where the weighted one reaches
 0.498 against a best possible of 0.513.
 
+### Tree backup asks the same question and never divides
+
+`tree-backup` is off-policy for the same reason and by a different route. It
+reaches back n steps, learns about a policy it is not following, and multiplies
+by no ratio at all.
+
+An importance ratio is a correction applied to a sample of the wrong thing.
+Tree backup never takes that sample: at every step of the window it takes the
+expectation over what the target policy would have done, and only the action
+really taken carries the recursion any further. The actions not taken are
+accounted for by their current estimated value rather than by a correction, so
+there is nothing to divide by. A test reads the source of the update and
+asserts there is no division in it.
+
+```console
+$ python scripts/measure_agents.py --env cliff --runs 10 \
+    --agents tree-backup off-policy-mc q-learning n-step-sarsa
+```
+
+| agent | greedy, exactly | stuck of 10 |
+| --- | ---: | ---: |
+| q-learning | **-13.00** | |
+| tree-backup | -15.00 | |
+| n-step-sarsa | -16.80 | |
+| off-policy-mc | - | **10** |
+
+**The method that exists to avoid importance sampling works on the grid where
+importance sampling cannot.** Both are asking what the greedy policy is worth
+from data an exploring one collected. One of them answers.
+
+It is not free. The recursion is multiplied by the target policy's probability
+of the action taken, at every step, so where the two policies disagree often
+that probability is small and the reach is short. Tree backup does not escape
+the problem of two policies differing. It pays for it in a currency that cannot
+explode.
+
 ### Where it cannot learn at all
 
 Not on the cliff walk, and the reason is worth writing down rather than leaving

@@ -13,7 +13,6 @@ questions. Everything here that has a number behind it says what was measured.
 
 | | What it would add | Why it is not here |
 | --- | --- | --- |
-| n-step tree backup | An off-policy n-step method with no importance sampling | Wanted. The off-policy machinery it needed is in now |
 | Prioritised sweeping | Dyna that replays the steps that matter rather than a random one | A queue and a predecessor table. Straightforward, and it would make the maze results far better |
 | Replay and a target network | The two pieces that make a value network stable | Needs a network over Q rather than over a policy, and the honest version needs more compute than pure Python has |
 | Continuous actions | Half of control, and everything about robotics | The whole action interface here is `Discrete`. This is a large change and it should be a large change |
@@ -27,6 +26,10 @@ questions. Everything here that has a number behind it says what was measured.
 a whole number of steps. The sweep found the same interaction with the step
 size that n-step SARSA had, including the same exception, which is the reason
 [algorithms.md](algorithms.md) now has the two of them in one section.
+
+**n-step tree backup**, as `tree-backup`. Off-policy n step learning with no
+importance ratio anywhere in it. On the cliff walk it reaches -15.00 with
+nothing stuck, where the method below is stuck on all ten seeds.
 
 **Off-policy Monte Carlo**, as `off-policy-mc`, with both estimators. The
 variance lesson is measured rather than asserted: the ordinary estimator's
