@@ -409,7 +409,8 @@ What is honestly weak is written down rather than left for a reader to find.
 The actor critic here reaches 8 on two cart pole seeds of five, which is a pole
 falling over, and on the mountain car it scores what a random policy scores on
 every seed. REINFORCE gets out of the mountain car valley once in five, and
-never reaches the goal on one cliff walk seed of twelve. All of it is measured
+needs 784 episodes to reach the goal on one cliff walk seed of twelve where the
+measurement runs for four hundred. All of it is measured
 in [docs/algorithms.md](docs/algorithms.md), with the number of seeds behind
 every claim.
 

@@ -865,9 +865,11 @@ afterwards:
 REINFORCE:  -13 -13 -13 -13 -13 -13 -15 -13 -15 never -15 -15
 ```
 
-Seven seeds of twelve find the optimal policy of -13. Four reach -15. One
-never reaches the goal at all. Over the eleven that finish the mean is
-**-13.73**, against a best possible of -13.
+Seven seeds of twelve find the optimal policy of -13. Four reach -15. One does
+not reach the goal inside four hundred episodes, and that is a statement about
+four hundred rather than about the seed: it reaches the goal at episode 784.
+Over the eleven that finish the mean is **-13.73**, against a best possible of
+-13.
 
 Twelve rather than six, and the reason is in
 [the entropy section](#the-entropy-bonus-on-a-policy-gradient) below. Six
@@ -998,7 +1000,7 @@ $ python scripts/measure_agents.py --env cliff --agents reinforce \
 **Cliff walk**, twelve seeds, four hundred episodes, exact value of the greedy
 policy:
 
-| entropy | mean of those that finish | never reaches the goal | each seed |
+| entropy | mean of those that finish | policy never finishes | each seed |
 | --- | ---: | ---: | --- |
 | 0.01 | **-13.22** | 3 of 12 | -15 -13 never -13 -13 -13 -13 never -13 never -13 -13 |
 | 0.05 | -13.73 | **1 of 12** | -13 -13 -13 -13 -13 -13 -15 -13 -15 never -15 -15 |

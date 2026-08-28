@@ -188,9 +188,10 @@ swept now: at 0.01 that seed first reaches the goal at episode 1088 of 1200,
 and at 0.05 it reaches it at episode 173 and finds the optimal -13. The
 registry default is 0.05 and [algorithms.md](algorithms.md) has both tables.
 
-One seed of twelve still never reaches the goal, and the trade is written down
-rather than tuned away: 0.05 loses one seed where 0.01 loses three, and the
-policies it does find are 0.51 blunter.
+One seed of twelve does not reach the goal inside four hundred episodes, and
+the trade is written down rather than tuned away: 0.05 loses one seed where
+0.01 loses three, and the policies it does find are 0.51 blunter. That seed
+reaches the goal at episode 784, which is the next question below.
 
 **Is the actor critic here wrong, or only untuned?** Measured, and the answer
 is neither on its own. The entropy bonus was swept on five seeds and six
