@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-1061_passing-427819?style=for-the-badge" alt="1061 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-1107_passing-427819?style=for-the-badge" alt="1107 tests passing"/>
 </p>
 
 <p align="center">
@@ -36,7 +36,7 @@ environments where the reward is not the point_
 **A reinforcement learning laboratory that runs in a terminal and needs
 nothing installed.**
 
-Twelve environments, twenty agents, a gradient engine, a dynamic programming
+Twelve environments, twenty two agents, a gradient engine, a dynamic programming
 solver that says what the best possible policy is worth, and a command line
 that draws a learning curve out of braille dots.
 
@@ -206,6 +206,8 @@ rather than an estimate.
   first visit Monte Carlo.
 - **Traces.** SARSA with eligibility traces and Watkins' Q with them, in
   accumulating, replacing and dutch flavours.
+- **Off-policy.** Monte Carlo with ordinary and weighted importance sampling,
+  and n-step tree backup, which asks the same question and never divides.
 - **Planning.** Dyna-Q and Dyna-Q+.
 - **Approximation.** Semi-gradient SARSA and Q-learning over a tile coder.
 - **Networks.** REINFORCE with a baseline and an actor critic, on a reverse
@@ -289,7 +291,7 @@ an agent when it is fifty times too large.
 rel/core.py         the contract: what an environment is, what a step is
 rel/rng.py          PCG written out, with named independent streams
 rel/envs/           twelve environments. Never import an agent.
-rel/agents/         twenty agents. Never import an environment.
+rel/agents/         twenty two agents. Never import an environment.
   dp.py             value iteration, policy iteration, exact policy values
   td.py             SARSA, Q-learning, Expected SARSA, Double Q, n-step
   tiles.py          tile coding, worked out exactly rather than hashed
@@ -305,14 +307,14 @@ scripts/            the scripts that produce the numbers in the documentation
 | --- | ---: | ---: |
 | Core | 4 | 874 |
 | Environments | 6 | 1855 |
-| Agents | 12 | 3201 |
+| Agents | 14 | 3605 |
 | Network | 4 | 672 |
 | Running | 3 | 506 |
 | Interface | 6 | 921 |
 | Command line | 3 | 1241 |
-| **Total** | **38** | **9270** |
+| **Total** | **40** | **9674** |
 
-Not counting 6795 lines of tests and 882 of measurement scripts. Run
+Not counting 7242 lines of tests and 1028 of measurement scripts. Run
 `python scripts/lines.py` for the current numbers.
 
 Three rules about who may import whom are enforced by a test that reads the
@@ -333,7 +335,7 @@ import statements of every module:
 $ pytest
 ```
 
-1061 tests. Some of what they cover, and why each one is there rather than the
+1107 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A
@@ -380,7 +382,7 @@ what it was for.
 
 ## Status
 
-Alpha, and complete enough to be useful. Twelve environments and twenty
+Alpha, and complete enough to be useful. Twelve environments and twenty two
 agents, all of them covered by a suite that runs in about five minutes with no
 browser, no display and no network.
 
