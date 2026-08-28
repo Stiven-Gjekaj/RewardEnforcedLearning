@@ -56,6 +56,7 @@ from rel.agents.policy import ActorCritic, Reinforce
 from rel.agents.td import DoubleQ, ExpectedSarsa, NStepSarsa, QLearning, Sarsa
 from rel.agents.tiles import TileCoder
 from rel.agents.traces import Kind, SarsaLambda, WatkinsQLambda
+from rel.agents.tree import Target, TreeBackup
 from rel.core import Env, TabularEnv
 from rel.registry import Entry, Registry
 from rel.rng import Rng
@@ -194,6 +195,28 @@ def _traced(cls: type[SarsaLambda[Any]]) -> AgentBuilder:
         )
 
     return build
+
+
+def _tree_backup(
+    rng: Rng,
+    env: Env[Any],
+    n: int = 3,
+    target: Target = "greedy",
+    step_size: float | Schedule = 0.2,
+    discount: float = 1.0,
+    epsilon: float | Schedule = 0.1,
+    optimism: float = 0.0,
+) -> Agent[Any]:
+    return TreeBackup(
+        rng,
+        env.action_space,
+        n=n,
+        target=target,
+        step_size=step_size,
+        discount=discount,
+        epsilon=epsilon,
+        optimism=optimism,
+    )
 
 
 def _monte_carlo(
@@ -416,6 +439,12 @@ AGENTS: Registry[Agent[Any]] = Registry(
             "q-lambda",
             "Q-learning with traces, cut whenever the agent leaves its policy.",
             _traced(WatkinsQLambda),
+            tags=("tabular", "off-policy"),
+        ),
+        Entry(
+            "tree-backup",
+            "Off-policy n-step learning that never divides by a probability.",
+            _tree_backup,
             tags=("tabular", "off-policy"),
         ),
         Entry(
