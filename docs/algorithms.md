@@ -266,6 +266,71 @@ stayed tidy. The measurement is more use than the tidiness.
 
 ---
 
+## A trace is the same dial, done smoothly
+
+`sarsa-lambda` and `q-lambda` keep a number on every cell they have visited
+that says how much of the current error belongs to it. It falls by the discount
+times the decay at every step, so credit reaches back for ever and fades rather
+than stopping at a whole number of steps.
+
+At a decay of zero the agent is the one step agent it was built on. That is
+checked exactly rather than approximately: `SarsaLambda` at zero and `Sarsa`
+fed the same transitions hold the same table cell for cell, and the same for
+Watkins' Q against Q-learning.
+
+### The same interaction, found from the other side
+
+The section above says n and the step size trade against each other, and that
+the sign of the trade flips. If a trace is that same idea done smoothly, the
+flip has to be here too. It is.
+
+```console
+$ python scripts/measure_agents.py --env windy --agents sarsa-lambda \
+    --runs 30 --episodes 600 --set trace_decay=0.8 step_size=0.1
+```
+
+What a decay of 0.8 is worth against a decay of zero, over thirty seeds:
+
+| step size | cliff | windy | rooms |
+| ---: | ---: | ---: | ---: |
+| 0.50 | -0.49 | -0.56 | -0.18 |
+| 0.20 | -1.08 | -0.12 | 0.00 |
+| 0.10 | -1.84 | **+1.97** | **+1.33** |
+| 0.05 | -1.46 | see below | see below |
+
+At a step size of 0.1 on the windy grid, a decay of zero leaves twenty seeds of
+thirty with a policy that never reaches the goal, and a decay of 0.8 leaves
+none. On four rooms the same two numbers are twenty seven and none. At a step
+size of 0.05 a decay of zero never reaches the goal on **any** of the thirty
+seeds of either grid, and a decay of 0.8 reaches the exact optimum on four
+rooms with nothing stuck.
+
+The cliff walk is the exception at every step size, and it was the exception in
+the n step sweep as well.
+
+**Two different ways of reaching further back, measured separately, give the
+same interaction and the same exception.** That is worth more than either
+measurement on its own. What reaching back buys is propagation, what it costs
+is spread, and a large step size is already propagating fast enough that the
+spread is all cost.
+
+### Watkins' Q almost never leaves a policy stuck
+
+Over six decays, four grids and thirty seeds, which is 720 runs of each agent:
+
+| agent | policies that never reach the goal |
+| --- | ---: |
+| `sarsa-lambda` | 59 of 720 |
+| `q-lambda` | **1 of 720** |
+
+That is the stuck column above, seen from a new direction. The trap is a cell
+where the four actions sit within a point of each other and the noise decides.
+Q-learning's policy runs where a wrong action costs a hundred, and no amount of
+noise reorders that. Cutting the trace on every exploratory step keeps that
+property rather than blurring it away.
+
+---
+
 ## Planning, on the maze
 
 ```console
