@@ -188,11 +188,97 @@ def rooms(env: TabularEnv, doors: Collection[int]) -> list[frozenset[int]]:
     return found
 
 
+# -- Building the hallway options --------------------------------------------
+
+
+def _likeliest(env: TabularEnv, state: int, action: int) -> int | None:
+    """Where this action most likely lands, or `None` if it goes nowhere."""
+    outcomes = env.transitions(state, action)
+    if not outcomes:
+        return None
+    landed = max(outcomes, key=lambda outcome: outcome.probability).observation
+    return None if landed == state else landed
+
+
+def walk_to(env: TabularEnv, target: int, inside: Collection[int]) -> dict[int, int]:
+    """The action from each state of `inside` that steps towards `target`.
+
+    A breadth first walk backwards from the target, so every state gets the
+    first action on a shortest path to it. A state of `inside` that cannot
+    reach the target without leaving is left out, which is what makes the
+    option's start set the room it can really cross.
+    """
+    ahead: dict[int, int] = {}
+    reached = {target}
+    frontier = [target]
+
+    while frontier:
+        following: list[int] = []
+        for landing in frontier:
+            for state in inside:
+                if state in reached:
+                    continue
+                for action in env.action_space:
+                    if _likeliest(env, state, action) == landing:
+                        ahead[state] = action
+                        reached.add(state)
+                        following.append(state)
+                        break
+        frontier = following
+
+    return ahead
+
+
+def hallway_options(env: TabularEnv, doors: Collection[int]) -> list[Option]:
+    """One option for each room and each doorway on its edge.
+
+    Cross this room and stop at that doorway. A doorway that touches only one
+    room is not a way out of anywhere, so it gets no options: on the Dyna maze
+    that leaves the list empty.
+
+    The start set is the room plus the other doorways on its edge, and not the
+    one being walked to. So an agent that has just arrived at one doorway can
+    choose to cross to another, which is the whole point of having them. An
+    option that could start where it stops would take an arbitrary first step
+    and then walk back.
+    """
+    edges = steps_between(env)
+    parts = rooms(env, doors)
+
+    def touches(door: int, part: frozenset[int]) -> bool:
+        return bool(edges.get(door, set()) & part)
+
+    built: list[Option] = []
+    for index, part in enumerate(parts):
+        boundary = sorted(
+            door
+            for door in doors
+            if touches(door, part) and sum(touches(door, other) for other in parts) >= 2
+        )
+
+        for door in boundary:
+            inside = set(part) | (set(boundary) - {door})
+            policy = walk_to(env, door, inside)
+            if not policy:
+                continue
+            built.append(
+                Option(
+                    name=f"room {index} to gap {door}",
+                    policy=policy,
+                    stops=frozenset({door}),
+                )
+            )
+
+    return built
+
+
 __all__ = [
     "Option",
+    "hallway_options",
     "primitive",
     "primitives",
     "reachable",
     "rooms",
     "steps_between",
+    "walk_to",
 ]

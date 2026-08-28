@@ -18,7 +18,15 @@ from rel.envs.classic import (
     frozen_lake,
     windy_grid,
 )
-from rel.options import Option, primitive, primitives, reachable, rooms, steps_between
+from rel.options import (
+    Option,
+    hallway_options,
+    primitive,
+    primitives,
+    reachable,
+    rooms,
+    steps_between,
+)
 from rel.rng import Rng
 from rel.spaces import Discrete
 
@@ -142,3 +150,61 @@ class TestReadingTheRoomsOffAModel:
     def test_the_rooms_come_back_in_a_stable_order(self) -> None:
         env = four_rooms(Rng(1))
         assert rooms(env, env.gaps()) == rooms(four_rooms(Rng(2)), env.gaps())
+
+
+class TestTheHallwayOptions:
+    def test_the_four_rooms_grid_gets_two_options_per_room(self) -> None:
+        # Sutton, Precup and Singh, 1999. Eight options, one for each room and
+        # each of the two doorways on its edge.
+        env = four_rooms(Rng(1))
+        assert len(hallway_options(env, env.gaps())) == 8
+
+    def test_each_option_reaches_its_hallway_from_everywhere_it_can_start(
+        self,
+    ) -> None:
+        # The claim the option makes about itself. Follow it from every state
+        # in its start set and it has to arrive at the doorway it names.
+        env = four_rooms(Rng(1))
+        for option in hallway_options(env, env.gaps()):
+            door = next(iter(option.stops))
+            for start in option.policy:
+                at, steps = start, 0
+                while not option.stops_at(at) or steps == 0:
+                    at = max(
+                        env.transitions(at, option.act(at)),
+                        key=lambda outcome: outcome.probability,
+                    ).observation
+                    steps += 1
+                    assert steps < 100, f"{option.name} did not stop from {start}"
+                assert at == door, f"{option.name} stopped at {at} from {start}"
+
+    def test_it_cannot_start_where_it_stops(self) -> None:
+        # An option that could would take an arbitrary first step and then
+        # walk back to where it already was.
+        env = four_rooms(Rng(1))
+        for option in hallway_options(env, env.gaps()):
+            assert not (set(option.policy) & option.stops)
+
+    def test_it_can_start_at_the_room_s_other_doorway(self) -> None:
+        # This is what makes them worth having. An agent that has just arrived
+        # at one doorway can choose to cross the room to the other.
+        env = four_rooms(Rng(1))
+        doors = set(env.gaps())
+        assert any(set(option.policy) & doors for option in hallway_options(env, doors))
+
+    def test_a_doorway_that_joins_no_two_rooms_gives_no_options(self) -> None:
+        # The maze has four gaps and none of them is a way between two rooms.
+        env = dyna_maze(Rng(1))
+        assert hallway_options(env, env.gaps()) == []
+
+    def test_a_grid_with_no_doorways_gives_no_options(self) -> None:
+        env = cliff_walk(Rng(1))
+        assert hallway_options(env, env.gaps()) == []
+
+    def test_the_options_come_back_in_a_stable_order(self) -> None:
+        env = four_rooms(Rng(1))
+        names = [option.name for option in hallway_options(env, env.gaps())]
+        again = [
+            option.name for option in hallway_options(four_rooms(Rng(9)), env.gaps())
+        ]
+        assert names == again
