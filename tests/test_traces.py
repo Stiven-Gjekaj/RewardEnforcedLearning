@@ -12,7 +12,7 @@ import pytest
 
 from rel.agents.base import Transition
 from rel.agents.dp import evaluate_policy
-from rel.agents.td import Sarsa
+from rel.agents.td import QLearning, Sarsa
 from rel.agents.traces import CUTOFF, KINDS, SarsaLambda, WatkinsQLambda
 from rel.envs.classic import cliff_walk
 from rel.rng import Rng
@@ -43,6 +43,25 @@ class TestTheDialAtZero:
             Rng(1).stream("a"), Discrete(2), step_size=0.5, discount=0.9, epsilon=0.0
         )
         traced: SarsaLambda[int] = SarsaLambda(
+            Rng(1).stream("a"),
+            Discrete(2),
+            step_size=0.5,
+            discount=0.9,
+            epsilon=0.0,
+            trace_decay=0.0,
+        )
+        feed(plain)
+        feed(traced)
+        assert traced.q == plain.q
+
+    def test_watkins_with_no_decay_is_q_learning_cell_for_cell(self) -> None:
+        # The same claim for the other agent. At a decay of zero the trace
+        # covers the cell just left and nothing else, and the cut has nothing
+        # to cut, so what is left has to be one step Q-learning exactly.
+        plain: QLearning[int] = QLearning(
+            Rng(1).stream("a"), Discrete(2), step_size=0.5, discount=0.9, epsilon=0.0
+        )
+        traced: WatkinsQLambda[int] = WatkinsQLambda(
             Rng(1).stream("a"),
             Discrete(2),
             step_size=0.5,

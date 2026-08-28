@@ -232,7 +232,15 @@ class TabularAgent(Agent[ObsT]):
         return self.action_scores(observation)
 
     def best_value(self, observation: ObsT) -> float:
-        return max(self.values(observation))
+        """The best number in the row, without adding one to the table.
+
+        This reads and does not write, for the same reason `action_scores`
+        does. Every caller is computing a target from the state it is about to
+        leave for, and on a terminated step that target drops the value again.
+        Behind `values` it left a row for the goal cell of every grid, which
+        then counted as a cell the agent had stood in.
+        """
+        return max(self.peek(observation))
 
     # -- The policy ---------------------------------------------------------
 

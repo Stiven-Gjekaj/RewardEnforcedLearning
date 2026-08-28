@@ -128,7 +128,7 @@ class Sarsa(TabularAgent[ObsT]):
         else:
             offset = next_action - self.actions.start
             target = self.bootstrap(
-                transition, self.values(transition.next_observation)[offset]
+                transition, self.peek(transition.next_observation)[offset]
             )
 
         row[index] += self.current_step_size() * (target - row[index])
@@ -149,7 +149,7 @@ class ExpectedSarsa(TabularAgent[ObsT]):
         index = transition.action - self.actions.start
 
         probabilities = self.policy_probabilities(transition.next_observation)
-        next_row = self.values(transition.next_observation)
+        next_row = self.peek(transition.next_observation)
         expected = sum(
             share * value for share, value in zip(probabilities, next_row, strict=True)
         )
@@ -219,18 +219,23 @@ class DoubleQ(TabularAgent[ObsT]):
     def observe(self, transition: Transition[ObsT]) -> None:
         super().observe(transition)
 
+        # The row being written needs `values`, which makes one. The two rows
+        # being read do not, and behind a writer they left a row for the goal
+        # cell of the grid in a table the agent never acts from.
         if self.rng.chance(0.5):
-            chooser = self.values
-            valuer = self.other_values
+            write_to = self.values
+            read_chooser, read_valuer = self.peek, self.peek_other
         else:
-            chooser = self.other_values
-            valuer = self.values
+            write_to = self.other_values
+            read_chooser, read_valuer = self.peek_other, self.peek
 
-        row = chooser(transition.observation)
+        row = write_to(transition.observation)
         index = transition.action - self.actions.start
 
-        best = self._argmax(chooser(transition.next_observation))
-        target = self.bootstrap(transition, valuer(transition.next_observation)[best])
+        best = self._argmax(read_chooser(transition.next_observation))
+        target = self.bootstrap(
+            transition, read_valuer(transition.next_observation)[best]
+        )
         row[index] += self.current_step_size() * (target - row[index])
 
 

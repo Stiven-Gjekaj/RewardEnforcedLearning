@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 
 from rel.agents import AGENTS
+from rel.agents.base import Transition
 from rel.core import Env
 from rel.envs import ENVIRONMENTS
 from rel.rng import Rng
@@ -191,3 +192,50 @@ class TestTheReference:
         record = evaluate(ENVIRONMENTS.make("cliff", Rng(2).stream("env")), agent, 3)
         assert record.final() == pytest.approx(best.start_value)
         assert record.final() == -13.0
+
+
+class TestNoAgentLearnsAboutACellItNeverStoodIn:
+    """A table row is a claim that the agent has been somewhere.
+
+    Every one of these agents computes its target from the value of the state
+    it is moving to. Read through `values` that lookup makes a row, so the goal
+    cell of every grid ended up in the table of three of them, and `knows` then
+    said the agent had stood in a cell it can only ever arrive at.
+
+    This is the second time this project has had that fault. The first was the
+    renderer asking for the greedy action of every cell in order to draw the
+    policy, and it is why `peek` exists.
+    """
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "sarsa",
+            "expected-sarsa",
+            "q-learning",
+            "double-q",
+            "n-step-sarsa",
+            "sarsa-lambda",
+            "q-lambda",
+            "dyna-q",
+            "dyna-q-plus",
+            "monte-carlo",
+        ],
+    )
+    def test_the_table_holds_no_state_it_never_acted_in(self, name: str) -> None:
+        root = Rng(1)
+        env = ENVIRONMENTS.make("cliff", root.stream("env"))
+        agent = AGENTS.make(name, root.stream("agent"), env)
+
+        stood_in: set[int] = set()
+        watched = agent.observe
+
+        def observe(transition: Transition[int]) -> None:
+            stood_in.add(transition.observation)
+            watched(transition)
+
+        agent.observe = observe  # type: ignore[method-assign]
+        train(env, agent, 60, discount=1.0)
+
+        extra = set(agent.q) - stood_in  # type: ignore[attr-defined]
+        assert extra == set(), f"{name} has rows for {sorted(extra)}"

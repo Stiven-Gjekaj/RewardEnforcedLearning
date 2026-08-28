@@ -149,7 +149,7 @@ class SarsaLambda(Sarsa[ObsT]):
         else:
             offset = next_action - self.actions.start
             target = self.bootstrap(
-                transition, self.values(transition.next_observation)[offset]
+                transition, self.peek(transition.next_observation)[offset]
             )
 
         return target - row[index]
