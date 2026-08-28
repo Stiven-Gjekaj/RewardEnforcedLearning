@@ -571,6 +571,108 @@ Ordered replay stops, and stopping is what makes the answer final.
 
 ---
 
+## An action that lasts several steps
+
+```console
+$ rel train options-q --env rooms
+$ rel train options-q --env rooms --set hallways=off
+$ python scripts/measure_options.py --runs 20
+```
+
+An option is a policy, a rule for when it stops, and the states it can start
+from. "Cross this room and stop at the doorway on your left" is one, and
+choosing it covers the seven steps that follow.
+
+`options-q` is Q-learning whose choices are options. The update is the same
+shape with the multi step return substituted in: the discounted reward
+collected while the option ran, bootstrapped by the discount raised to how many
+steps it took. At one step that is Q-learning exactly.
+
+### Where the options come from
+
+Nothing here names the four rooms grid. A gap in a wall is a cell you can only
+pass straight through, which is a shape the layout can be read for. Take those
+cells out of the model and what is left falls into rooms. A gap that touches
+two of them is a doorway, and for each room and each doorway on its edge there
+is one option: cross this room, stop there.
+
+On the four rooms grid that finds the eight options of Sutton, Precup and
+Singh, 1999. On the Dyna maze it finds four gaps and no options, because those
+gaps are passages inside one room rather than doors between two, and on the
+cliff walk, the windy grid and the frozen lake it finds nothing at all because
+none of them has an interior wall.
+
+### The collapse, and then the cost
+
+| agent | while learning | greedy, exactly | stuck |
+| --- | ---: | ---: | ---: |
+| q-learning | -22.44 | -20.00 | |
+| options-q, `hallways=off` | -22.44 | -20.00 | |
+| options-q | -25.01 | -20.00 | 1 |
+
+*Four rooms, ten seeds, 500 episodes. The best possible return is -20.*
+
+The first two rows are the collapse. An option that stops after every step is a
+primitive action, so an agent holding only those is Q-learning, and it is
+Q-learning to the last two decimal places on a whole grid rather than on one
+update.
+
+The third row is the result. **The eight hallway options cost 2.57 return while
+learning and leave one seed of ten with a policy that never reaches the goal.**
+What they were expected to do was the opposite.
+
+### Where the cost is
+
+The cost is the price of exploring, and the way to show that is a ladder rather
+than an argument. An exploratory choice that lands on a long option commits
+several steps in one direction, so it is paid for several times over. A cost
+that comes from that has to fall with epsilon. A cost that came from what was
+learned would not.
+
+| epsilon | actions only | with options | cost | cost / epsilon | long | length |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0.2 | -25.75 | -31.95 | 6.20 | 31.0 | 11% | 1.34 |
+| 0.1 | -22.56 | -25.00 | 2.43 | 24.3 | 10% | 1.28 |
+| 0.05 | -21.31 | -22.40 | 1.09 | 21.9 | 9% | 1.25 |
+| 0.02 | -20.54 | -21.00 | 0.46 | 23.2 | 9% | 1.24 |
+
+*Twenty seeds. `long` is the share of choices that were an option lasting more
+than a step, and `length` is the mean number of steps an option ran for.*
+
+Epsilon changes by a factor of ten and the fourth column sits between 22 and 31
+with no trend in it. The cost is the exploring.
+
+That is not an argument against options. It is a measurement of what this
+particular pairing costs on this particular grid, where the reward is dense and
+one step of feedback arrives after every step. An option is a commitment, and a
+commitment is worth what it saves minus what it costs to be wrong about. Here
+there is nothing to save: the value of a cell is already carried back one cell
+per step by every reward, and the doorways are not where the agent wants to be.
+
+### The picture is not the policy
+
+There is a second thing here, and it is about measurement rather than about
+options.
+
+Every report in this project reads a policy off an agent one cell at a time:
+`greedy` is asked about each state and the answers are laid out as a map. An
+agent that chooses options does not follow one action per cell. It commits to
+an option and runs it, and asking it about a cell it is not standing in cannot
+be allowed to move that option along, because the renderer asks about every
+cell of a grid in any order.
+
+So `greedy` here reports the first step of the best option available at that
+cell, with no running state at all. That is a real policy and it is not the one
+the agent follows. On the four rooms grid, after 500 episodes on seed 1, 18 of
+the 103 cells carry a choice that would have run on. The policy picture marks
+them, because a picture that did not would be a picture of something nobody
+does.
+
+The stuck seed in the table above is this. What the agent learned is fine, and
+the map read off it walks in a circle.
+
+---
+
 ## The tile coder
 
 A tile coder lays several grids over a continuous space, each shifted by a
@@ -944,6 +1046,7 @@ a network in pure Python.
 | The tile coder offsets | `python scripts/measure_tiling_offsets.py` |
 | What importance sampling costs | `python scripts/measure_importance.py` |
 | Ordered replay against uniform | `python scripts/measure_sweeping.py --episodes 400` |
+| What an option costs | `python scripts/measure_options.py --runs 20` |
 | Specification gaming | `rel gaming` |
 | One run in detail | `rel train q-learning --env cliff --seed 7` |
 | Two agents side by side | `rel compare sarsa q-learning --env cliff` |
