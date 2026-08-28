@@ -14,11 +14,28 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 AREAS = (
-    ("Core", ("rel/core.py", "rel/rng.py", "rel/spaces.py", "rel/registry.py")),
+    (
+        "Core",
+        (
+            "rel/__init__.py",
+            "rel/core.py",
+            "rel/rng.py",
+            "rel/spaces.py",
+            "rel/registry.py",
+        ),
+    ),
     ("Environments", ("rel/envs",)),
-    ("Agents", ("rel/agents",)),
+    ("Agents", ("rel/agents", "rel/options.py")),
     ("Network", ("rel/nn",)),
-    ("Running", ("rel/training.py", "rel/metrics.py", "rel/schedules.py")),
+    (
+        "Running",
+        (
+            "rel/training.py",
+            "rel/metrics.py",
+            "rel/schedules.py",
+            "rel/pressure.py",
+        ),
+    ),
     ("Interface", ("rel/ui",)),
     ("Command line", ("rel/cli.py", "rel/cli_gaming.py", "rel/__main__.py")),
 )
@@ -37,7 +54,35 @@ def count(paths: tuple[str, ...]) -> tuple[int, int]:
     return files, lines
 
 
+def named() -> set[Path]:
+    """Every file some area claims."""
+    claimed: set[Path] = set()
+    for _, paths in AREAS:
+        for name in paths:
+            target = ROOT / name
+            found = sorted(target.rglob("*.py")) if target.is_dir() else [target]
+            claimed.update(found)
+    return claimed
+
+
+def missed() -> list[Path]:
+    """Every file of the package that no area claims.
+
+    A total that quietly leaves a module out is worse than no total. This
+    script is what the table in the readme is copied from, and two modules had
+    been missing from it for as long as they had existed.
+    """
+    return sorted(set((ROOT / "rel").rglob("*.py")) - named())
+
+
 def main() -> int:
+    left_out = missed()
+    if left_out:
+        print("These files are in no area, so the total would be wrong:")
+        for path in left_out:
+            print(f"  {path.relative_to(ROOT)}")
+        return 1
+
     print(f"{'area':<14} {'files':>6} {'lines':>7}")
     print(f"{'-' * 14} {'-' * 6} {'-' * 7}")
 
