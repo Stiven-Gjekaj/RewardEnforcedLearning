@@ -515,6 +515,60 @@ environment, and the agent wanders.
 the environment really pays, and nothing about the agent knows what those are.
 That is why it is an argument with 0.001 behind it and not a constant.
 
+### Ordering the replays, counted in updates
+
+```console
+$ python scripts/measure_sweeping.py --episodes 400
+```
+
+Comparing two planners by episode hides the question. Both of them replay
+remembered steps, and the question is how many replays it takes. An update here
+is one application of the learning rule to one cell: `dyna-q` makes one for the
+real step and its full quota after it, and `prioritised-sweeping` makes one for
+every entry it takes off the queue.
+
+| planner | solved | updates | fewest | most | idle |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| dyna-q | 9 of 10 | 8520 | 2532 | 19296 | 6.000 |
+| prioritised-sweeping | 9 of 10 | **880** | 705 | 6590 | **0.001** |
+
+*The maze, ten seeds, 400 episodes, five planning steps, step size 0.5.
+`updates` is the median number of updates before the greedy policy was exactly
+optimal, over the seeds where it was. `idle` is the updates per real step over
+the last twenty episodes.*
+
+The median is a factor of nearly ten, and the worst seed the sweeper solves takes
+fewer updates than the median seed the uniform planner solves. Both see the
+same steps and hold the same model. The only difference is which remembered
+step is replayed next.
+
+Per seed, in updates:
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| dyna-q | 3534 | 5412 | 11958 | 8322 | 12246 | - | 10950 | 8520 | 2532 | 19296 |
+| prioritised-sweeping | 1060 | 880 | 965 | 840 | 6590 | 705 | 730 | 920 | - | 725 |
+
+### The idle column is the other half of it
+
+`dyna-q` makes six updates for every step for as long as it runs, whatever it
+has left to learn. Once the table has settled, all six teach nothing.
+
+`prioritised-sweeping` stops. A step whose replay would move a value by less
+than `threshold` never goes on the queue, so when nothing in the model would
+move, the queue empties and stays empty. Over the last twenty episodes of these
+runs it makes about one update every thousand steps.
+
+**It stops because it believes it is finished, and it can be wrong about that.**
+Seed 9 is the case. It settles on a route two steps longer than the shortest
+one, nothing in the model changes any more, so nothing is queued and it never
+looks again. Two hundred further episodes move it nowhere. That is the seed
+`dyna-q` solves in 2532 updates, which is the fewest it needs anywhere.
+
+The two planners lose one seed each and they are not the same seed. Uniform
+replay keeps grinding at a settled model and sometimes that is what is needed.
+Ordered replay stops, and stopping is what makes the answer final.
+
 ---
 
 ## The tile coder
@@ -888,6 +942,8 @@ a network in pure Python.
 | One setting swept | `python scripts/measure_control.py --env cartpole --set entropy=0.05` |
 | Every seed behind a mean | `python scripts/measure_agents.py --env cliff --each-seed` |
 | The tile coder offsets | `python scripts/measure_tiling_offsets.py` |
+| What importance sampling costs | `python scripts/measure_importance.py` |
+| Ordered replay against uniform | `python scripts/measure_sweeping.py --episodes 400` |
 | Specification gaming | `rel gaming` |
 | One run in detail | `rel train q-learning --env cliff --seed 7` |
 | Two agents side by side | `rel compare sarsa q-learning --env cliff` |
