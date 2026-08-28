@@ -11,7 +11,7 @@ from rel.envs.classic import dyna_maze
 from rel.envs.gridworld import GridWorld
 from rel.rng import Rng
 from rel.spaces import Discrete
-from rel.training import train
+from rel.training import digest_of, train
 
 TWO = Discrete(2)
 
@@ -222,3 +222,24 @@ class TestDynaQPlus:
 
         assert length(0.001) < 40.0
         assert length(0.05) > 300.0
+
+
+class TestWhatItLearned:
+    def test_the_model_is_part_of_it(self) -> None:
+        # Two agents holding the same table and different models believe
+        # different things about the environment, and the next replay will
+        # show it. A digest over the table alone would call them one agent.
+        one = DynaQ(Rng(1), TWO, planning_steps=0)
+        other = DynaQ(Rng(1), TWO, planning_steps=0)
+        one.observe(go(0, 0, -1.0, 1))
+        other.observe(go(0, 0, -1.0, 2))
+
+        assert one.q == other.q
+        assert digest_of(one) != digest_of(other)
+
+    def test_the_table_is_still_part_of_it(self) -> None:
+        one = DynaQ(Rng(1), TWO, planning_steps=0, step_size=0.5)
+        other = DynaQ(Rng(1), TWO, planning_steps=0, step_size=0.5)
+        one.observe(go(0, 0, -1.0, 1))
+        other.observe(go(0, 0, -5.0, 1))
+        assert digest_of(one) != digest_of(other)

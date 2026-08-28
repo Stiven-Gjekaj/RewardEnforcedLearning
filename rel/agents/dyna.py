@@ -25,9 +25,10 @@ learns something, and it learns it from a model that is confidently wrong.
 from __future__ import annotations
 
 import math
+from collections.abc import Iterator
 
 from rel.agents.base import TabularAgent, Transition
-from rel.core import ObsT
+from rel.core import DIGEST_FIGURES, ObsT, encoded
 from rel.rng import Rng
 from rel.schedules import Schedule
 from rel.spaces import Discrete
@@ -62,6 +63,18 @@ class DynaQ(TabularAgent[ObsT]):
         #: state and action to reward, landing state and whether it ended.
         self.model: dict[tuple[ObsT, int], tuple[float, ObsT, bool]] = {}
         self._seen: list[tuple[ObsT, int]] = []
+
+    def learned(self) -> Iterator[str]:
+        # The table and the model. A Dyna agent's conclusions are both: two of
+        # them holding the same table and different models believe different
+        # things about the environment, and the next replay will show it.
+        yield from super().learned()
+        for key in sorted(self.model, key=encoded):
+            reward, landed, ended = self.model[key]
+            yield (
+                f"model.{encoded(key)}|{reward:.{DIGEST_FIGURES}g}"
+                f",{encoded(landed)},{int(ended)}"
+            )
 
     def observe(self, transition: Transition[ObsT]) -> None:
         super().observe(transition)
