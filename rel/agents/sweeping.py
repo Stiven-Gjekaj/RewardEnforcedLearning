@@ -26,6 +26,19 @@ The consequence is that this agent with no planning steps learns nothing at
 all, where `dyna-q` with no planning steps is plain Q-learning. That is a trap
 rather than a feature, so the setting is refused.
 
+## Why the queue is capped
+
+The queue holds one entry per state and action, so it cannot be larger than the
+model. It can still be large, and both the push and the pop walk it, so a run
+on a big model spends its time in the queue rather than in the environment.
+`CAP` bounds it, and the entry dropped is the smallest, which is the one whose
+replay would have changed the least.
+
+No environment in this repository comes near that bound: the largest grid here
+has 54 cells and four actions. The bound is there because `TabularAgent` takes
+an observation of any hashable shape, including a pair of real numbers that has
+been rounded, and the number of those is not small.
+
 ## Why a threshold
 
 A step whose replay would change a value by almost nothing is not worth a slot.
@@ -49,6 +62,10 @@ from rel.core import ObsT
 from rel.rng import Rng
 from rel.schedules import Schedule
 from rel.spaces import Discrete
+
+#: How many entries the queue holds. Beyond this the smallest is dropped, and
+#: the smallest is the replay that would have changed the least.
+CAP = 2000
 
 
 class PrioritisedSweeping(DynaQ[ObsT]):
@@ -125,6 +142,10 @@ class PrioritisedSweeping(DynaQ[ObsT]):
             return
         self.queue[key] = change
 
+        if len(self.queue) > CAP:
+            smallest = min(self.queue, key=lambda entry: self.queue[entry])
+            del self.queue[smallest]
+
     def pop(self) -> tuple[ObsT, int] | None:
         """The step whose replay would change the most, and take it off."""
         if not self.queue:
@@ -177,4 +198,4 @@ class PrioritisedSweeping(DynaQ[ObsT]):
         )
 
 
-__all__ = ["PrioritisedSweeping"]
+__all__ = ["CAP", "PrioritisedSweeping"]

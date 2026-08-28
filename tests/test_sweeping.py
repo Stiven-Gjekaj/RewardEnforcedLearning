@@ -12,7 +12,7 @@ import pytest
 
 from rel.agents.base import Transition
 from rel.agents.dp import evaluate_policy
-from rel.agents.sweeping import PrioritisedSweeping
+from rel.agents.sweeping import CAP, PrioritisedSweeping
 from rel.envs.classic import cliff_walk, dyna_maze
 from rel.rng import Rng
 from rel.spaces import Discrete
@@ -96,6 +96,20 @@ class TestTheQueue:
 
     def test_an_empty_queue_has_nothing_to_offer(self) -> None:
         assert sweeper().pop() is None
+
+    def test_a_full_queue_drops_the_smallest_change(self) -> None:
+        # The bound is on the shipped constant rather than a patched one, so
+        # a change to it that broke this would be seen here.
+        agent = sweeper(threshold=0.0)
+        for index in range(CAP):
+            agent.push(index, 0, 1.0 + index)
+        assert len(agent.queue) == CAP
+
+        agent.push(-1, 0, 500.0)
+        assert len(agent.queue) == CAP
+        # The new entry is worth more than the smallest, so the smallest went.
+        assert (-1, 0) in agent.queue
+        assert (0, 0) not in agent.queue
 
     def test_a_negative_threshold_is_refused(self) -> None:
         with pytest.raises(ValueError, match="below zero"):
