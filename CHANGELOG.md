@@ -50,6 +50,11 @@ Everything below is new.
 
 **Agents**
 
+- **Off-policy Monte Carlo**, learning the greedy policy from episodes an
+  exploring one collected, with both the ordinary and the weighted estimator.
+  The variance the first is known for is measured rather than described: its
+  worst cell on the Dyna maze reads four trillion, on a problem whose best
+  possible value is 0.513.
 - **Eligibility traces**, on SARSA and on Watkins' Q, in accumulating,
   replacing and dutch flavours. One dial from one step learning to crediting
   the whole episode, in place of n-step SARSA's whole number. At a decay of

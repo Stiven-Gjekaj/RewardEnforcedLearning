@@ -360,6 +360,77 @@ property rather than blurring it away.
 
 ---
 
+## Learning about one policy while following another
+
+Every agent above learns about the policy it is following, or about the greedy
+policy behind it. `off-policy-mc` learns about the greedy policy from episodes
+an exploring one collected, which is the question worth asking whenever the
+data already exists and was not collected by whoever now wants an answer.
+
+The correction is the ratio of the two policies at each step, multiplied along
+the episode. The target policy here is greedy, so the ratio is zero the moment
+the behaviour policy explored, and the walk backwards stops there. That is the
+algorithm and not an optimisation.
+
+### The two estimators, and what the second one is for
+
+Both divide the same product. `ordinary` divides by a count and is unbiased
+with unbounded variance. `weighted` divides by the sum of the ratios it really
+saw, and is biased with far less.
+
+"Unbounded" is doing a great deal of work in that sentence, so here it is as a
+number.
+
+```console
+$ python scripts/measure_importance.py
+```
+
+Ten seeds, 1200 episodes, a behaviour policy that explores a fifth of the time.
+`spread` is how far apart the ten seeds' estimates of one cell are, averaged
+over every cell all ten of them credited.
+
+| grid | estimator | cells | spread | widest | policy |
+| --- | --- | ---: | ---: | ---: | ---: |
+| frozen lake, best 0.824 | ordinary | 10 | 4.194 | 13.204 | 0.237 |
+| frozen lake | **weighted** | 10 | **0.710** | **0.913** | **0.369** |
+| maze, best 0.513 | ordinary | 2 | 1,970,224,597,202 | 3,928,201,830,698 | never finishes |
+| maze | **weighted** | 34 | **0.058** | **0.136** | **0.498** |
+
+**The ordinary estimator's worst cell on the maze reads about four trillion,
+on a problem whose best possible value is 0.513.**
+
+That is not a fault in the arithmetic. The behaviour policy takes the greedy
+action about 85% of the time, so every greedy step multiplies the correction by
+about 1.18. A long run of them multiplies it by 1.18 raised to the length of
+the run, and a maze episode early in a run is long.
+
+The unbiasedness is real and it is not worth anything here. An estimator whose
+average over infinitely many runs is right, and whose ten runs disagree by
+twelve orders of magnitude, has not told anybody what the maze is worth. The
+registry default is `weighted`.
+
+Two other things in that table are worth reading. The ordinary estimator
+credited **2** cells that all ten seeds agreed on, against 34 for the weighted
+one, so the huge spread is measured over almost nothing. And it never reached
+the goal on the maze on any of the ten seeds, where the weighted one reaches
+0.498 against a best possible of 0.513.
+
+### Where it cannot learn at all
+
+Not on the cliff walk, and the reason is worth writing down rather than leaving
+for somebody to rediscover.
+
+An episode teaches only the tail after the last step the behaviour policy
+explored. On the cliff walk, episodes run to the five hundred step limit far
+more often than they reach the goal: over two hundred episodes, ten of them
+finished and the agent credited **about one cell per episode**. The cell next
+to the goal was still untouched.
+
+Two tests hold that shape, because a weakness that is measured is worth more
+than a weakness that is described.
+
+---
+
 ## Planning, on the maze
 
 ```console

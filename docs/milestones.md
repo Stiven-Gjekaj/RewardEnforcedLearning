@@ -13,13 +13,25 @@ questions. Everything here that has a number behind it says what was measured.
 
 | | What it would add | Why it is not here |
 | --- | --- | --- |
-| Eligibility traces | One dial from one step learning to Monte Carlo, done properly rather than by choosing an `n` | The clearest thing missing. n-step SARSA is the crude version of it and it is in |
-| n-step tree backup | An off-policy n-step method with no importance sampling | Wanted, and it needs the off-policy machinery below first |
-| Off-policy Monte Carlo | Weighted importance sampling, and the variance lesson that goes with it | The lesson needs a behaviour policy that can be set separately, which no agent here has |
+| n-step tree backup | An off-policy n-step method with no importance sampling | Wanted. The off-policy machinery it needed is in now |
 | Prioritised sweeping | Dyna that replays the steps that matter rather than a random one | A queue and a predecessor table. Straightforward, and it would make the maze results far better |
 | Replay and a target network | The two pieces that make a value network stable | Needs a network over Q rather than over a policy, and the honest version needs more compute than pure Python has |
 | Continuous actions | Half of control, and everything about robotics | The whole action interface here is `Discrete`. This is a large change and it should be a large change |
 | Options | Temporally extended actions, on the grid the literature uses for them | Four rooms is in the project waiting for this |
+
+---
+
+## Built since that table was written
+
+**Eligibility traces**, as `sarsa-lambda` and `q-lambda`. One dial rather than
+a whole number of steps. The sweep found the same interaction with the step
+size that n-step SARSA had, including the same exception, which is the reason
+[algorithms.md](algorithms.md) now has the two of them in one section.
+
+**Off-policy Monte Carlo**, as `off-policy-mc`, with both estimators. The
+variance lesson is measured rather than asserted: the ordinary estimator's
+worst cell on the maze reads four trillion on a problem whose best possible
+value is 0.513.
 
 ---
 
