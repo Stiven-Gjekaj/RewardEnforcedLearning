@@ -51,6 +51,7 @@ from rel.agents.dyna import DynaQ, DynaQPlus
 from rel.agents.features import encoder_for
 from rel.agents.linear import SemiGradientQ, SemiGradientSarsa
 from rel.agents.monte_carlo import MonteCarloControl
+from rel.agents.off_policy import Estimator, OffPolicyMonteCarlo
 from rel.agents.policy import ActorCritic, Reinforce
 from rel.agents.td import DoubleQ, ExpectedSarsa, NStepSarsa, QLearning, Sarsa
 from rel.agents.tiles import TileCoder
@@ -148,6 +149,26 @@ def _n_step(
 #: started at, SARSA with traces is better on all four grids and leaves 1 policy
 #: stuck rather than 10, and Watkins' Q is better on two and the same on two.
 #: `docs/algorithms.md` has the sweep.
+def _off_policy(
+    rng: Rng,
+    env: Env[Any],
+    estimator: Estimator = "weighted",
+    step_size: float | Schedule | None = None,
+    discount: float = 1.0,
+    epsilon: float | Schedule = 0.1,
+    optimism: float = 0.0,
+) -> Agent[Any]:
+    return OffPolicyMonteCarlo(
+        rng,
+        env.action_space,
+        estimator=estimator,
+        step_size=step_size,
+        discount=discount,
+        epsilon=epsilon,
+        optimism=optimism,
+    )
+
+
 def _traced(cls: type[SarsaLambda[Any]]) -> AgentBuilder:
     """A builder for the two agents that keep traces."""
 
@@ -395,6 +416,12 @@ AGENTS: Registry[Agent[Any]] = Registry(
             "q-lambda",
             "Q-learning with traces, cut whenever the agent leaves its policy.",
             _traced(WatkinsQLambda),
+            tags=("tabular", "off-policy"),
+        ),
+        Entry(
+            "off-policy-mc",
+            "Learns the greedy policy from episodes an exploring one collected.",
+            _off_policy,
             tags=("tabular", "off-policy"),
         ),
         Entry(
