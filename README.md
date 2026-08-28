@@ -36,7 +36,7 @@ environments where the reward is not the point_
 **A reinforcement learning laboratory that runs in a terminal and needs
 nothing installed.**
 
-Twelve environments, eighteen agents, a gradient engine, a dynamic programming
+Twelve environments, twenty agents, a gradient engine, a dynamic programming
 solver that says what the best possible policy is worth, and a command line
 that draws a learning curve out of braille dots.
 
@@ -204,6 +204,8 @@ rather than an estimate.
 - **Bandits.** Epsilon greedy, optimistic, upper confidence, gradient.
 - **Tabular.** SARSA, Q-learning, Expected SARSA, Double Q, n-step SARSA,
   first visit Monte Carlo.
+- **Traces.** SARSA with eligibility traces and Watkins' Q with them, in
+  accumulating, replacing and dutch flavours.
 - **Planning.** Dyna-Q and Dyna-Q+.
 - **Approximation.** Semi-gradient SARSA and Q-learning over a tile coder.
 - **Networks.** REINFORCE with a baseline and an actor critic, on a reverse
@@ -287,7 +289,7 @@ an agent when it is fifty times too large.
 rel/core.py         the contract: what an environment is, what a step is
 rel/rng.py          PCG written out, with named independent streams
 rel/envs/           twelve environments. Never import an agent.
-rel/agents/         eighteen agents. Never import an environment.
+rel/agents/         twenty agents. Never import an environment.
   dp.py             value iteration, policy iteration, exact policy values
   td.py             SARSA, Q-learning, Expected SARSA, Double Q, n-step
   tiles.py          tile coding, worked out exactly rather than hashed
@@ -378,7 +380,7 @@ what it was for.
 
 ## Status
 
-Alpha, and complete enough to be useful. Twelve environments and eighteen
+Alpha, and complete enough to be useful. Twelve environments and twenty
 agents, all of them covered by a suite that runs in about five minutes with no
 browser, no display and no network.
 
