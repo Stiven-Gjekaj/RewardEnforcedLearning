@@ -151,6 +151,197 @@ class TestAGridFromAFile:
         assert "cannot be read" in capsys.readouterr().err
 
 
+class TestRecordingARun:
+    """`--out` on `rel train`, and `rel replay` reading it back."""
+
+    def test_a_run_can_be_written_to_a_file(self, tmp_path: Path) -> None:
+        path = tmp_path / "run.txt"
+        assert (
+            main(
+                [
+                    "train",
+                    "q-learning",
+                    "--env",
+                    "cliff",
+                    "--episodes",
+                    "20",
+                    "--quiet",
+                    "--out",
+                    str(path),
+                ]
+            )
+            == 0
+        )
+        assert path.exists()
+        assert path.read_text(encoding="utf-8").startswith("rel-run 1")
+
+    def test_recording_does_not_change_the_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # The recorder stands in for the digest and nothing else moves, so a
+        # recorded run and an unrecorded one on the same seed take the same
+        # path through the environment.
+        path = tmp_path / "run.txt"
+        main(
+            [
+                "train",
+                "q-learning",
+                "--env",
+                "cliff",
+                "--episodes",
+                "20",
+                "--quiet",
+                "--out",
+                str(path),
+            ]
+        )
+        capsys.readouterr()
+
+        main(
+            [
+                "train",
+                "q-learning",
+                "--env",
+                "cliff",
+                "--episodes",
+                "20",
+                "--quiet",
+                "--print",
+                "digest",
+            ]
+        )
+        unrecorded = capsys.readouterr().out.strip()
+
+        from rel.recording import read_run
+
+        assert read_run(path).header["digest"] == unrecorded
+
+    def test_the_header_says_what_was_run(self, tmp_path: Path) -> None:
+        from rel.recording import read_run
+
+        path = tmp_path / "run.txt"
+        main(
+            [
+                "train",
+                "sarsa",
+                "--env",
+                "cliff",
+                "--episodes",
+                "10",
+                "--seed",
+                "3",
+                "--quiet",
+                "--out",
+                str(path),
+            ]
+        )
+        header = read_run(path).header
+        assert header["env"] == "cliff"
+        assert header["agent"] == "sarsa"
+        assert header["seed"] == "3"
+        assert header["episodes"] == "10"
+
+    def test_a_name_ending_in_gz_is_compressed(self, tmp_path: Path) -> None:
+        path = tmp_path / "run.txt.gz"
+        main(
+            [
+                "train",
+                "q-learning",
+                "--env",
+                "cliff",
+                "--episodes",
+                "20",
+                "--quiet",
+                "--out",
+                str(path),
+            ]
+        )
+        assert path.read_bytes()[:2] == b"\x1f\x8b"
+
+    def test_replay_draws_what_the_run_drew(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        path = tmp_path / "run.txt"
+        main(
+            [
+                "train",
+                "q-learning",
+                "--env",
+                "cliff",
+                "--episodes",
+                "40",
+                "--quiet",
+                "--out",
+                str(path),
+                "--no-colour",
+            ]
+        )
+        capsys.readouterr()
+
+        assert main(["replay", str(path), "--no-colour"]) == 0
+        printed = capsys.readouterr().out
+        assert "q-learning on cliff" in printed
+        assert "episodes             40" in printed
+
+    def test_a_compressed_file_replays(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        path = tmp_path / "run.txt.gz"
+        main(
+            [
+                "train",
+                "q-learning",
+                "--env",
+                "cliff",
+                "--episodes",
+                "20",
+                "--quiet",
+                "--out",
+                str(path),
+            ]
+        )
+        capsys.readouterr()
+        assert main(["replay", str(path), "--no-colour"]) == 0
+        assert "episodes             20" in capsys.readouterr().out
+
+    def test_a_changed_file_is_refused_rather_than_drawn(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        path = tmp_path / "run.txt"
+        main(
+            [
+                "train",
+                "q-learning",
+                "--env",
+                "cliff",
+                "--episodes",
+                "20",
+                "--quiet",
+                "--out",
+                str(path),
+            ]
+        )
+
+        text = path.read_text(encoding="utf-8").splitlines()
+        for index, line in enumerate(text):
+            if "|" in line:
+                fields = line.split("|")
+                fields[2] = "-2"
+                text[index] = "|".join(fields)
+                break
+        path.write_text("\n".join(text) + "\n", encoding="utf-8")
+
+        capsys.readouterr()
+        assert main(["replay", str(path), "--no-colour"]) == 2
+        assert "changed since it was written" in capsys.readouterr().err
+
+    def test_a_file_that_is_not_there_says_so(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert main(["replay", "nowhere.txt", "--no-colour"]) == 2
+        assert "cannot be read" in capsys.readouterr().err
+
+
 class TestList:
     def test_it_names_every_environment_and_agent(
         self, capsys: pytest.CaptureFixture[str]

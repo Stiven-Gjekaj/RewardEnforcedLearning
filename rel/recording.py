@@ -279,7 +279,7 @@ def _verify(found: Recording, where: str) -> None:
         )
 
 
-def save(path: str | Path, recorder: Recorder, **header: Any) -> Path:
+def save_run(path: str | Path, recorder: Recorder, **header: Any) -> Path:
     """Write a run to a file, compressed when the name ends in `.gz`."""
     found = Path(path)
     text = write(recorder, **header)
@@ -290,7 +290,7 @@ def save(path: str | Path, recorder: Recorder, **header: Any) -> Path:
     return found
 
 
-def read(path: str | Path, *, check: bool = True) -> Recording:
+def read_run(path: str | Path, *, check: bool = True) -> Recording:
     """Read a run from a file, compressed or not.
 
     Which one is decided by looking at the first two bytes rather than at the
@@ -327,8 +327,8 @@ __all__ = [
     "Recording",
     "RecordingError",
     "parse",
-    "read",
-    "save",
+    "read_run",
+    "save_run",
     "watched",
     "write",
 ]

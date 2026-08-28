@@ -20,8 +20,8 @@ from rel.recording import (
     Recorder,
     RecordingError,
     parse,
-    read,
-    save,
+    read_run,
+    save_run,
     watched,
     write,
 )
@@ -194,16 +194,16 @@ class TestWhatCanBeWorkedOutAgain:
 
 class TestFiles:
     def test_it_writes_and_reads_a_plain_file(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
-        path = save(tmp_path / "run.txt", watched(WALK), env="cliff")
-        assert len(read(path).steps) == len(WALK)
+        path = save_run(tmp_path / "run.txt", watched(WALK), env="cliff")
+        assert len(read_run(path).steps) == len(WALK)
 
     def test_a_name_ending_in_gz_is_compressed(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
-        path = save(tmp_path / "run.txt.gz", watched(WALK), env="cliff")
+        path = save_run(tmp_path / "run.txt.gz", watched(WALK), env="cliff")
         assert path.read_bytes()[:2] == b"\x1f\x8b"
 
     def test_the_compressed_file_reads_back_the_same(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
-        plain = read(save(tmp_path / "run.txt", watched(WALK), env="cliff"))
-        packed = read(save(tmp_path / "run.txt.gz", watched(WALK), env="cliff"))
+        plain = read_run(save_run(tmp_path / "run.txt", watched(WALK), env="cliff"))
+        packed = read_run(save_run(tmp_path / "run.txt.gz", watched(WALK), env="cliff"))
         assert packed.steps == plain.steps
         assert packed.header == plain.header
 
@@ -213,11 +213,11 @@ class TestFiles:
         # A file renamed by a browser still reads.
         path = tmp_path / "renamed.txt"
         path.write_bytes(gzip.compress(a_file().encode("utf-8")))
-        assert len(read(path).steps) == len(WALK)
+        assert len(read_run(path).steps) == len(WALK)
 
     def test_a_file_that_is_not_there_says_so(self) -> None:
         with pytest.raises(RecordingError, match="cannot be read"):
-            read("nowhere/at/all.txt")
+            read_run("nowhere/at/all.txt")
 
     def test_something_that_is_not_gzip_but_looks_like_it_says_so(
         self, tmp_path
@@ -225,4 +225,4 @@ class TestFiles:
         path = tmp_path / "broken.gz"
         path.write_bytes(b"\x1f\x8b" + b"not really")
         with pytest.raises(RecordingError, match="not readable gzip"):
-            read(path)
+            read_run(path)

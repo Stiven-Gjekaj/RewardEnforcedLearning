@@ -48,6 +48,7 @@ from rel.envs import ENVIRONMENTS
 from rel.envs.gridfile import read as read_grid
 from rel.envs.gridworld import GridWorld
 from rel.metrics import summarise
+from rel.recording import Recorder, read_run, save_run
 from rel.rng import Rng
 from rel.training import Episode, Record, evaluate, train
 from rel.ui.chart import line_chart, smooth, sparkline
@@ -413,6 +414,62 @@ def command_solve(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_replay(args: argparse.Namespace) -> int:
+    """Read a run out of a file and draw what it did.
+
+    The digest is checked on the way in, so a file that has been changed since
+    it was written is refused rather than drawn.
+    """
+    palette = palette_for(forced=args.colour)
+    found = read_run(args.path)
+    record = found.record()
+
+    named = [
+        (name, palette.paint(found.header[name], "grey"))
+        for name in ("env", "agent", "seed", "episodes", "discount", "steps")
+        if name in found.header
+    ]
+    named.append(("digest", palette.paint(found.header["digest"], "grey")))
+    for line in pairs(named, palette):
+        print(line)
+
+    if not record.returns:
+        print("\nThe file holds steps and no episode that ended.")
+        return 0
+
+    window = _window(args, len(record))
+    label = found.header.get("agent", "the run")
+    print()
+    for line in line_chart(
+        {label: smooth(record.returns, window)},
+        width=args.width,
+        height=args.height,
+        palette=palette,
+        clip=args.clip,
+        title=palette.paint(
+            f"{label} on {found.header.get('env', 'an environment')}, "
+            f"return per episode, smoothed over {window}",
+            "bold",
+        ),
+    ):
+        print(line)
+
+    summary = record.summary()
+    ended = sum(record.terminated)
+    print()
+    for line in pairs(
+        [
+            ("episodes", f"{len(record):,}"),
+            ("return, mean", f"{summary.mean:.2f} +/- {summary.error:.2f}"),
+            ("return, last 100", f"{record.final(100):.2f}"),
+            ("episodes that ended", f"{ended:,} of {len(record):,}"),
+        ],
+        palette,
+    ):
+        print(line)
+    return 0
+
+
 def command_train(args: argparse.Namespace) -> int:
     palette = palette_for(forced=args.colour)
     env, agent = build(
@@ -425,6 +482,11 @@ def command_train(args: argparse.Namespace) -> int:
     )
     assert agent is not None
     discount = resolve_discount(args, env)
+
+    # A run that is being recorded hands the loop a recorder in place of its
+    # digest. Nothing else about the run changes, so a recorded run and an
+    # unrecorded one on the same seed have the same digest.
+    recorder = Recorder() if args.out else None
 
     live = Live(enabled=(not args.quiet) and args.colour is not False)
     started = time.perf_counter()
@@ -449,8 +511,28 @@ def command_train(args: argparse.Namespace) -> int:
         )
 
     with live:
-        learning = train(env, agent, args.episodes, discount=discount, on_episode=draw)
+        learning = train(
+            env,
+            agent,
+            args.episodes,
+            discount=discount,
+            on_episode=draw,
+            digest=recorder,
+        )
     seconds = time.perf_counter() - started
+
+    if recorder is not None:
+        written = save_run(
+            args.out,
+            recorder,
+            env=env.spec.name,
+            agent=args.agent,
+            seed=args.seed,
+            episodes=args.episodes,
+            discount=f"{discount:g}",
+        )
+        if not args.quiet:
+            print(f"wrote {recorder.steps} steps to {written}")
 
     watch_env, _ = build(
         args.env, None, args.seed + 1, parse_settings(args.env_set), {}, args.env_file
@@ -762,6 +844,11 @@ def build_parser() -> argparse.ArgumentParser:
     training.add_argument("agent")
     training.add_argument("--episodes", type=int, default=DEFAULT_EPISODES)
     training.add_argument(
+        "--out",
+        metavar="PATH",
+        help="write the run to a file. A name ending in .gz is compressed.",
+    )
+    training.add_argument(
         "--watch",
         type=int,
         default=20,
@@ -806,6 +893,20 @@ def build_parser() -> argparse.ArgumentParser:
     watching.add_argument("--set", action="append", metavar="NAME=VALUE")
     _add_common(watching)
     watching.set_defaults(run=command_demo)
+
+    replaying = commands.add_parser(
+        "replay", help="read a recorded run out of a file and draw it"
+    )
+    replaying.add_argument("path", help="a file written by rel train --out")
+    replaying.add_argument(
+        "--colour",
+        dest="colour",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="force colour on or off. The default reads the terminal.",
+    )
+    _add_chart(replaying)
+    replaying.set_defaults(run=command_replay)
 
     gaming = commands.add_parser(
         "gaming", help="the demonstration this project is named for"
