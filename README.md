@@ -77,7 +77,8 @@ best possible                     -13.00
 What the reward did not pay for
 pit_entries  0.370
 
-digest  5b72150454218ff0
+digest, the path         5b72150454218ff0
+digest, what it learned  99b9fde0a785516a
 
 The policy it learned
 >^>>>>>>>v>v
@@ -175,10 +176,12 @@ $ rel train q-learning --env cliff --out run.gz  # write the run down
 $ rel replay run.gz                              # and read it back
 ```
 
-Every run is reproducible from its seed, and every run prints a digest of its
-own transitions so that two runs can be compared without comparing prose.
+Every run is reproducible from its seed, and every run prints two digests so
+that runs can be compared without comparing prose. One covers the path through
+the environment and one covers what the agent came to believe, because two
+learning rules fed the same steps walk the same path and end up disagreeing.
 `--out` writes the transitions themselves, and `rel replay` checks them against
-that digest rather than trusting it.
+the path digest rather than trusting it.
 
 ---
 
