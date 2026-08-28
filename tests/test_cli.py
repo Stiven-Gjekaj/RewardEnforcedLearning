@@ -385,6 +385,62 @@ class TestGaming:
         assert "LAPS" in printed
         assert "REALLY COMFORTABLE" in printed
 
+    def test_the_pressure_walk_is_off_unless_it_is_asked_for(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # It costs a third again of the time this command already takes, and
+        # this command is the one a reader runs first.
+        assert main(["gaming", "--no-learn", "--no-colour"]) == 0
+        assert "HOW HARD THE AGENT TRIES" not in capsys.readouterr().out
+
+    def test_the_pressure_walk_reports_every_rung(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert (
+            main(
+                [
+                    "gaming",
+                    "--no-learn",
+                    "--no-colour",
+                    "--pressure",
+                    "--pressure-episodes",
+                    "4",
+                ]
+            )
+            == 0
+        )
+        printed = capsys.readouterr().out
+        assert "HOW HARD THE AGENT TRIES" in printed
+        assert "the reward" in printed
+        assert "the point" in printed
+        # Six rungs on each of three environments, and the ends of the ladder
+        # are the two rows a reader checks first.
+        assert printed.count("       0.0 ") >= 3
+        assert printed.count("       1.0 ") >= 3
+
+    def test_the_pressure_chart_draws_with_no_terminal(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # A test runs inside a captured stream rather than a terminal. A chart
+        # that only drew when one was attached would pass every other test in
+        # this file and print nothing where it matters.
+        assert (
+            main(
+                [
+                    "gaming",
+                    "--no-learn",
+                    "--no-colour",
+                    "--pressure",
+                    "--pressure-episodes",
+                    "4",
+                ]
+            )
+            == 0
+        )
+        printed = capsys.readouterr().out
+        drawn = printed[printed.index("HOW HARD THE AGENT TRIES") :]
+        assert any("\u2800" <= mark <= "\u28ff" for mark in drawn)
+
 
 def test_the_version_is_printed(capsys: pytest.CaptureFixture[str]) -> None:
     from rel import __version__

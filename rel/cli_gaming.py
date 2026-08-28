@@ -23,8 +23,10 @@ from rel.agents.dp import FixedPolicyAgent, value_iteration
 from rel.agents.td import QLearning
 from rel.core import TabularEnv
 from rel.envs.gaming import BoatRace, Thermostat, VaseRoom
+from rel.pressure import ladder, share
 from rel.rng import Rng
 from rel.training import evaluate, train
+from rel.ui.chart import line_chart
 from rel.ui.colour import Palette, palette_for
 from rel.ui.table import table
 
@@ -248,6 +250,99 @@ def _thermostat(args: argparse.Namespace, palette: Palette) -> None:
     )
 
 
+#: Each gaming environment, the reward as written and the reward repaired, the
+#: number the audit reports, and what that number reads when the objective is
+#: not met at all. The last of those is the floor of the objective share, and
+#: it has to be the objective's own zero: anchored at whatever a uniform policy
+#: happens to score, the result below clamps away.
+PRESSURE_CASES = (
+    (
+        "boat race",
+        lambda rng: BoatRace(rng, reward="touch"),
+        lambda rng: BoatRace(rng, reward="ordered"),
+        "laps",
+        0.0,
+    ),
+    (
+        "vase room",
+        lambda rng: VaseRoom(rng, vase_penalty=0.0),
+        lambda rng: VaseRoom(rng, vase_penalty=3.0),
+        "vase_broken",
+        1.0,
+    ),
+    (
+        "thermostat",
+        lambda rng: Thermostat(rng, reward="sensor"),
+        lambda rng: Thermostat(rng, reward="true"),
+        "comfortable_share",
+        0.0,
+    ),
+)
+
+
+def _pressure(args: argparse.Namespace, palette: Palette) -> None:
+    """Walk each reward from a uniform policy to its optimum, and chart both.
+
+    The tables above are the two ends of this. What they cannot show is that
+    the objective falls the whole way, so that the best policy under the stated
+    reward is worse at the real objective than a policy that optimises nothing.
+    """
+    print()
+    print(palette.paint("HOW HARD THE AGENT TRIES", "bold"))
+    print()
+    print(
+        "  Every rung follows the best policy under the stated reward more of\n"
+        "  the time. Nothing is learned along the way, so what moves is how\n"
+        "  hard the agent optimises and nothing else."
+    )
+
+    for name, gamed, repaired, key, unmet in PRESSURE_CASES:
+        discount = _discount(args, gamed(Rng(1).stream("env")))
+        episodes = args.pressure_episodes
+        rungs = ladder(gamed, discount, episodes=episodes, seed=1)
+        reachable = ladder(
+            repaired, discount, epsilons=(0.0,), episodes=episodes, seed=1
+        )[0]
+
+        paid_shares = [share(r.paid, rungs[0].paid, rungs[-1].paid) for r in rungs]
+        point_shares = [share(r.audit[key], unmet, reachable.audit[key]) for r in rungs]
+
+        print()
+        print(f"  {palette.paint(name, 'bold')}")
+        for line in line_chart(
+            {"the reward": paid_shares, "the point": point_shares},
+            width=46,
+            height=8,
+            palette=palette,
+        ):
+            print(f"    {line}")
+
+        rows = [
+            (
+                f"{rung.pressure:.1f}",
+                f"{rung.paid:.1f}",
+                f"{paid:.2f}",
+                f"{rung.audit[key]:.2f}",
+                f"{point:.2f}",
+                palette.paint(
+                    f"{paid - point:+.2f}", "red" if paid - point > 0.5 else "grey"
+                ),
+            )
+            for rung, paid, point in zip(rungs, paid_shares, point_shares, strict=True)
+        ]
+        headings = ["pressure", "paid", "reward", key, "the point", "gap"]
+        for line in table(headings, rows, align=["right"] * len(headings)):
+            print(f"    {line}")
+
+    print()
+    print(
+        "  The reward rises to one because that is what the policy was solved\n"
+        "  for. The point falls the whole way. At the far end of every one of\n"
+        "  these the best policy under the stated reward is worse at the real\n"
+        "  objective than a policy that optimises nothing at all."
+    )
+
+
 def run_gaming(args: argparse.Namespace) -> int:
     palette = palette_for(forced=args.colour)
 
@@ -272,6 +367,9 @@ def run_gaming(args: argparse.Namespace) -> int:
     _boat_race(args, palette)
     _vase_room(args, palette)
     _thermostat(args, palette)
+
+    if getattr(args, "pressure", False):
+        _pressure(args, palette)
 
     print()
     print(palette.paint("What the three have in common", "bold"))

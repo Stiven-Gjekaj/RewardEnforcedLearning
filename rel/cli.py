@@ -789,6 +789,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=True,
         help="also train an agent, rather than only solving the model",
     )
+    gaming.add_argument(
+        "--pressure",
+        action="store_true",
+        help="also walk each reward from a uniform policy to its optimum",
+    )
+    gaming.add_argument(
+        "--pressure-episodes",
+        type=int,
+        default=40,
+        dest="pressure_episodes",
+        help="episodes at each rung of that walk",
+    )
     _add_common(gaming)
     gaming.set_defaults(run=command_gaming)
 
