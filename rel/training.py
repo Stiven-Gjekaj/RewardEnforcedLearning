@@ -46,10 +46,14 @@ from rel.metrics import Summary, last_mean, summarise
 DIGEST_FIGURES = 12
 
 
-def _encode(value: Any) -> str:
-    """One observation, as text that does not depend on how Python prints it."""
+def encoded(value: Any) -> str:
+    """One observation, as text that does not depend on how Python prints it.
+
+    Public because a recording writes the same text to a file and reads it
+    back. An observation spelled two ways would be two digests.
+    """
     if isinstance(value, tuple):
-        return ",".join(_encode(item) for item in value)
+        return ",".join(encoded(item) for item in value)
     if isinstance(value, float):
         return f"{value:.{DIGEST_FIGURES}g}"
     return str(value)
@@ -64,7 +68,7 @@ def digest_line(transition: Transition[Any]) -> str:
     only one of them.
     """
     return (
-        f"{_encode(transition.observation)}"
+        f"{encoded(transition.observation)}"
         f"|{transition.action}"
         f"|{transition.reward:.{DIGEST_FIGURES}g}"
         f"|{int(transition.terminated)}{int(transition.truncated)}\n"
@@ -264,9 +268,15 @@ def train(
     discount: float = 1.0,
     keep_steps: bool = False,
     on_episode: Callable[[Episode, Record], None] | None = None,
+    digest: Digest | None = None,
 ) -> Record:
-    """Run the agent for `episodes` episodes while it learns."""
-    record = Record()
+    """Run the agent for `episodes` episodes while it learns.
+
+    `digest` lets the caller supply the thing that watches every step. A run
+    that is being recorded hands it a `rel.recording.Recorder`, which is a
+    digest that also keeps what it hashed.
+    """
+    record = Record(digest=digest) if digest is not None else Record()
     for number in range(episodes):
         episode = run_episode(
             env,
@@ -315,6 +325,7 @@ __all__ = [
     "Episode",
     "Record",
     "digest_line",
+    "encoded",
     "evaluate",
     "run_episode",
     "train",

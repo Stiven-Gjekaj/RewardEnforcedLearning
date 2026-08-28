@@ -34,6 +34,7 @@ AREAS = (
             "rel/metrics.py",
             "rel/schedules.py",
             "rel/pressure.py",
+            "rel/recording.py",
         ),
     ),
     ("Interface", ("rel/ui",)),
