@@ -251,3 +251,66 @@ class TestAgainstUniformReplay:
         uniform = self.updates_to_solve(DynaQ, seed)
         ordered = self.updates_to_solve(PrioritisedSweeping, seed)
         assert ordered * 3 < uniform
+
+
+class TestItStopsWhenThereIsNothingLeft:
+    """The threshold is why the work ends, and why it can end too early.
+
+    Once every step in the model would change by less than the threshold, the
+    queue empties and stays empty. `dyna-q` in the same position keeps making
+    its full quota of replays forever, all of them teaching nothing.
+
+    The same mechanism is the weakness. The agent stops because it believes it
+    is finished, and it can believe that while holding a policy that is not the
+    best one.
+    """
+
+    @staticmethod
+    def settled(seed: int) -> PrioritisedSweeping[int]:
+        rng = Rng(seed)
+        env = dyna_maze(rng.stream("env"))
+        agent: PrioritisedSweeping[int] = PrioritisedSweeping(
+            rng.stream("agent"),
+            env.action_space,
+            planning_steps=5,
+            step_size=0.5,
+            discount=0.95,
+            epsilon=0.1,
+        )
+        train(env, agent, 200)
+        return agent
+
+    def test_a_settled_run_costs_almost_nothing(self) -> None:
+        rng = Rng(1)
+        env = dyna_maze(rng.stream("env"))
+        agent = self.settled(1)
+        assert agent.queue == {}
+
+        before_replays, before_steps = agent.replays, agent.steps
+        train(env, agent, 20)
+        steps = agent.steps - before_steps
+
+        # Dyna-Q would have made six updates for each of these steps.
+        assert steps > 200
+        assert agent.replays - before_replays <= 1
+
+    def test_it_can_stop_while_holding_a_policy_that_is_not_the_best(self) -> None:
+        # Seed 9 settles on a route two steps longer than the shortest one and
+        # never moves off it. Nothing in the model changes any more, so nothing
+        # is queued, and the only way back to the question is a real step that
+        # surprises it. That is what the bonus of Dyna-Q+ is for, and this
+        # agent does not have one.
+        rng = Rng(9)
+        env = dyna_maze(rng.stream("env"))
+        best = value_iteration(env, discount=0.95).start_value
+        agent = self.settled(9)
+
+        policy = [agent.greedy(state) for state in range(env.observation_space.n)]
+        report = evaluate_policy(env, policy, discount=0.95)
+        assert report.reaches_end
+        assert report.start_value < best
+
+        # And it stays there. Two hundred more episodes change nothing.
+        train(env, agent, 200)
+        policy = [agent.greedy(state) for state in range(env.observation_space.n)]
+        assert evaluate_policy(env, policy, discount=0.95).start_value < best
