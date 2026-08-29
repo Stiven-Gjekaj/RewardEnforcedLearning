@@ -13,12 +13,25 @@ questions. Everything here that has a number behind it says what was measured.
 
 | | What it would add | Why it is not here |
 | --- | --- | --- |
-| Replay and a target network | The two pieces that make a value network stable | Needs a network over Q rather than over a policy, and the honest version needs more compute than pure Python has |
 | Continuous actions | Half of control, and everything about robotics | The whole action interface here is `Discrete`. This is a large change and it should be a large change |
 
 ---
 
 ## Built since that table was written
+
+**A value network**, as `deep-q`, with a replay buffer and a target network as
+two settings of one agent rather than two agents. The ablation is the point,
+and it reads differently on two environments. On the cart pole neither piece
+alone does anything: the median of the last fifty episodes is 66.3 with both
+and 9.0, 9.4 and 8.8 with either one missing, where a pole nobody balances
+falls in about nine steps. On the cliff walk all four medians are the same
+number, -55.2, -49.6, -55.6 and -55.3, and only the tail moves: with neither
+piece four seeds of ten end past -240, and with both one does. The difference
+is the representation. A one-hot grid gives each state close to its own
+parameters, so the shared weight problem barely arises and what is left is the
+occasional run where it does. The honest note stands: nothing here solves the
+cart pole. The best setting reaches 66 steps of a possible 500, where
+`tile-sarsa` reaches 498.
 
 **Intra-option learning**, as `intra-option-q`. One real step is evidence about
 every option that would have taken that action there, so the states an option
