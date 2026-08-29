@@ -19,6 +19,30 @@ questions. Everything here that has a number behind it says what was measured.
 
 ## Built since that table was written
 
+**Planning at the moment of choosing**, as `mcts`. It runs simulations from the
+state it is standing in and acts on what they said, where `dyna-q` and
+`prioritised-sweeping` spend the same work in the background on a table. All
+three are counted in model steps, because a table of returns against episodes
+lets an agent that asks a model a thousand times a step look free.
+
+Two things came out of measuring it and neither was the expected one. On the
+Dyna maze every setting settles in about the same place and they are two orders
+of magnitude apart in cost: the search reaches sixteen steps for 94,296 model
+steps and prioritised sweeping reaches seventeen for 3,575, having had to learn
+its model rather than being handed one. And more simulations buy nothing, so
+what carries the agent is not the search from where it stands.
+
+It is the tree. With `reuse=off`, which is decision-time planning with nothing
+else in it, the same code with the same model never settles: 330 steps against
+a shortest route of fourteen, three seeds of three with a policy that never
+reaches the goal, and forty two million model steps to fail.
+
+The reason is the rollout. A random policy of thirty steps reaches an ending on
+none of two hundred tries on either the maze or the cliff walk, so the tail of
+a simulation is nearly always the same number. On the cliff walk it is exactly
+the same number, because every step pays -1 and the discount is one. **The
+repair is a value at the leaf instead of a rollout, and it is not built.**
+
 **Exploring by something other than chance.** `explore` is a setting on every
 tabular agent, and three rules answer it: epsilon-greedy, softmax, and a
 count-based bonus. Optimistic initialisation is the fourth way and it is a
