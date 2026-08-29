@@ -267,6 +267,17 @@ class TreeSearch(Agent[int]):
         return None if node is None else node.means()
 
     def knows(self, observation: int) -> bool:
+        """Whether the search has an opinion about this state.
+
+        The value map draws the cells this answers no for as unknown, and its
+        label there reads "never stood in". For every other agent here the two
+        are the same thing, because a table only gains a row where the agent
+        acted. A planner is different: this tree holds every state a simulation
+        passed through, and the agent may never have stood in any of them.
+
+        Having an opinion is the question the map is really asking, so this
+        answers that one.
+        """
         return observation in self.tree
 
     def learned(self) -> Iterator[str]:
