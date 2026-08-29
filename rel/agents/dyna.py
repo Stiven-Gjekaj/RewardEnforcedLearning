@@ -66,6 +66,14 @@ class DynaQ(TabularAgent[ObsT]):
         #: state and action to reward, landing state and whether it ended.
         self.model: dict[tuple[ObsT, int], tuple[float, ObsT, bool]] = {}
         self._seen: list[tuple[ObsT, int]] = []
+        #: How many replays this agent has made.
+        #:
+        #: `prioritised-sweeping` counts the same thing, and so does the tree
+        #: search, which calls them simulated steps. All three of them work by
+        #: asking a model what would happen, and this is what each of them is
+        #: spending. A comparison against episodes would let an agent that asks
+        #: a thousand times a step look free.
+        self.replays = 0
 
     def learned(self) -> Iterator[str]:
         # The table and the model. A Dyna agent's conclusions are both: two of
@@ -109,6 +117,7 @@ class DynaQ(TabularAgent[ObsT]):
         for _ in range(self.planning_steps):
             observation, action = self._seen[self.rng.below(len(self._seen))]
             reward, landed, terminated = self.model[(observation, action)]
+            self.replays += 1
             self._replay(observation, action, reward, landed, terminated)
 
     def _replay(

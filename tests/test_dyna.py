@@ -6,6 +6,7 @@ import pytest
 
 from rel.agents.base import Transition
 from rel.agents.dyna import DynaQ, DynaQPlus
+from rel.agents.sweeping import PrioritisedSweeping
 from rel.agents.td import QLearning
 from rel.envs.classic import dyna_maze
 from rel.envs.gridworld import GridWorld
@@ -243,3 +244,35 @@ class TestWhatItLearned:
         one.observe(go(0, 0, -1.0, 1))
         other.observe(go(0, 0, -5.0, 1))
         assert digest_of(one) != digest_of(other)
+
+
+class TestItCountsWhatItSpends:
+    """Every planner here works by asking a model what would happen.
+
+    `prioritised-sweeping` counted its replays and the tree search counts its
+    simulated steps. Dyna counted nothing, so the three could not be put on one
+    axis, and a comparison against episodes lets an agent that asks a thousand
+    times a step look free.
+    """
+
+    def test_a_step_makes_its_quota_of_replays(self) -> None:
+        agent = DynaQ(Rng(1), Discrete(2), planning_steps=7, epsilon=0.0)
+        agent.observe(Transition(0, 0, 1.0, 1, False, False))
+        assert agent.replays == 7
+
+    def test_the_first_step_has_nothing_to_replay_before_it(self) -> None:
+        """The model is empty until a step has been remembered."""
+        agent = DynaQ(Rng(1), Discrete(2), planning_steps=7, epsilon=0.0)
+        assert agent.replays == 0
+
+    def test_no_planning_spends_nothing(self) -> None:
+        agent = DynaQ(Rng(1), Discrete(2), planning_steps=0, epsilon=0.0)
+        for _ in range(5):
+            agent.observe(Transition(0, 0, 1.0, 1, False, False))
+        assert agent.replays == 0
+
+    def test_the_sweeper_counts_the_same_thing(self) -> None:
+        """It inherits the counter rather than declaring a second one."""
+        agent = PrioritisedSweeping(Rng(1), Discrete(2), planning_steps=5)
+        agent.observe(Transition(0, 0, 1.0, 1, True, False))
+        assert agent.replays > 0

@@ -114,11 +114,12 @@ class PrioritisedSweeping(DynaQ[ObsT]):
         self.leading_to: dict[ObsT, set[tuple[ObsT, int]]] = {}
         #: A state and action, to how much replaying it would change its value.
         self.queue: dict[tuple[ObsT, int], float] = {}
-        #: How many replays this agent has made, which is how many updates it
-        #: has made in total. The measurement in `docs/algorithms.md` is about
-        #: this rather than about episodes, because the whole claim is that
-        #: fewer of them are needed.
-        self.replays = 0
+
+        # `replays` comes from `DynaQ` and counts the same thing here: every
+        # update this agent makes comes off the queue, so the count of replays
+        # is the count of updates. The measurement in `docs/algorithms.md` is
+        # about that rather than about episodes, because the whole claim is
+        # that fewer of them are needed.
 
     # -- The queue ----------------------------------------------------------
 
