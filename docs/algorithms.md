@@ -1829,6 +1829,118 @@ it off.
 
 ---
 
+## Whether the difference is real, and how large
+
+```console
+$ rel compare sarsa q-learning --env cliff --runs 10
+$ python scripts/measure_noise.py --trials 200
+$ python scripts/measure_noise.py --trials 200 --runs 10
+```
+
+Two means and two standard errors describe two sets of numbers. A reader takes
+a comparison from them anyway, so `rel compare` makes the comparison instead of
+leaving it to be made by eye:
+
+```
+sarsa against q-learning, paired by seed
+  difference    +16.53
+  95% interval  +10.50 to +21.83
+  p value       0.0078
+```
+
+**The comparison is paired.** Both agents meet the same seeds, so a difference
+on seed 4 is a difference between the agents rather than between the problems
+they were given. That matters here more than usual: one agent's ten cliff walk
+seeds run from -20 to -545, and a comparison that threw the pairing away would
+be looking for a difference of sixteen inside a spread of five hundred.
+
+The p value comes from flipping the sign of each paired difference every
+possible way and counting how often the mean lands at least as far from zero.
+Under the claim that the two agents are the same, the label on each pair is
+arbitrary, so every sign pattern was equally likely.
+
+### Five seeds cannot reach five percent
+
+A paired test over `n` seeds has `2 ** n` sign patterns, and the two most
+extreme of them are always at least as far from zero as whatever was seen. So
+the smallest p it can ever report is `2 / 2**n`:
+
+| seeds | smallest p possible |
+| ---: | ---: |
+| 3 | 0.2500 |
+| 4 | 0.1250 |
+| 5 | **0.0625** |
+| 6 | 0.0313 |
+| 10 | 0.0020 |
+
+**Whatever the difference is.** A million to one gap on five seeds still reads
+0.0625, because there are only thirty two ways to arrange five signs.
+
+Several measurements on this page ran five seeds, so none of them could have
+reached 0.05 whatever they found. `rel compare` says so when it applies, since
+otherwise a p of 0.06 reads as a result that nearly happened rather than as the
+best the arithmetic allows.
+
+### How large a difference turns up by chance
+
+`scripts/measure_noise.py` runs one agent against a copy of itself: same code,
+same settings, same environment seeds, and a different draw for the agent on
+each run. Everything it reports is noise by construction.
+
+| over 200 comparisons | 5 seeds | 10 seeds |
+| --- | ---: | ---: |
+| difference, median | 3.14 | 2.32 |
+| difference, nine in ten under | 7.71 | 4.76 |
+| difference, largest seen | 16.63 | 8.99 |
+| interval excluded zero | **39 of 200** | 12 of 200 |
+| p below 0.05 | 0 of 200 | 6 of 200 |
+
+*`q-learning` on the cliff walk, 100 episodes each.*
+
+Three things to read off it.
+
+**A 95% interval on five seeds is wrong about one time in five.** It should
+have excluded zero on about ten of those two hundred and it did on thirty nine.
+The bootstrap has five numbers to resample and it is optimistic about what it
+can tell from them. At ten seeds it is twelve of two hundred, which is what a
+95% interval is supposed to look like.
+
+**The permutation test is never wrong at five seeds and correctly cautious at
+ten.** Zero of two hundred at five, because it cannot fire at all. Six of two
+hundred at ten, which is 3% against a nominal 5%: an exact test is conservative
+rather than calibrated, and that is the right direction to be wrong in.
+
+**The noise floor halves between five seeds and ten.** The largest difference
+two identical agents showed is 16.63 at five seeds and 8.99 at ten. That is the
+number to hold a claimed difference against, and it is why the sarsa result
+above is worth believing: +16.53 is roughly twice anything noise produced over
+two hundred tries at ten seeds.
+
+### What this project should do, and mostly did not
+
+**Ten seeds, not five.** It costs twice the time and it moves the interval from
+wrong one time in five to wrong one time in seventeen, and it moves the
+permutation test from unable to fire to correctly calibrated. Several tables on
+this page run five, and they are marked with the seed count for exactly this
+reason.
+
+### Where it is weak
+
+**Pairing is an assumption about how the runs were made.** These functions are
+the wrong ones for two agents run on different seeds, and nothing in the
+numbers could tell.
+
+**The environment seed does nothing on a deterministic grid.** The cliff walk
+has no chance in it, so every seed builds the identical grid and all the
+variation in a run of it is the agent's own. Its seeds are agent seeds, and the
+same is true of every environment here except the bandits and the frozen lake.
+
+**Two agents, not three.** With three the reader wants three pairs, or one
+against each of the others, and which of those was meant is a question rather
+than a default.
+
+---
+
 ## Where the numbers on this page can be checked
 
 | Table | Command |
@@ -1847,6 +1959,7 @@ it off.
 | Replay and a target network | `python scripts/measure_value_network.py --env cartpole --runs 10 --set step_size=0.02` |
 | Four ways of exploring | `python scripts/measure_exploration.py --runs 10 --each-seed` |
 | Which loop a discount chooses | `python scripts/measure_average_reward.py` |
+| How large a difference is noise | `python scripts/measure_noise.py --trials 200` |
 | Decision time against background planning | `python scripts/measure_search.py --episodes 40 --runs 3` |
 | One rule at several dials | `python scripts/measure_exploration.py --rules softmax:0.02,softmax:0.001` |
 | Any one or two settings | `rel sweep <agent> --env <env> --over name=a,b,c` |
