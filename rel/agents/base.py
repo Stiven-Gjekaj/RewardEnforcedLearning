@@ -126,6 +126,21 @@ class Agent(ABC, Generic[ObsT]):
     #: pretending to be a picture of value.
     values_are_returns = True
 
+    def state_value(self, observation: ObsT) -> float | None:
+        """What this agent thinks this state is worth, if it can say.
+
+        The default is the best of the action values, which is what an agent
+        keeping one number per action believes about the state it is in.
+
+        An agent that predicts rather than controls keeps one number per state
+        and no action values at all, and it answers this directly. Without it a
+        value map could only be drawn for an agent that ranks actions, which
+        would leave the agents whose whole job is the value map unable to draw
+        one.
+        """
+        row = self.action_values(observation)
+        return None if row is None else max(row)
+
     def learned(self) -> Iterator[str]:
         """What this agent has learned, as lines of text, for a digest.
 

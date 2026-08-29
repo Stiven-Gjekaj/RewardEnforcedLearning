@@ -10,10 +10,12 @@ import io
 
 import pytest
 
+from rel.agents.base import Agent, RandomAgent
 from rel.agents.dp import value_iteration
 from rel.agents.td import QLearning
 from rel.envs.classic import cliff_walk
 from rel.rng import Rng
+from rel.spaces import Discrete
 from rel.ui.chart import (
     BAND,
     MARK,
@@ -433,3 +435,38 @@ class TestLive:
         display = Live(buffer, enabled=False)
         display.finish(["done"])
         assert buffer.getvalue() == "done\n"
+
+
+class TestWhatAStateIsWorth:
+    """`Agent.state_value`, which the value map is drawn from."""
+
+    def test_an_agent_that_ranks_actions_gives_the_best_of_them(self) -> None:
+        agent: QLearning[int] = QLearning(Rng(1), Discrete(3))
+        agent.values(0)[:] = [1.0, 5.0, 2.0]
+        assert agent.state_value(0) == 5.0
+
+    def test_an_agent_that_keeps_no_numbers_says_nothing(self) -> None:
+        assert RandomAgent(Rng(1), Discrete(2)).state_value(0) is None
+
+    def test_the_value_map_asks_for_it(self) -> None:
+        # An agent that predicts rather than controls keeps one number per
+        # state and no action values at all. Drawing its map off the best
+        # action value would leave the agents whose whole job is the map
+        # unable to draw one.
+        env, agent = self._map_pair()
+        drawn = value_map(env, best_values(env, agent))  # type: ignore[arg-type]
+        assert drawn.splitlines()
+
+    @staticmethod
+    def _map_pair() -> tuple[object, Agent[int]]:
+        rng = Rng(1)
+        env = cliff_walk(rng.stream("env"))
+
+        class OneNumberPerState(RandomAgent[int]):
+            def state_value(self, observation: int) -> float:
+                return float(observation)
+
+            def knows(self, observation: int) -> bool:
+                return True
+
+        return env, OneNumberPerState(rng.stream("agent"), env.action_space)

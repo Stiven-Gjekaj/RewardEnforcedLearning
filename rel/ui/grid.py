@@ -185,6 +185,10 @@ def best_values(env: GridWorld, agent: Agent[int]) -> list[float]:
     An agent that keeps no numbers has none of these, and this raises rather
     than inventing zeros. A map of zeros looks like a value map of a state
     nothing has learned, which is a different thing entirely.
+
+    It asks for the value of the state rather than the best of the action
+    values, because an agent that predicts rather than controls keeps the
+    first and not the second.
     """
     if not agent.values_are_returns:
         raise TypeError(
@@ -204,13 +208,13 @@ def best_values(env: GridWorld, agent: Agent[int]) -> list[float]:
             values.append(float("nan"))
             continue
 
-        row = agent.action_values(state)
-        if row is None:
+        worth = agent.state_value(state)
+        if worth is None:
             raise TypeError(
-                f"{type(agent).__name__} keeps no value for an action, so "
-                f"there is no value map to draw."
+                f"{type(agent).__name__} keeps no value for a state, so there "
+                f"is no value map to draw."
             )
-        values.append(max(row))
+        values.append(worth)
     return values
 
 
