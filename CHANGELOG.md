@@ -33,6 +33,12 @@ Everything below is new.
 
 **Environments**
 
+- **A corridor**, one folded path forty seven steps long with no branch
+  anywhere in it and nothing paid until the goal. It exists because every other
+  grid here can be solved by an agent that wanders, so all four ways of
+  exploring read the same on all of them. A random policy covers a line of
+  length n in about n squared steps, and a test measures the consequence: over
+  twenty episodes of the step limit a random policy arrives at most twice.
 - **Bandits.** The ten armed testbed, and a version where every lever wanders.
 - **Grids.** The cliff walk, the windy grid, four rooms, the Dyna maze and the
   frozen lake, each written as a picture of itself.
@@ -50,6 +56,21 @@ Everything below is new.
 
 **Agents**
 
+- **Exploring by something other than chance.** `explore` is a setting on every
+  tabular agent, and three rules answer it: epsilon-greedy, softmax, and a
+  count-based bonus that adds a term shrinking as an action is taken.
+  Optimistic initialisation is the fourth way and it is a starting value rather
+  than a rule. Each rule answers two questions rather than one, because
+  expected SARSA averages over the policy and an off-policy correction divides
+  by it, so a rule whose two answers disagreed would put a bias in both and
+  neither would report it. All thirteen tabular digests are unchanged by the
+  default. The finding is that **the dial of a rule cannot help find a first
+  reward, and only what the rule ranks by can**: before anything pays, every
+  value in the table is the starting number, so epsilon 0.1, 0.5 and 0.9 walk
+  one path, softmax at two temperatures a hundredfold apart walks another, and
+  the count bonus at three confidences walks a third. On the corridor the
+  median run first reaches the goal on episode 18, 21, 6 and 1, and all four
+  end with the same optimal policy.
 - **A value network**, as `deep-q`: Q-learning with a network in place of the
   table, and the two pieces that make one work as settings that can each be
   switched off. A replay buffer breaks up the correlation between steps that
