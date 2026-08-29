@@ -1574,6 +1574,8 @@ it off.
 | What crediting the middle buys | `python scripts/measure_intra_option.py --episodes 800 --block 100` |
 | Prediction against a known answer | `python scripts/measure_prediction.py` |
 | Replay and a target network | `python scripts/measure_value_network.py --env cartpole --runs 10 --set step_size=0.02` |
+| Four ways of exploring | `python scripts/measure_exploration.py --runs 10 --each-seed` |
+| One rule at several dials | `python scripts/measure_exploration.py --rules softmax:0.02,softmax:0.001` |
 | Any one or two settings | `rel sweep <agent> --env <env> --over name=a,b,c` |
 | Specification gaming | `rel gaming` |
 | One run in detail | `rel train q-learning --env cliff --seed 7` |
