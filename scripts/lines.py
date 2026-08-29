@@ -32,6 +32,7 @@ AREAS = (
         (
             "rel/training.py",
             "rel/metrics.py",
+            "rel/compare.py",
             "rel/schedules.py",
             "rel/pressure.py",
             "rel/recording.py",
