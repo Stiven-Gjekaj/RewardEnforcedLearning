@@ -33,6 +33,15 @@ Everything below is new.
 
 **Environments**
 
+- **A task with no ending**, as `loops`: one decision made over and over,
+  between a short loop paying 1 a step and a long one paying 2 a step. Their
+  discounted values are equal at 0.7394, and below that the exactly optimal
+  policy takes the loop paying half as much. The agent is not going wrong
+  there. The discount was part of the question, and 0.7 is a number chosen
+  because it converges quickly. Lengthen the long loop to eight steps and a
+  discount of 0.9 does the same thing. The `endless` tag now marks every
+  environment whose spec says it cannot end, held to the spec by a test rather
+  than to a list kept up to date by hand.
 - **A corridor**, one folded path forty eight steps long with no branch
   anywhere in it and nothing paid until the goal. It exists because every other
   grid here can be solved by an agent that wanders, so all four ways of
@@ -56,6 +65,13 @@ Everything below is new.
 
 **Agents**
 
+- **Average reward**, as `differential-q`: Q-learning with the rate it is
+  collecting subtracted from every reward and no discount anywhere. There is no
+  discount setting on it, and that is the point of it. The rate is learned from
+  the same error rather than averaged over the rewards that arrived, because a
+  running mean would be the rate of the behaviour policy with exploration in
+  it. On a task whose better policy collects exactly 2.000 a step it settles at
+  2.000, so the number it subtracts is an estimate of something real.
 - **Planning at the moment of choosing**, as `mcts`. It runs simulations from
   the state it is standing in and acts on what they said, where `dyna-q` and
   `prioritised-sweeping` spend the same work in the background on a table. The
