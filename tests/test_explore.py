@@ -16,20 +16,24 @@ from collections.abc import Sequence
 
 import pytest
 
+from rel.agents import AGENTS
 from rel.agents.base import TabularAgent
 from rel.agents.dyna import DynaQ
 from rel.agents.explore import (
+    NAMES,
     CountBonus,
     Counts,
     EpsilonGreedy,
     Rule,
     Softmax,
     argmax,
+    as_rule,
     greedy_probabilities,
 )
 from rel.agents.monte_carlo import MonteCarloControl
 from rel.agents.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rel.agents.traces import SarsaLambda, WatkinsQLambda
+from rel.envs import ENVIRONMENTS
 from rel.envs.classic import cliff_walk
 from rel.rng import Rng
 from rel.schedules import linear
@@ -429,3 +433,116 @@ class TestTheCountsTable:
         agent.act(0)
         agent.act(0)
         assert rule.seen == [[0, 0], [1, 0]]
+
+
+class TestAsRule:
+    def test_a_rule_is_given_straight_back(self) -> None:
+        rule = Softmax(2.0)
+        assert as_rule(rule) is rule
+
+    def test_the_plain_name_takes_the_agent_epsilon(self) -> None:
+        """So `--set epsilon=0.3` keeps meaning what it always meant."""
+        rule = as_rule("epsilon-greedy", 0.3)
+        assert rule.probabilities([0.0, 1.0], None, 0, 0) == pytest.approx([0.15, 0.85])
+
+    def test_a_rate_after_the_colon_wins(self) -> None:
+        rule = as_rule("epsilon-greedy:1.0", 0.3)
+        assert rule.probabilities([0.0, 1.0], None, 0, 0) == pytest.approx([0.5, 0.5])
+
+    def test_softmax_takes_its_own_default(self) -> None:
+        assert repr(as_rule("softmax")) == repr(Softmax(1.0))
+
+    def test_softmax_takes_a_temperature(self) -> None:
+        assert repr(as_rule("softmax:0.5")) == repr(Softmax(0.5))
+
+    def test_the_count_bonus_takes_its_own_default(self) -> None:
+        assert repr(as_rule("count-bonus")) == repr(CountBonus(2.0))
+
+    def test_the_count_bonus_takes_a_confidence(self) -> None:
+        assert repr(as_rule("count-bonus:1")) == repr(CountBonus(1.0))
+
+    def test_an_unknown_name_lists_the_known_ones(self) -> None:
+        with pytest.raises(ValueError, match="epsilon-greedy, softmax, count-bonus"):
+            as_rule("greedy")
+
+    def test_a_dial_that_is_not_a_number_says_so(self) -> None:
+        with pytest.raises(ValueError, match="is a number"):
+            as_rule("softmax:hot")
+
+    def test_every_name_builds(self) -> None:
+        for name in NAMES:
+            assert isinstance(as_rule(name), Rule)
+
+
+class TestTheRuleReachesTheAgent:
+    """Through the registry, which is what the command line goes through."""
+
+    def _run(self, explore: str) -> tuple[str, str]:
+        root = Rng(7)
+        env = ENVIRONMENTS.make("cliff", root.stream("env"))
+        agent = AGENTS.make("q-learning", root.stream("agent"), env, explore=explore)
+        record = train(env, agent, 30)
+        return record.digest.hexdigest(), str(digest_of(agent))
+
+    def test_the_default_is_the_same_run_as_naming_it(self) -> None:
+        root = Rng(7)
+        env = ENVIRONMENTS.make("cliff", root.stream("env"))
+        agent = AGENTS.make("q-learning", root.stream("agent"), env)
+        record = train(env, agent, 30)
+        left = record.digest.hexdigest(), str(digest_of(agent))
+        assert left == self._run("epsilon-greedy")
+
+    @pytest.mark.parametrize("explore", ["softmax:1", "count-bonus:1"])
+    def test_another_rule_is_another_run(self, explore: str) -> None:
+        assert self._run("epsilon-greedy") != self._run(explore)
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "q-learning",
+            "sarsa",
+            "expected-sarsa",
+            "double-q",
+            "n-step-sarsa",
+            "monte-carlo",
+            "dyna-q",
+            "dyna-q-plus",
+            "prioritised-sweeping",
+            "tree-backup",
+            "sarsa-lambda",
+            "q-lambda",
+        ],
+    )
+    def test_every_tabular_agent_accepts_it(self, name: str) -> None:
+        root = Rng(2)
+        env = ENVIRONMENTS.make("cliff", root.stream("env"))
+        agent = AGENTS.make(name, root.stream("agent"), env, explore="count-bonus:1")
+        record = train(env, agent, 10)
+        assert len(record.returns) == 10
+
+    def test_importance_sampling_refuses_a_rule_with_no_chance_in_it(self) -> None:
+        """Found by running the test above over every agent.
+
+        Off-policy Monte Carlo divides by how likely the behaviour policy was
+        to take the action it took. The count bonus explores by ranking rather
+        than by chance, so every action but its choice has a probability of
+        zero and the correction is not defined. Nothing is wrong with either
+        piece and they cannot be used together.
+        """
+        root = Rng(2)
+        env = ENVIRONMENTS.make("cliff", root.stream("env"))
+        agent = AGENTS.make(
+            "off-policy-mc", root.stream("agent"), env, explore="count-bonus:1"
+        )
+        with pytest.raises(ValueError, match="coverage"):
+            train(env, agent, 10)
+
+    def test_importance_sampling_takes_a_rule_that_keeps_chance_in_it(self) -> None:
+        """Softmax gives every action a share, so the correction is defined."""
+        root = Rng(2)
+        env = ENVIRONMENTS.make("cliff", root.stream("env"))
+        agent = AGENTS.make(
+            "off-policy-mc", root.stream("agent"), env, explore="softmax:5"
+        )
+        record = train(env, agent, 10)
+        assert len(record.returns) == 10

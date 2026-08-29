@@ -66,11 +66,19 @@ def ratio(target: Sequence[float], behaviour: Sequence[float], action: int) -> f
     is not a behaviour policy this can learn from. That is coverage, and it is
     the one assumption off-policy learning cannot do without, so it raises
     rather than dividing by zero and carrying on.
+
+    A deterministic exploration rule fails this, and `count-bonus` is one. It
+    explores by ranking rather than by chance, so every action but its choice
+    has a probability of zero. Nothing is wrong with either piece. They cannot
+    be used together, and this says so rather than learning from a correction
+    that is not defined.
     """
     if behaviour[action] <= 0.0:
         raise ValueError(
             "The behaviour policy never takes an action the target policy "
-            "might. Without coverage there is nothing to correct."
+            "might. Without coverage there is nothing to correct. An "
+            "exploration rule that explores by ranking rather than by chance "
+            "cannot be the behaviour policy of an importance sampling method."
         )
     return target[action] / behaviour[action]
 

@@ -48,6 +48,7 @@ from rel.agents.bandit import (
 from rel.agents.base import Agent, RandomAgent, TabularAgent, Transition
 from rel.agents.dp import FixedPolicyAgent, value_iteration
 from rel.agents.dyna import DynaQ, DynaQPlus
+from rel.agents.explore import as_rule
 from rel.agents.features import encoder_for
 from rel.agents.linear import SemiGradientQ, SemiGradientSarsa
 from rel.agents.monte_carlo import MonteCarloControl
@@ -85,6 +86,7 @@ def _tabular(cls: type[TabularAgent[Any]]) -> AgentBuilder:
         step_size: float | Schedule = 0.5,
         discount: float = 1.0,
         epsilon: float | Schedule = 0.1,
+        explore: str = "epsilon-greedy",
         optimism: float = 0.0,
     ) -> Agent[Any]:
         return cls(
@@ -93,6 +95,7 @@ def _tabular(cls: type[TabularAgent[Any]]) -> AgentBuilder:
             step_size=step_size,
             discount=discount,
             epsilon=epsilon,
+            explore=as_rule(explore, epsilon),
             optimism=optimism,
         )
 
@@ -137,6 +140,7 @@ def _n_step(
     step_size: float | Schedule = 0.2,
     discount: float = 1.0,
     epsilon: float | Schedule = 0.1,
+    explore: str = "epsilon-greedy",
     optimism: float = 0.0,
 ) -> Agent[Any]:
     return NStepSarsa(
@@ -146,6 +150,7 @@ def _n_step(
         step_size=step_size,
         discount=discount,
         epsilon=epsilon,
+        explore=as_rule(explore, epsilon),
         optimism=optimism,
     )
 
@@ -167,6 +172,7 @@ def _off_policy(
     step_size: float | Schedule | None = None,
     discount: float = 1.0,
     epsilon: float | Schedule = 0.1,
+    explore: str = "epsilon-greedy",
     optimism: float = 0.0,
 ) -> Agent[Any]:
     return OffPolicyMonteCarlo(
@@ -176,6 +182,7 @@ def _off_policy(
         step_size=step_size,
         discount=discount,
         epsilon=epsilon,
+        explore=as_rule(explore, epsilon),
         optimism=optimism,
     )
 
@@ -191,6 +198,7 @@ def _traced(cls: type[SarsaLambda[Any]]) -> AgentBuilder:
         step_size: float | Schedule = 0.1,
         discount: float = 1.0,
         epsilon: float | Schedule = 0.1,
+        explore: str = "epsilon-greedy",
         optimism: float = 0.0,
     ) -> Agent[Any]:
         return cls(
@@ -201,6 +209,7 @@ def _traced(cls: type[SarsaLambda[Any]]) -> AgentBuilder:
             step_size=step_size,
             discount=discount,
             epsilon=epsilon,
+            explore=as_rule(explore, epsilon),
             optimism=optimism,
         )
 
@@ -215,6 +224,7 @@ def _tree_backup(
     step_size: float | Schedule = 0.2,
     discount: float = 1.0,
     epsilon: float | Schedule = 0.1,
+    explore: str = "epsilon-greedy",
     optimism: float = 0.0,
 ) -> Agent[Any]:
     return TreeBackup(
@@ -225,6 +235,7 @@ def _tree_backup(
         step_size=step_size,
         discount=discount,
         epsilon=epsilon,
+        explore=as_rule(explore, epsilon),
         optimism=optimism,
     )
 
@@ -235,6 +246,7 @@ def _monte_carlo(
     step_size: float | Schedule | None = 0.1,
     discount: float = 1.0,
     epsilon: float | Schedule = 0.1,
+    explore: str = "epsilon-greedy",
     optimism: float = 0.0,
 ) -> Agent[Any]:
     return MonteCarloControl(
@@ -243,6 +255,7 @@ def _monte_carlo(
         step_size=step_size,
         discount=discount,
         epsilon=epsilon,
+        explore=as_rule(explore, epsilon),
         optimism=optimism,
     )
 
@@ -255,6 +268,7 @@ def _dyna(cls: type[DynaQ[Any]]) -> AgentBuilder:
         step_size: float | Schedule = 0.5,
         discount: float = 0.95,
         epsilon: float | Schedule = 0.1,
+        explore: str = "epsilon-greedy",
         optimism: float = 0.0,
     ) -> Agent[Any]:
         return cls(
@@ -264,6 +278,7 @@ def _dyna(cls: type[DynaQ[Any]]) -> AgentBuilder:
             step_size=step_size,
             discount=discount,
             epsilon=epsilon,
+            explore=as_rule(explore, epsilon),
             optimism=optimism,
         )
 
@@ -278,6 +293,7 @@ def _dyna_plus(
     step_size: float | Schedule = 0.5,
     discount: float = 0.95,
     epsilon: float | Schedule = 0.1,
+    explore: str = "epsilon-greedy",
 ) -> Agent[Any]:
     return DynaQPlus(
         rng,
@@ -287,6 +303,7 @@ def _dyna_plus(
         step_size=step_size,
         discount=discount,
         epsilon=epsilon,
+        explore=as_rule(explore, epsilon),
     )
 
 
@@ -298,6 +315,7 @@ def _sweeping(
     step_size: float | Schedule = 0.5,
     discount: float = 0.95,
     epsilon: float | Schedule = 0.1,
+    explore: str = "epsilon-greedy",
 ) -> Agent[Any]:
     #: Five planning steps where the other two planners take twenty. Ordering
     #: the replays is what buys the reach, so the quota does not have to, and
@@ -310,6 +328,7 @@ def _sweeping(
         step_size=step_size,
         discount=discount,
         epsilon=epsilon,
+        explore=as_rule(explore, epsilon),
     )
 
 

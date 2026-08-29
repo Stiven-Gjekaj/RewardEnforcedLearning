@@ -329,12 +329,66 @@ class CountBonus(Rule):
         return f"CountBonus(confidence={self.confidence:g})"
 
 
+#: Every rule by the name the command line calls it.
+NAMES = ("epsilon-greedy", "softmax", "count-bonus")
+
+
+def as_rule(asked: str | Rule, epsilon: float | Schedule = 0.1) -> Rule:
+    """The rule a name asks for, with its dial after a colon.
+
+        epsilon-greedy      the agent's own `epsilon`
+        epsilon-greedy:0.3  that rate instead
+        softmax             a temperature of 1
+        softmax:0.3         that temperature
+        count-bonus         a confidence of 2
+        count-bonus:1       that confidence
+
+    One setting rather than three. Each rule has a dial of its own, and a
+    separate `temperature` and `confidence` on every agent would be two
+    settings that say nothing for the rule almost every run uses.
+
+    `epsilon-greedy` with nothing after it takes the agent's `epsilon`, so
+    `--set epsilon=0.3` keeps meaning what it has always meant. Writing a rate
+    after the colon overrides it.
+    """
+    if isinstance(asked, Rule):
+        return asked
+
+    name, colon, given = asked.partition(":")
+    if name not in NAMES:
+        offered = ", ".join(NAMES)
+        raise ValueError(f"There is no rule named {name!r}. There is: {offered}.")
+
+    if not colon:
+        if name == "softmax":
+            return Softmax()
+        if name == "count-bonus":
+            return CountBonus()
+        return EpsilonGreedy(epsilon)
+
+    try:
+        dial = float(given)
+    except ValueError:
+        raise ValueError(
+            f"The setting after the colon in {asked!r} is a number, "
+            f"and {given!r} is not one."
+        ) from None
+
+    if name == "softmax":
+        return Softmax(dial)
+    if name == "count-bonus":
+        return CountBonus(dial)
+    return EpsilonGreedy(dial)
+
+
 __all__ = [
+    "NAMES",
     "CountBonus",
     "Counts",
     "EpsilonGreedy",
     "Rule",
     "Softmax",
     "argmax",
+    "as_rule",
     "greedy_probabilities",
 ]
