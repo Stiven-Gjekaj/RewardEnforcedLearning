@@ -1121,6 +1121,134 @@ scores 0.2427, which is worse than not learning at all.
 
 ---
 
+## The discount is part of the question
+
+```console
+$ python scripts/measure_average_reward.py
+$ python scripts/measure_average_reward.py --length 8 --episodes 30
+$ rel train differential-q --env loops
+$ rel solve --env loops --discount 0.7
+```
+
+Every environment above has a goal, so an episode ends and the return of a
+policy is a finite number whatever the discount is. The discount changes how
+much a run is worth and not which policy is best.
+
+A task that never ends has no such number. The reward keeps arriving for ever,
+and the two ways to compare policies are to discount the future or to take the
+average per step. **Those are different comparisons and they can disagree.**
+
+### One decision, made over and over
+
+`loops` is a junction. One action takes a short loop that pays 1 and comes
+straight back. The other takes a long loop that pays 10 and takes five steps to
+come round.
+
+    short   one step,  pays 1     ->  1.00 per step
+    long    five steps, pays 10   ->  2.00 per step
+
+By reward per step the long loop is twice as good. The discounted value of the
+junction under each is
+
+    short   p / (1 - d)
+    long    d^(n-1) q / (1 - d^n)
+
+and those are equal at a discount of **0.7394**. Below it the short loop has
+the higher discounted value.
+
+| discount | best policy | what it collects per step |
+| ---: | ---: | ---: |
+| 0.5 | short | 1.00 |
+| 0.7 | short | 1.00 |
+| 0.735 | short | 1.00 |
+| 0.745 | **long** | **2.00** |
+| 0.8 | long | 2.00 |
+| 0.9 | long | 2.00 |
+| 0.99 | long | 2.00 |
+| none, `differential-q` | **long** | **2.00** |
+
+*The `best policy` column is from `value_iteration` on the model, not from a
+run. `q-learning` at each of those discounts finds the same answer on all five
+seeds, and the script prints both columns side by side.*
+
+**The agent at 0.7 is not going wrong.** It is playing the exactly optimal
+policy for the question it was asked, and the question had a discount in it.
+Nobody chooses 0.7 to mean "prefer the loop that pays half as much". They
+choose it because it converges quickly.
+
+### The threshold depends on the environment, and nothing knows it
+
+Lengthen the long loop and it pays less per step, so a discounted agent has to
+be more patient to prefer it:
+
+| long loop | it pays per step | crossover | 0.9 picks | 0.99 picks |
+| ---: | ---: | ---: | ---: | ---: |
+| 2 steps | 5.000 | 0.1111 | long | long |
+| 3 steps | 3.333 | 0.3935 | long | long |
+| 5 steps | 2.000 | 0.7394 | long | long |
+| 8 steps | 1.250 | 0.9408 | **short** | long |
+| 10 steps | 1.000 | 1.0000 | short | short |
+
+At eight steps the long loop is still a quarter better per step, and **a
+discount of 0.9 takes the short one**. That is not an exotic setting: 0.9 is
+what this environment suggested for itself until checking this table found it
+wrong. The suggestion is computed from the crossover now, and the environment
+can only do that because it is a toy that knows its own answer.
+
+At ten steps the two loops are worth the same per step and no discount below
+one prefers the long one, which is correct rather than a failure: there is
+nothing to prefer.
+
+**There is no safe default for the discount on a task that never ends.** It has
+to be close enough to one for the environment it is used on, and nothing about
+the agent knows how close that is. This project has met that shape once
+already, in `kappa` on Dyna-Q+, and the answer is the same both times: a
+setting that has to be right against numbers the agent cannot see is a setting
+that will be wrong somewhere.
+
+### The agent with no discount to get wrong
+
+`differential-q` is Q-learning with the rate it is collecting subtracted from
+every reward, and no discount anywhere:
+
+    error = reward - average + max Q(s', a) - Q(s, a)
+    Q(s, a) += step_size * error
+    average += average_step * step_size * error
+
+It takes the long loop at every step size and every average step tried, which
+is what having no discount buys.
+
+**The rate it learns is the rate it collects.** After twenty episodes it
+believes 2.000 a step on a task whose better policy collects exactly 2.000 a
+step, so the number it subtracts is an estimate of something real rather than a
+bias term that happens to work.
+
+The average is learned from the same error rather than averaged over the
+rewards that arrived. A running mean of the rewards would be the rate of the
+behaviour policy, exploration included, and the rate the update needs is the
+one of the policy being learned.
+
+### Where it is weak
+
+**The values are relative.** Adding the same number to every cell of a
+differential table changes nothing, so its value map is a picture of what is
+better than what and not of what anything is worth. The policy read off it is
+the same policy, which is all that is asked of it, but the numbers beside the
+picture do not mean what they mean for every other agent on this page.
+
+**It assumes the task does not end.** The derivation is about one long run with
+a rate. Given a terminated step this drops the bootstrap, which is the only
+sensible thing to do, and what comes out on an episodic task is an agent
+maximising reward per step over the whole run rather than per episode. That is
+sometimes the question and usually not.
+
+**Only the off-policy version is here.** The on-policy one needs the action the
+policy really takes next, which means holding the last transition and waiting a
+step exactly as `sarsa` does. On this environment the two agree, so it was not
+built to find that out.
+
+---
+
 ## The tile coder
 
 A tile coder lays several grids over a continuous space, each shifted by a
@@ -1718,6 +1846,7 @@ it off.
 | Prediction against a known answer | `python scripts/measure_prediction.py` |
 | Replay and a target network | `python scripts/measure_value_network.py --env cartpole --runs 10 --set step_size=0.02` |
 | Four ways of exploring | `python scripts/measure_exploration.py --runs 10 --each-seed` |
+| Which loop a discount chooses | `python scripts/measure_average_reward.py` |
 | Decision time against background planning | `python scripts/measure_search.py --episodes 40 --runs 3` |
 | One rule at several dials | `python scripts/measure_exploration.py --rules softmax:0.02,softmax:0.001` |
 | Any one or two settings | `rel sweep <agent> --env <env> --over name=a,b,c` |
