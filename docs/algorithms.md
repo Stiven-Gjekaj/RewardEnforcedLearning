@@ -979,6 +979,124 @@ what a reader comparing this code with the book needs to see.
 
 ---
 
+## A value network, and the two pieces that make one work
+
+```console
+$ rel train deep-q --env cartpole --set step_size=0.02
+$ python scripts/measure_value_network.py --env cartpole --episodes 400 --runs 10 --set step_size=0.02
+$ python scripts/measure_value_network.py --env cliff --runs 10 --each-seed
+```
+
+`deep-q` is Q-learning with a network in place of the table. A table has one
+number for each state and action, and moving one never moves another. A network
+has one set of weights for all of them, so two things that are harmless with a
+table become the reason a value network diverges.
+
+**The steps arrive correlated.** Twenty steps of a pole falling to the left are
+twenty samples of nearly the same thing, and a network fitted to them in a row
+forgets what it knew about falling to the right. A **replay buffer** keeps the
+last few thousand steps and learns from a batch drawn out of them, so one batch
+mixes experience from far apart in time.
+
+**The target moves with the estimate.** Q-learning aims at
+`r + discount * max Q(s')`, and the same weights produce both sides, so every
+step moves the thing being fitted and the thing it is fitted to. That is a
+feedback loop rather than a regression. A **target network** is a second copy of
+the weights, refreshed every so often, that the target is computed from.
+
+Both are settings of one agent, so the four rows below are the same code with
+two numbers changed. `replay=0` learns from the step just taken;
+`target_refresh=0` takes the target from the live network.
+
+### On the cart pole, neither piece alone does anything
+
+| replay | target | median | worst | best |
+| ---: | ---: | ---: | ---: | ---: |
+| on | on | **66.3** | 15.6 | 88.8 |
+| on | off | 9.0 | 8.8 | 16.2 |
+| off | on | 9.4 | 8.6 | 9.8 |
+| off | off | 8.8 | 8.4 | 8.9 |
+
+*Ten seeds, 400 episodes, step size 0.02. The number is the mean episode length
+over the last fifty, which on this environment is the return.*
+
+A pole nobody is balancing falls in about nine steps. **So the bottom three
+rows are all indistinguishable from not learning at all.** The two pieces are
+not additive and neither is a partial answer: with either one missing this
+agent is a random policy with extra arithmetic.
+
+### On the cliff walk, they change how often it blows up
+
+| replay | target | median | mean | worst | best |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| on | on | -55.2 | -103.1 | -545.2 | -29.7 |
+| on | off | -49.6 | -57.2 | -129.5 | -36.1 |
+| off | on | -55.6 | -104.4 | -310.9 | -20.0 |
+| off | off | -55.3 | -239.1 | -664.3 | -24.6 |
+
+*Ten seeds, 200 episodes. The best possible return is -13.*
+
+**The four medians are the same number.** -55.2, -49.6, -55.6, -55.3. On the
+typical seed of this grid the two pieces change nothing at all.
+
+What they change is the tail. Every seed, in seed order:
+
+```
+on / on     -49.1  -46.6  -44.1  -70.1  -29.7  -79.1  -67.6  -545.2  -38.3  -61.4
+on / off    -44.4  -47.9  -46.2  -52.4  -51.2 -129.5  -57.6   -47.0  -60.0  -36.1
+off / on   -108.3  -35.8  -30.9  -91.5  -41.2  -40.1  -20.0  -310.9  -70.0 -295.3
+off / off   -44.4 -242.9  -29.9  -61.9  -47.3 -664.3 -629.8   -24.6  -48.8 -597.0
+```
+
+With neither piece, four seeds of ten end past -240 and three of those past
+-590. With both, one does. **The pieces are not making the agent better. They
+are making it fail less often.**
+
+### Why the two environments disagree
+
+The cliff walk hands the network a one-hot vector: forty eight inputs, one of
+them a 1. Each state then has close to its own parameters and a typical update
+barely generalises, so the shared-weights problem hardly arises. What is left
+is the occasional run where it does arise and the whole thing diverges.
+
+The cart pole hands it four real numbers, and every update moves every
+estimate. There is no typical run in which the problem does not arise, so
+without the two answers there is no learning to speak of.
+
+**The same ablation on two environments gives opposite-looking tables, and the
+difference is the representation rather than the algorithm.**
+
+### The mean would have said something true and useless
+
+On the cliff walk the means rank the rows -57.2, -103.1, -104.4, -239.1, which
+reads as a performance ordering and is a failure-rate ordering wearing its
+clothes. The medians are all -55 and the rank comes entirely from how many runs
+blew up.
+
+Five seeds said something different again. Every mean moved by tens between
+five seeds and ten, because a diverged run moves a mean further than the
+distance between any two rows of this table. That is why
+`scripts/measure_value_network.py` leads with the median, prints the worst
+beside it, and takes `--each-seed`.
+
+### What it costs
+
+Every step is a forward pass for each member of the batch, plus one for the
+target, plus a backward pass: `2 * batch + 1` passes through a network against
+one dictionary lookup. On the cliff walk the four rows took between 298 and 999
+seconds for ten seeds of 200 episodes, where every tabular agent on the same
+grid takes about two.
+
+### Where it is weak
+
+**Nothing here solves the cart pole.** The best configuration reaches a median
+of 66 steps of a possible 500, where `tile-sarsa` reaches 498. A value network
+over a tile coder is not being compared with one over a small network here: the
+tile coder wins, and this agent is the honest small version of a method whose
+published results come from far more compute than pure Python has.
+
+---
+
 ## The two agents that learn a policy directly
 
 Neither is as steady as anything tabular in this project, and both are far
@@ -1283,6 +1401,7 @@ it off.
 | What an option costs | `python scripts/measure_options.py --runs 20` |
 | What crediting the middle buys | `python scripts/measure_intra_option.py --episodes 800 --block 100` |
 | Prediction against a known answer | `python scripts/measure_prediction.py` |
+| Replay and a target network | `python scripts/measure_value_network.py --env cartpole --runs 10 --set step_size=0.02` |
 | Any one or two settings | `rel sweep <agent> --env <env> --over name=a,b,c` |
 | Specification gaming | `rel gaming` |
 | One run in detail | `rel train q-learning --env cliff --seed 7` |
