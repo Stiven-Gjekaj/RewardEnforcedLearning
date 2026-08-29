@@ -601,3 +601,53 @@ class TestOnTheCorridorTheRulesSeparate:
         counting = self._steps_before_arriving("count-bonus:0.5", 0.0)
         valuing = self._steps_before_arriving("epsilon-greedy", 0.0)
         assert counting < valuing
+
+
+class TestADialCannotFindTheFirstReward:
+    """Two rules that rank by value, at dials a hundredfold apart.
+
+    Before anything pays, every value in the table is the starting number, so a
+    rule that ranks actions by value ranks a row of equal numbers and takes a
+    uniform action. The run is then the same run whatever the dial says, and
+    the digest is what says "the same" rather than "close".
+    """
+
+    def _walked(self, explore: str) -> str:
+        root = Rng(1)
+        env = ENVIRONMENTS.make("corridor", root.stream("env"))
+        agent = AGENTS.make(
+            "q-learning", root.stream("agent"), env, discount=0.95, explore=explore
+        )
+        return train(env, agent, 3, discount=0.95).digest.hexdigest()
+
+    @pytest.mark.parametrize("rate", ["0.5", "0.9"])
+    def test_every_rate_between_the_ends_is_one_run(self, rate: str) -> None:
+        assert self._walked("epsilon-greedy:0.1") == self._walked(
+            f"epsilon-greedy:{rate}"
+        )
+
+    def test_the_two_ends_are_one_run_of_their_own(self) -> None:
+        """`Rng.chance` answers 0 and 1 without drawing.
+
+        So those two spend one draw fewer per step than the rates between
+        them. They are still uniform and still identical to each other, and
+        the reason they differ from the middle is the count of draws rather
+        than anything about the policy.
+        """
+        assert self._walked("epsilon-greedy:0.0") == self._walked("epsilon-greedy:1.0")
+        assert self._walked("epsilon-greedy:0.0") != self._walked("epsilon-greedy:0.5")
+
+    def test_every_temperature_is_one_run(self) -> None:
+        assert self._walked("softmax:0.02") == self._walked("softmax:0.001")
+
+    def test_a_rule_that_ranks_by_novelty_walks_somewhere_else(self) -> None:
+        """The finding, stated as the one comparison that comes out different."""
+        assert self._walked("count-bonus:0.5") != self._walked("epsilon-greedy:0.1")
+
+    @pytest.mark.parametrize("confidence", ["0.1", "2"])
+    def test_the_count_bonus_dial_does_nothing_either(self, confidence: str) -> None:
+        """Scaling every bonus by a constant does not reorder them, and with
+        the values all equal the bonus is the whole score."""
+        assert self._walked("count-bonus:0.5") == self._walked(
+            f"count-bonus:{confidence}"
+        )
