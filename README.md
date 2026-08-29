@@ -277,6 +277,15 @@ no sampling noise in it and says outright when a policy never finishes, which
 happens on two of ten SARSA seeds on the cliff walk and would otherwise be
 reported as a long path.
 
+**A difference is measured against what noise produces, not against zero.**
+`rel compare` prints the paired difference, an interval and a permutation p
+value rather than two means and two standard errors. Running one agent against
+a copy of itself two hundred times says how large a difference turns up by
+chance: a median of 3.14 on the cliff walk over five seeds, and up to 16.63.
+The same measurement found that a 95% interval on five seeds excludes zero one
+time in five when there is nothing there, and that a paired test over five
+seeds cannot report a p below 0.0625 whatever the difference is.
+
 **Nothing is imported, and one of the costs of that is written down.** The tile
 coder had a fault that threw away six sevenths of the resolution of its last
 grid. Every agent still learned, and every curve still went up. It was found by
@@ -341,6 +350,7 @@ rel/pressure.py     following a fixed policy with a dial on how hard it tries
 rel/recording.py    a run written down step by step, and read back
 rel/nn/             reverse mode gradients, three networks, SGD and Adam
 rel/training.py     the loop, the record and the run digest
+rel/compare.py      whether a difference between two agents is real
 rel/ui/             braille charts, grid pictures, tables. Draws only.
 rel/cli.py          the command line
 grids/              every built in grid, written as a text file
@@ -353,12 +363,12 @@ scripts/            the scripts that produce the numbers in the documentation
 | Environments | 8 | 2489 |
 | Agents | 23 | 6654 |
 | Network | 4 | 720 |
-| Running | 5 | 1026 |
+| Running | 6 | 1252 |
 | Interface | 6 | 1022 |
-| Command line | 3 | 1595 |
-| **Total** | **54** | **14416** |
+| Command line | 3 | 1658 |
+| **Total** | **55** | **14705** |
 
-Not counting 12592 lines of tests and 2591 of measurement scripts. Run
+Not counting 12933 lines of tests and 2733 of measurement scripts. Run
 `python scripts/lines.py` for the current numbers.
 
 Three rules about who may import whom are enforced by a test that reads the
