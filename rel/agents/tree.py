@@ -42,6 +42,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from rel.agents.explore import Rule
 from rel.agents.td import NStepSarsa
 from rel.core import ObsT
 from rel.rng import Rng
@@ -75,6 +76,7 @@ class TreeBackup(NStepSarsa[ObsT]):
         discount: float = 1.0,
         epsilon: float | Schedule = 0.1,
         optimism: float = 0.0,
+        explore: Rule | None = None,
     ) -> None:
         super().__init__(
             rng,
@@ -84,6 +86,7 @@ class TreeBackup(NStepSarsa[ObsT]):
             discount=discount,
             epsilon=epsilon,
             optimism=optimism,
+            explore=explore,
         )
         if target not in TARGETS:
             raise ValueError(f"target is one of {TARGETS}. {target!r} is not.")

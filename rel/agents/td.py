@@ -24,6 +24,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 
 from rel.agents.base import TabularAgent, Transition, rows_of
+from rel.agents.explore import Rule
 from rel.core import ObsT
 from rel.rng import Rng
 from rel.schedules import Schedule
@@ -79,6 +80,7 @@ class Sarsa(TabularAgent[ObsT]):
         discount: float = 1.0,
         epsilon: float | Schedule = 0.1,
         optimism: float = 0.0,
+        explore: Rule | None = None,
     ) -> None:
         super().__init__(
             rng,
@@ -87,6 +89,7 @@ class Sarsa(TabularAgent[ObsT]):
             discount=discount,
             epsilon=epsilon,
             optimism=optimism,
+            explore=explore,
         )
         self._held: Transition[ObsT] | None = None
 
@@ -181,6 +184,7 @@ class DoubleQ(TabularAgent[ObsT]):
         discount: float = 1.0,
         epsilon: float | Schedule = 0.1,
         optimism: float = 0.0,
+        explore: Rule | None = None,
     ) -> None:
         super().__init__(
             rng,
@@ -189,6 +193,7 @@ class DoubleQ(TabularAgent[ObsT]):
             discount=discount,
             epsilon=epsilon,
             optimism=optimism,
+            explore=explore,
         )
         self.q_other: dict[ObsT, list[float]] = {}
 
@@ -272,6 +277,7 @@ class NStepSarsa(TabularAgent[ObsT]):
         discount: float = 1.0,
         epsilon: float | Schedule = 0.1,
         optimism: float = 0.0,
+        explore: Rule | None = None,
     ) -> None:
         super().__init__(
             rng,
@@ -280,6 +286,7 @@ class NStepSarsa(TabularAgent[ObsT]):
             discount=discount,
             epsilon=epsilon,
             optimism=optimism,
+            explore=explore,
         )
         if n < 1:
             raise ValueError("An n step method needs n of one or more.")

@@ -32,6 +32,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Generic
 
+from rel.agents.explore import EpsilonGreedy, Rule, argmax
 from rel.core import DIGEST_FIGURES, ObsT, encoded
 from rel.rng import Rng
 from rel.schedules import Schedule, as_schedule
@@ -235,6 +236,7 @@ class TabularAgent(Agent[ObsT]):
         discount: float = 1.0,
         epsilon: float | Schedule = 0.1,
         optimism: float = 0.0,
+        explore: Rule | None = None,
     ) -> None:
         super().__init__(rng, actions)
 
@@ -245,8 +247,24 @@ class TabularAgent(Agent[ObsT]):
         self.discount = discount
         self.epsilon = as_schedule(epsilon)
         self.optimism = optimism
+        #: How this agent turns the row into the action it takes.
+        #:
+        #: The default is epsilon-greedy at `epsilon`, which is what every
+        #: agent here did before there was anything else, and what every
+        #: measured number in the documentation was measured with. A rule
+        #: given here replaces it, and `epsilon` then says nothing.
+        self.explore: Rule = EpsilonGreedy(self.epsilon) if explore is None else explore
 
         self.q: dict[ObsT, list[float]] = {}
+        #: How many times each action was taken in each state, or nothing.
+        #:
+        #: A second dictionary the size of the table, written on every step,
+        #: and only a rule that explores by novelty reads it. The rule says
+        #: whether it is kept, so an agent that does not need one does not pay
+        #: for one.
+        self.counts: dict[ObsT, list[int]] | None = (
+            {} if self.explore.needs_counts else None
+        )
 
     # -- The table ----------------------------------------------------------
 
@@ -313,44 +331,65 @@ class TabularAgent(Agent[ObsT]):
     # -- The policy ---------------------------------------------------------
 
     def current_epsilon(self) -> float:
+        """The exploration rate of the default rule.
+
+        This says nothing about an agent given a rule of its own. `explore` is
+        what such an agent acts by, and this is the setting the default rule
+        was built from.
+        """
         return self.epsilon(self.episodes)
 
     def current_step_size(self) -> float:
         return self.step_size(self.steps)
 
+    def action_counts(self, observation: ObsT) -> Sequence[int] | None:
+        """How many times each action was taken here, if that is being counted.
+
+        Reading has to be free of side effects, so an observation with no row
+        yet reads as zeros rather than gaining one. This is the same rule
+        `peek` follows and for the same reason.
+        """
+        if self.counts is None:
+            return None
+        row = self.counts.get(observation)
+        return [0] * self.actions.n if row is None else row
+
     def act(self, observation: ObsT) -> int:
-        if self.rng.chance(self.current_epsilon()):
-            return self.actions.start + self.rng.below(self.actions.n)
-        return self.greedy(observation)
+        index = self.explore.choose(
+            self.rng,
+            self.action_scores(observation),
+            self.action_counts(observation),
+            self.episodes,
+            self.steps,
+        )
+        if self.counts is not None:
+            row = self.counts.get(observation)
+            if row is None:
+                row = [0] * self.actions.n
+                self.counts[observation] = row
+            row[index] += 1
+        return self.actions.start + index
 
     def greedy(self, observation: ObsT) -> int:
         return self.actions.start + self._argmax(self.action_scores(observation))
 
     def _argmax(self, row: Sequence[float]) -> int:
-        best = max(row)
-        tied = [index for index, value in enumerate(row) if value == best]
-        if len(tied) == 1:
-            return tied[0]
-        return tied[self.rng.below(len(tied))]
+        return argmax(self.rng, row)
 
     def policy_probabilities(self, observation: ObsT) -> list[float]:
         """How likely this agent is to take each action here.
 
         Expected SARSA needs this, and so does an off-policy correction. It is
-        written once here so that a change to the exploration rule reaches
-        every agent that reasons about it.
+        the rule's own answer rather than a second opinion about it, so an
+        agent that explores by novelty is corrected for exploring by novelty
+        rather than for an epsilon it does not use.
         """
-        epsilon = self.current_epsilon()
-        count = self.actions.n
-        row = self.action_scores(observation)
-
-        best = max(row)
-        tied = [index for index, value in enumerate(row) if value == best]
-        share = epsilon / count
-        probabilities = [share] * count
-        for index in tied:
-            probabilities[index] += (1.0 - epsilon) / len(tied)
-        return probabilities
+        return self.explore.probabilities(
+            self.action_scores(observation),
+            self.action_counts(observation),
+            self.episodes,
+            self.steps,
+        )
 
     # -- The target ---------------------------------------------------------
 
@@ -368,7 +407,7 @@ class TabularAgent(Agent[ObsT]):
     def __repr__(self) -> str:
         return (
             f"{type(self).__name__}(step_size={self.current_step_size():g}, "
-            f"discount={self.discount:g}, epsilon={self.current_epsilon():g})"
+            f"discount={self.discount:g}, {self.explore!r})"
         )
 
 

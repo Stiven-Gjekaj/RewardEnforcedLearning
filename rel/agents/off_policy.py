@@ -45,6 +45,7 @@ from collections.abc import Sequence
 from typing import Literal
 
 from rel.agents.base import TabularAgent, Transition
+from rel.agents.explore import Rule
 from rel.core import ObsT
 from rel.rng import Rng
 from rel.schedules import Schedule
@@ -102,6 +103,7 @@ class OffPolicyMonteCarlo(TabularAgent[ObsT]):
         discount: float = 1.0,
         epsilon: float | Schedule = 0.1,
         optimism: float = 0.0,
+        explore: Rule | None = None,
         estimator: Estimator = "weighted",
     ) -> None:
         super().__init__(
@@ -111,6 +113,7 @@ class OffPolicyMonteCarlo(TabularAgent[ObsT]):
             discount=discount,
             epsilon=epsilon,
             optimism=optimism,
+            explore=explore,
         )
         if estimator not in ESTIMATORS:
             raise ValueError(f"estimator is one of {ESTIMATORS}. {estimator!r} is not.")

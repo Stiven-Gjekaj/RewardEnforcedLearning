@@ -150,6 +150,15 @@ class OptionsQ(TabularAgent[int]):
         return self.options[self.running].act(observation)
 
     def _choose(self, observation: int) -> int:
+        """Which option to start here.
+
+        Epsilon-greedy, written out rather than taken from `self.explore`. A
+        rule ranks the whole row and this ranks the options that can start
+        here, which on the four rooms grid is four of ten. Handing a rule a
+        row with the unavailable options cut out of it would work, and the
+        index it gave back would mean something different from the index every
+        other agent gets, which is worth more than sharing four lines.
+        """
         choices = self.available(observation)
         if not choices:
             raise ValueError(

@@ -11,6 +11,7 @@ and on the cliff walk one unlucky fall makes that sample a hundred worse.
 from __future__ import annotations
 
 from rel.agents.base import TabularAgent, Transition
+from rel.agents.explore import Rule
 from rel.core import ObsT
 from rel.rng import Rng
 from rel.schedules import Schedule
@@ -58,6 +59,7 @@ class MonteCarloControl(TabularAgent[ObsT]):
         discount: float = 1.0,
         epsilon: float | Schedule = 0.1,
         optimism: float = 0.0,
+        explore: Rule | None = None,
     ) -> None:
         super().__init__(
             rng,
@@ -66,6 +68,7 @@ class MonteCarloControl(TabularAgent[ObsT]):
             discount=discount,
             epsilon=epsilon,
             optimism=optimism,
+            explore=explore,
         )
         self.averaging = step_size is None
         self.visits: dict[tuple[ObsT, int], int] = {}

@@ -58,6 +58,7 @@ from __future__ import annotations
 
 from rel.agents.base import Transition
 from rel.agents.dyna import DynaQ
+from rel.agents.explore import Rule
 from rel.core import ObsT
 from rel.rng import Rng
 from rel.schedules import Schedule
@@ -87,6 +88,7 @@ class PrioritisedSweeping(DynaQ[ObsT]):
         discount: float = 0.95,
         epsilon: float | Schedule = 0.1,
         optimism: float = 0.0,
+        explore: Rule | None = None,
     ) -> None:
         super().__init__(
             rng,
@@ -96,6 +98,7 @@ class PrioritisedSweeping(DynaQ[ObsT]):
             discount=discount,
             epsilon=epsilon,
             optimism=optimism,
+            explore=explore,
         )
         if planning_steps < 1:
             raise ValueError(

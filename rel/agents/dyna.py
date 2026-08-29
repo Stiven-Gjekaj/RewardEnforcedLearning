@@ -28,6 +28,7 @@ import math
 from collections.abc import Iterator
 
 from rel.agents.base import TabularAgent, Transition
+from rel.agents.explore import Rule
 from rel.core import DIGEST_FIGURES, ObsT, encoded
 from rel.rng import Rng
 from rel.schedules import Schedule
@@ -47,6 +48,7 @@ class DynaQ(TabularAgent[ObsT]):
         discount: float = 0.95,
         epsilon: float | Schedule = 0.1,
         optimism: float = 0.0,
+        explore: Rule | None = None,
     ) -> None:
         super().__init__(
             rng,
@@ -55,6 +57,7 @@ class DynaQ(TabularAgent[ObsT]):
             discount=discount,
             epsilon=epsilon,
             optimism=optimism,
+            explore=explore,
         )
         if planning_steps < 0:
             raise ValueError("The number of planning steps must not be below zero.")
@@ -154,6 +157,7 @@ class DynaQPlus(DynaQ[ObsT]):
         discount: float = 0.95,
         epsilon: float | Schedule = 0.1,
         optimism: float = 0.0,
+        explore: Rule | None = None,
     ) -> None:
         super().__init__(
             rng,
@@ -163,6 +167,7 @@ class DynaQPlus(DynaQ[ObsT]):
             discount=discount,
             epsilon=epsilon,
             optimism=optimism,
+            explore=explore,
         )
         self.kappa = kappa
         self.last_taken: dict[tuple[ObsT, int], int] = {}

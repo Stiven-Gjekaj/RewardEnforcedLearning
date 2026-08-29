@@ -1,21 +1,38 @@
-"""The rules an agent can explore by, on their own.
+"""The rules an agent can explore by.
 
-The agents that use them are tested elsewhere. What is held here is what a rule
-promises whatever uses it: that `probabilities` is what `choose` really does,
-and that `EpsilonGreedy` spends the draws the old code spent.
+Two things are held here. A rule on its own has to keep its two answers in
+agreement: `probabilities` must be what `choose` really does, or expected SARSA
+averages over one policy while the agent follows another.
+
+An agent given the default rule has to run exactly as it did before there was a
+rule at all. That is not a nicety. The numbers in the documentation were
+measured with the old code, and a refactor that moved any of them would have
+made the whole page a claim about a version that no longer exists.
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import pytest
 
+from rel.agents.base import TabularAgent
+from rel.agents.dyna import DynaQ
 from rel.agents.explore import (
+    Counts,
     EpsilonGreedy,
+    Rule,
     argmax,
     greedy_probabilities,
 )
+from rel.agents.monte_carlo import MonteCarloControl
+from rel.agents.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
+from rel.agents.traces import SarsaLambda, WatkinsQLambda
+from rel.envs.classic import cliff_walk
 from rel.rng import Rng
 from rel.schedules import linear
+from rel.spaces import Discrete
+from rel.training import digest_of, train
 
 
 class TestArgmax:
@@ -119,3 +136,124 @@ class TestEpsilonGreedy:
 
     def test_it_says_what_it_is(self) -> None:
         assert "0.1" in repr(EpsilonGreedy(0.1))
+
+
+class Counted(Rule):
+    """A rule that asks for the counts and otherwise takes the first action.
+
+    Written here rather than imported, so that what the agent does with a rule
+    that wants counting is tested apart from any particular way of using them.
+    """
+
+    needs_counts = True
+
+    def __init__(self) -> None:
+        self.seen: list[Counts] = []
+
+    def choose(
+        self,
+        rng: Rng,
+        scores: Sequence[float],
+        counts: Counts,
+        episodes: int,
+        steps: int,
+    ) -> int:
+        self.seen.append(None if counts is None else list(counts))
+        return 0
+
+    def probabilities(
+        self,
+        scores: Sequence[float],
+        counts: Counts,
+        episodes: int,
+        steps: int,
+    ) -> list[float]:
+        return [1.0] + [0.0] * (len(scores) - 1)
+
+
+class TestTheDefaultRuleChangesNothing:
+    """Every tabular agent explores as it did before there was a rule object.
+
+    The refactor that put the rule behind an object was checked by running
+    twelve agents on the cliff walk and comparing both digests against the
+    commit before it. All twenty four matched. What is held here is the claim
+    that survives a later change to the default: naming the rule and leaving
+    it out have to be the same run, step for step and cell for cell.
+    """
+
+    AGENTS = (
+        QLearning,
+        Sarsa,
+        ExpectedSarsa,
+        DoubleQ,
+        MonteCarloControl,
+        DynaQ,
+        SarsaLambda,
+        WatkinsQLambda,
+    )
+
+    def _run(self, cls: type[TabularAgent[int]], epsilon: float) -> tuple[str, str]:
+        root = Rng(7)
+        env = cliff_walk(root.stream("env"))
+        agent = cls(root.stream("agent"), env.action_space, epsilon=epsilon)
+        record = train(env, agent, 30)
+        return record.digest.hexdigest(), digest_of(agent)
+
+    def _named(self, cls: type[TabularAgent[int]], rate: float) -> tuple[str, str]:
+        root = Rng(7)
+        env = cliff_walk(root.stream("env"))
+        agent = cls(root.stream("agent"), env.action_space, explore=EpsilonGreedy(rate))
+        record = train(env, agent, 30)
+        return record.digest.hexdigest(), digest_of(agent)
+
+    @pytest.mark.parametrize("cls", AGENTS)
+    def test_naming_the_default_is_the_same_run(
+        self, cls: type[TabularAgent[int]]
+    ) -> None:
+        assert self._run(cls, 0.1) == self._named(cls, 0.1)
+
+    @pytest.mark.parametrize("cls", AGENTS)
+    def test_a_different_rate_is_a_different_run(
+        self, cls: type[TabularAgent[int]]
+    ) -> None:
+        """The check above would pass if `explore` were being ignored."""
+        assert self._run(cls, 0.1) != self._named(cls, 0.4)
+
+
+class TestTheCountsTable:
+    def test_it_is_not_kept_for_a_rule_that_does_not_ask(self) -> None:
+        agent = QLearning(Rng(1), Discrete(4))
+        assert agent.counts is None
+        assert agent.action_counts(0) is None
+
+    def test_it_is_kept_for_a_rule_that_does(self) -> None:
+        agent = QLearning(Rng(1), Discrete(4), explore=Counted())
+        assert agent.counts == {}
+
+    def test_reading_it_makes_no_row(self) -> None:
+        """The same rule `peek` follows.
+
+        A count read for a state the agent has never been in must not put that
+        state in the table, or the value map reports it has stood there.
+        """
+        agent = QLearning(Rng(1), Discrete(4), explore=Counted())
+        assert list(agent.action_counts(3) or []) == [0, 0, 0, 0]
+        assert agent.counts == {}
+
+    def test_acting_counts_the_action_it_took(self) -> None:
+        agent = QLearning(Rng(1), Discrete(4), explore=Counted())
+        agent.act(3)
+        agent.act(3)
+        assert agent.counts == {3: [2, 0, 0, 0]}
+
+    def test_the_rule_sees_the_count_before_the_action_it_is_choosing(self) -> None:
+        """A rule choosing its nth visit is told n-1, not n.
+
+        A bonus that shrinks with the count would be shrunk by the visit it is
+        deciding, which is the visit that has not happened yet.
+        """
+        rule = Counted()
+        agent = QLearning(Rng(1), Discrete(2), explore=rule)
+        agent.act(0)
+        agent.act(0)
+        assert rule.seen == [[0, 0], [1, 0]]

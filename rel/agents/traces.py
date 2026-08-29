@@ -44,6 +44,7 @@ from __future__ import annotations
 from typing import Literal
 
 from rel.agents.base import Transition
+from rel.agents.explore import Rule
 from rel.agents.td import Sarsa
 from rel.core import ObsT
 from rel.rng import Rng
@@ -81,6 +82,7 @@ class SarsaLambda(Sarsa[ObsT]):
         discount: float = 1.0,
         epsilon: float | Schedule = 0.1,
         optimism: float = 0.0,
+        explore: Rule | None = None,
         trace_decay: float = 0.9,
         traces: Kind = "replacing",
     ) -> None:
@@ -91,6 +93,7 @@ class SarsaLambda(Sarsa[ObsT]):
             discount=discount,
             epsilon=epsilon,
             optimism=optimism,
+            explore=explore,
         )
 
         if not 0.0 <= trace_decay <= 1.0:
