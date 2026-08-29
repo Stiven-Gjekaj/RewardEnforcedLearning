@@ -727,6 +727,85 @@ the map read off it walks in a circle.
 
 ---
 
+## Prediction, where the answer is known
+
+Every agent above controls. It keeps a number for each action, ranks them, and
+acts on the ranking. Estimating what a policy you are not trying to improve is
+worth is the other half of the subject, and it is worth separating because
+control mixes two questions: when a policy improves, its estimates chase a
+moving target, and a measurement of how good the estimates are cannot say
+whether the answer moved or the estimate did.
+
+```console
+$ rel train td --env walk --set start_value=0.5
+$ python scripts/measure_prediction.py
+```
+
+### The one problem whose answer is arithmetic
+
+The random walk is five cells in a line between two endings. The left one pays
+nothing, the right one pays 1, and a policy that goes each way half the time
+reaches the right one from the k-th cell exactly k times in six.
+
+```
+|--o--|          0.167  0.333  0.500  0.667  0.833
+```
+
+Every other table on this page compares an agent against dynamic programming
+over the same model. That is a strong check and it is still a check against
+another computation. This one is a check against arithmetic, and a test holds
+the closed form against a sweep over the model so that a fault in either shows
+up as a disagreement rather than as a plausible number.
+
+### TD against Monte Carlo
+
+| method | step 0.01 | step 0.02 | step 0.05 | step 0.1 | step 0.2 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| td | 0.1283 | 0.0689 | **0.0343** | 0.0543 | 0.0822 |
+| 3-step td | 0.0880 | **0.0455** | 0.0571 | 0.0820 | 0.1219 |
+| td-lambda 0.8 | 0.1124 | 0.0592 | 0.0470 | 0.0685 | 0.1017 |
+| mc, first visit | **0.1278** | 0.0761 | 0.0590 | 0.0854 | 0.1313 |
+| mc, every visit | 0.0942 | 0.0768 | 0.1189 | 0.1739 | 0.2427 |
+
+*Fifty runs of a hundred episodes, estimates starting at 0.5. Each cell is the
+root mean square error against the true values, over the five states an agent
+can be in. An untrained table scores 0.2357.*
+
+**TD's best is 0.0343 and Monte Carlo's best is 0.0590.** Both are estimating
+the same thing from the same episodes, and the one that uses what it already
+believes about where it ended up gets 42% closer than the one that waits to
+find out what the return was.
+
+The two are level at the smallest step size and TD is ahead everywhere else. At
+0.01 neither has arrived after a hundred episodes, so that column is a
+measurement of how far they have got rather than of where they settle.
+
+### Every row is a U
+
+There is no best step size in that table, only a best step size for a method
+and a budget. Too small and a hundred episodes is not enough to arrive. Too
+large and the estimate never settles.
+
+**A constant step size does not converge at all.** It tracks: the estimate ends
+up in a band around the answer whose width is proportional to the step size.
+That is the right behaviour for a problem that moves and the wrong behaviour
+for one that does not, and the random walk does not move. It is also why the
+test that says these methods reach the answer decays the step size, and why
+this table is a ladder rather than a row.
+
+### Every visit is the odd one out
+
+Crediting a state once for every time an episode passed through it, rather than
+once for the first, is worse everywhere but the smallest step size, and it gets
+worse fastest as the step size grows.
+
+The random walk is why. It doubles back constantly, so one episode can pass
+through a cell four or five times, and every visit then moves that cell four or
+five times in the same direction from the same return. At a step size of 0.2 it
+scores 0.2427, which is worse than not learning at all.
+
+---
+
 ## The tile coder
 
 A tile coder lays several grids over a continuous space, each shifted by a
@@ -1203,6 +1282,7 @@ it off.
 | The seed that gets lost | `python scripts/measure_lost_seed.py --ladder-all` |
 | What an option costs | `python scripts/measure_options.py --runs 20` |
 | What crediting the middle buys | `python scripts/measure_intra_option.py --episodes 800 --block 100` |
+| Prediction against a known answer | `python scripts/measure_prediction.py` |
 | Any one or two settings | `rel sweep <agent> --env <env> --over name=a,b,c` |
 | Specification gaming | `rel gaming` |
 | One run in detail | `rel train q-learning --env cliff --seed 7` |

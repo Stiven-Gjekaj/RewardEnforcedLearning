@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-1393_passing-427819?style=for-the-badge" alt="1393 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-1506_passing-427819?style=for-the-badge" alt="1506 tests passing"/>
 </p>
 
 <p align="center">
@@ -36,7 +36,7 @@ environments where the reward is not the point_
 **A reinforcement learning laboratory that runs in a terminal and needs
 nothing installed.**
 
-Twelve environments, twenty five agents, a gradient engine, a dynamic programming
+Thirteen environments, twenty nine agents, a gradient engine, a dynamic programming
 solver that says what the best possible policy is worth, and a command line
 that draws a learning curve out of braille dots.
 
@@ -196,6 +196,9 @@ the path digest rather than trusting it.
 - **Bandits.** The ten armed testbed, and a version where every lever wanders.
 - **Grids.** The cliff walk, the windy grid, four rooms, the Dyna maze and the
   frozen lake, all written as pictures of themselves.
+- **A random walk.** The one environment here whose values are arithmetic
+  rather than another computation, which is what makes a prediction checkable
+  against the answer.
 - **Control.** A cart pole and a mountain car, with the physics written out and
   a note on which integrator and why.
 - **Three where the reward is not the point.** A boat race that can be farmed,
@@ -212,6 +215,8 @@ package: see [docs/grids.md](docs/grids.md).
 ### Agents
 
 - **Bandits.** Epsilon greedy, optimistic, upper confidence, gradient.
+- **Prediction.** TD, n-step TD, TD with traces and Monte Carlo, estimating a
+  policy nobody is trying to improve.
 - **Tabular.** SARSA, Q-learning, Expected SARSA, Double Q, n-step SARSA,
   first visit Monte Carlo.
 - **Traces.** SARSA with eligibility traces and Watkins' Q with them, in
@@ -304,8 +309,8 @@ an agent when it is fifty times too large.
 ```
 rel/core.py         the contract: what an environment is, what a step is
 rel/rng.py          PCG written out, with named independent streams
-rel/envs/           twelve environments. Never import an agent.
-rel/agents/         twenty five agents. Never import an environment.
+rel/envs/           thirteen environments. Never import an agent.
+rel/agents/         twenty nine agents. Never import an environment.
   dp.py             value iteration, policy iteration, exact policy values
   td.py             SARSA, Q-learning, Expected SARSA, Double Q, n-step
   tiles.py          tile coding, worked out exactly rather than hashed
@@ -324,15 +329,15 @@ scripts/            the scripts that produce the numbers in the documentation
 | Area | Files | Lines |
 | --- | ---: | ---: |
 | Core | 5 | 910 |
-| Environments | 7 | 2079 |
-| Agents | 17 | 4651 |
+| Environments | 7 | 2222 |
+| Agents | 18 | 5243 |
 | Network | 4 | 672 |
 | Running | 5 | 1026 |
-| Interface | 6 | 1018 |
-| Command line | 3 | 1559 |
-| **Total** | **47** | **11915** |
+| Interface | 6 | 1022 |
+| Command line | 3 | 1595 |
+| **Total** | **48** | **12690** |
 
-Not counting 9792 lines of tests and 1700 of measurement scripts. Run
+Not counting 10408 lines of tests and 1830 of measurement scripts. Run
 `python scripts/lines.py` for the current numbers.
 
 Three rules about who may import whom are enforced by a test that reads the
@@ -353,7 +358,7 @@ import statements of every module:
 $ pytest
 ```
 
-1393 tests. Some of what they cover, and why each one is there rather than the
+1506 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A
@@ -402,7 +407,7 @@ what it was for.
 
 ## Status
 
-Alpha, and complete enough to be useful. Twelve environments and twenty five
+Alpha, and complete enough to be useful. Thirteen environments and twenty nine
 agents, all of them covered by a suite that runs in about five minutes with no
 browser, no display and no network.
 
