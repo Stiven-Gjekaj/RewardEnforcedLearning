@@ -316,34 +316,45 @@ def main() -> int:
 
     started = time.perf_counter()
     stale = 0
-    for block in blocks:
+    broken = 0
+    for number, block in enumerate(blocks, start=1):
+        # Said before the command runs rather than after. Some of these take
+        # minutes, and a run that prints nothing for an hour looks the same
+        # as a run that has hung.
+        print(f"\n[{number}/{len(blocks)}] {block.label}", flush=True)
+
         result = check(block, args.timeout)
-        mark = "ok   " if not result.absent and not result.trouble else "moved"
-        print(f"\n{mark}  {block.label}", flush=True)
         if result.trouble:
-            print(f"  {result.trouble}")
-            stale += 1
+            print(f"  could not check it. {result.trouble}", flush=True)
+            broken += 1
             continue
         print(
             f"  {result.found} of {result.claimed} numbers still printed, "
-            f"in {result.seconds:.0f}s"
+            f"in {result.seconds:.0f}s",
+            flush=True,
         )
         for line in result.absent:
-            print(f"  {line}")
+            print(f"  {line}", flush=True)
         stale += bool(result.absent)
 
+    checked = len(blocks) - broken
     print(
-        f"\n{len(blocks) - stale} of {len(blocks)} commands print every number "
-        f"the page states for them, in {time.perf_counter() - started:.0f}s."
+        f"\n{checked - stale} of {checked} blocks print every number the page "
+        f"states for them, in {time.perf_counter() - started:.0f}s."
     )
     if stale:
         print(
-            "A command that prints none of its numbers is more likely a table\n"
+            "A block that prints none of its numbers is more likely a table\n"
             "attached to the wrong command than a table that is wholly wrong.\n"
             "This cannot tell those apart, so it reports both and calls\n"
             "neither of them stale."
         )
-    return 0
+    if broken:
+        # A documented command that will not run is a defect whatever the
+        # numbers under it say, so this is the one thing here worth an exit
+        # code. Numbers that moved need a person to read them.
+        print(f"{broken} of {len(blocks)} would not run at all.")
+    return 1 if broken else 0
 
 
 if __name__ == "__main__":

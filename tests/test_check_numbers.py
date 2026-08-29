@@ -252,3 +252,90 @@ class TestAgainstTheRealPage:
             for claim in block.claims:
                 for row in claim.rows:
                     assert "scripts/measure" not in row, row
+
+
+class TestWhatTheExitCodeMeans:
+    """One exit code, for the one thing here that is unambiguous.
+
+    A number that moved needs a person to look at it: this cannot tell a
+    table that is stale from a table attached to the wrong command. A
+    documented command that will not run at all is a defect either way, so
+    that is what the exit code is for.
+    """
+
+    def go(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        page: Path,
+        *rest: str,
+    ) -> int:
+        monkeypatch.setattr(
+            sys, "argv", ["check_numbers", "--doc", str(page), "--all", *rest]
+        )
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        return int(script.main())
+
+    def test_a_command_that_runs_and_matches_is_zero(
+        self, script: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        page = write(
+            tmp_path,
+            '```console\n$ python -c "print(7.5)"\n```\n\n| a | b |\n| --- | --- |\n| x | 7.5 |\n',
+        )
+        assert self.go(script, monkeypatch, page) == 0
+
+    def test_a_number_that_moved_is_still_zero(
+        self, script: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        page = write(
+            tmp_path,
+            '```console\n$ python -c "print(7.5)"\n```\n\n| a | b |\n| --- | --- |\n| x | 9.5 |\n',
+        )
+        assert self.go(script, monkeypatch, page) == 0
+
+    def test_a_command_that_will_not_run_is_one(
+        self, script: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        page = write(
+            tmp_path,
+            "```console\n$ definitely-not-a-command\n```\n\n| a | b |\n| --- | --- |\n| x | 1 |\n",
+        )
+        assert self.go(script, monkeypatch, page) == 1
+
+    def test_it_says_which_numbers_moved_and_where(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        page = write(
+            tmp_path,
+            '```console\n$ python -c "print(7.5)"\n```\n\n| a | b |\n| --- | --- |\n| x | 9.5 |\n',
+        )
+        self.go(script, monkeypatch, page)
+        printed = capsys.readouterr().out
+        assert "line 5" in printed
+        assert "9.5" in printed
+        assert "0 of 1 numbers still printed" in printed
+
+    def test_the_listing_runs_nothing(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # A page whose only command cannot be run. `--list` says what it
+        # would do, so it has to say it without finding that out.
+        page = write(
+            tmp_path,
+            "```console\n$ definitely-not-a-command\n```\n\n| a | b |\n| --- | --- |\n| x | 1 |\n",
+        )
+        monkeypatch.setattr(
+            sys, "argv", ["check_numbers", "--doc", str(page), "--list"]
+        )
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        assert script.main() == 0
+        assert "definitely-not-a-command" in capsys.readouterr().out
