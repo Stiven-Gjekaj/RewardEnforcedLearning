@@ -362,13 +362,13 @@ scripts/            the scripts that produce the numbers in the documentation
 | Core | 5 | 910 |
 | Environments | 8 | 2489 |
 | Agents | 23 | 6654 |
-| Network | 4 | 720 |
+| Network | 4 | 782 |
 | Running | 6 | 1252 |
 | Interface | 6 | 1022 |
 | Command line | 3 | 1658 |
-| **Total** | **55** | **14705** |
+| **Total** | **55** | **14767** |
 
-Not counting 12933 lines of tests and 2733 of measurement scripts. Run
+Not counting 12981 lines of tests and 2936 of measurement scripts. Run
 `python scripts/lines.py` for the current numbers.
 
 Three rules about who may import whom are enforced by a test that reads the
