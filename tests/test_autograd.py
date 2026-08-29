@@ -249,3 +249,51 @@ class TestShapes:
     def test_selecting_outside_the_tensor_is_refused(self) -> None:
         with pytest.raises(IndexError):
             select(Tensor([1.0, 2.0]), 5)
+
+
+class TestTheInternalConstructor:
+    """`Tensor._made` skips the copy and the check, and owes an explanation.
+
+    The public constructor takes anything a caller has: a tuple of whole
+    numbers, a list it means to keep using, a shape that does not fit what it
+    was given. Every operation inside the engine builds a fresh list of floats
+    and knows the shape it made it to, so both the copy and the check are waste
+    on the path that runs for every tensor of every forward pass.
+
+    What it promises in exchange is that the list belongs to it.
+    """
+
+    def test_it_takes_the_list_it_was_given(self) -> None:
+        data = [1.0, 2.0]
+        made = Tensor._made(data, (2,), ())
+        assert made.data is data
+
+    def test_the_public_one_copies_instead(self) -> None:
+        """A caller that keeps its list would otherwise change the tensor
+        under it, which is the reason the copy is there at all."""
+        data = [1.0, 2.0]
+        made = Tensor(data)
+        data[0] = 99.0
+        assert made.data[0] == 1.0
+
+    def test_it_starts_with_no_gradient(self) -> None:
+        made = Tensor._made([1.0, 2.0, 3.0], (3,), ())
+        assert made.grad == [0.0, 0.0, 0.0]
+
+    def test_it_keeps_the_parents_it_was_given(self) -> None:
+        parent = Tensor([1.0])
+        made = Tensor._made([2.0], (1,), (parent,))
+        assert made._parents == (parent,)
+
+    def test_what_it_makes_is_an_ordinary_tensor(self) -> None:
+        """It builds the object without calling __init__, so every attribute
+        has to be set by hand and a forgotten one would be missing rather than
+        wrong. This is the test that would catch that."""
+        made = Tensor._made([1.0, 2.0], (2,), ())
+        assert len(made) == 2
+        assert made.shape == (2,)
+        assert made.name == ""
+        assert made._backward is None
+        assert "Tensor" in repr(made)
+        made.zero_grad()
+        assert made.grad == [0.0, 0.0]

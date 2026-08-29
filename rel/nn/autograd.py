@@ -71,6 +71,35 @@ class Tensor:
         self._backward = backward
         self.name = name
 
+    @classmethod
+    def _made(
+        cls,
+        data: list[float],
+        shape: tuple[int, ...],
+        parents: tuple[Tensor, ...],
+    ) -> Tensor:
+        """A tensor from a list this module has just built.
+
+        The public constructor copies its data and checks the shape against
+        it, because a caller can hand it anything: a tuple of whole numbers, a
+        list it means to keep using, a shape that does not fit. Every operation
+        in this file builds a fresh list of floats and knows the shape it made
+        it to, so both are waste, and there is one of each for every tensor of
+        every forward pass.
+
+        Nothing outside this module may call it. What it promises is that the
+        list it is given belongs to it, and a caller that keeps a reference is
+        a caller whose numbers change under it.
+        """
+        made = cls.__new__(cls)
+        made.data = data
+        made.shape = shape
+        made.grad = [0.0] * len(data)
+        made._parents = parents
+        made._backward = None
+        made.name = ""
+        return made
+
     # -- Reading ------------------------------------------------------------
 
     def __len__(self) -> int:
@@ -180,7 +209,7 @@ def linear(x: Tensor, weight: Tensor, bias: Tensor) -> Tensor:
         out[row] = total
         base += columns
 
-    result = Tensor(out, (rows,), parents=(x, weight, bias))
+    result = Tensor._made(out, (rows,), (x, weight, bias))
 
     def backward() -> None:
         shares = result.grad
@@ -208,7 +237,7 @@ def linear(x: Tensor, weight: Tensor, bias: Tensor) -> Tensor:
 def tanh(x: Tensor) -> Tensor:
     """The hyperbolic tangent, one element at a time."""
     out = [math.tanh(value) for value in x.data]
-    result = Tensor(out, x.shape, parents=(x,))
+    result = Tensor._made(out, x.shape, (x,))
 
     def backward() -> None:
         for index, value in enumerate(out):
@@ -226,7 +255,7 @@ def relu(x: Tensor) -> Tensor:
     discover from the code.
     """
     out = [value if value > 0.0 else 0.0 for value in x.data]
-    result = Tensor(out, x.shape, parents=(x,))
+    result = Tensor._made(out, x.shape, (x,))
 
     def backward() -> None:
         for index, value in enumerate(x.data):
@@ -252,7 +281,7 @@ def log_softmax(x: Tensor) -> Tensor:
     total = math.log(sum(math.exp(value) for value in shifted))
     out = [value - total for value in shifted]
 
-    result = Tensor(out, x.shape, parents=(x,))
+    result = Tensor._made(out, x.shape, (x,))
 
     def backward() -> None:
         share = sum(result.grad)
@@ -270,7 +299,7 @@ def exp(x: Tensor) -> Tensor:
     result rather than recomputing anything.
     """
     out = [math.exp(value) for value in x.data]
-    result = Tensor(out, x.shape, parents=(x,))
+    result = Tensor._made(out, x.shape, (x,))
 
     def backward() -> None:
         for index, value in enumerate(out):
@@ -285,7 +314,7 @@ def select(x: Tensor, index: int) -> Tensor:
     if not 0 <= index < len(x):
         raise IndexError(f"{index} is outside a tensor of {len(x)}.")
 
-    result = Tensor([x.data[index]], (1,), parents=(x,))
+    result = Tensor._made([x.data[index]], (1,), (x,))
 
     def backward() -> None:
         x.grad[index] += result.grad[0]
@@ -296,7 +325,7 @@ def select(x: Tensor, index: int) -> Tensor:
 
 def scale(x: Tensor, factor: float) -> Tensor:
     """Every element times the same number."""
-    result = Tensor([value * factor for value in x.data], x.shape, parents=(x,))
+    result = Tensor._made([value * factor for value in x.data], x.shape, (x,))
 
     def backward() -> None:
         for index in range(len(x.data)):
@@ -312,7 +341,7 @@ def add(a: Tensor, b: Tensor) -> Tensor:
         raise ValueError(f"{a.shape} and {b.shape} cannot be added.")
 
     out = [first + second for first, second in zip(a.data, b.data, strict=True)]
-    result = Tensor(out, a.shape, parents=(a, b))
+    result = Tensor._made(out, a.shape, (a, b))
 
     def backward() -> None:
         for index, share in enumerate(result.grad):
@@ -329,7 +358,7 @@ def multiply(a: Tensor, b: Tensor) -> Tensor:
         raise ValueError(f"{a.shape} and {b.shape} cannot be multiplied.")
 
     out = [first * second for first, second in zip(a.data, b.data, strict=True)]
-    result = Tensor(out, a.shape, parents=(a, b))
+    result = Tensor._made(out, a.shape, (a, b))
 
     def backward() -> None:
         for index, share in enumerate(result.grad):
@@ -342,7 +371,7 @@ def multiply(a: Tensor, b: Tensor) -> Tensor:
 
 def total(x: Tensor) -> Tensor:
     """Every element added together."""
-    result = Tensor([sum(x.data)], (1,), parents=(x,))
+    result = Tensor._made([sum(x.data)], (1,), (x,))
 
     def backward() -> None:
         share = result.grad[0]
@@ -355,7 +384,7 @@ def total(x: Tensor) -> Tensor:
 
 def square(x: Tensor) -> Tensor:
     """Every element times itself."""
-    result = Tensor([value * value for value in x.data], x.shape, parents=(x,))
+    result = Tensor._made([value * value for value in x.data], x.shape, (x,))
 
     def backward() -> None:
         for index, value in enumerate(x.data):
