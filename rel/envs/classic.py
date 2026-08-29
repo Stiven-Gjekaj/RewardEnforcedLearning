@@ -11,8 +11,12 @@ says so and says why.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
+from rel.core import EnvSpec, Outcome, Step, TabularEnv
 from rel.envs.gridworld import GridWorld
 from rel.rng import Rng
+from rel.spaces import Discrete
 
 # Example 6.6. Four rows and twelve columns. Every step pays -1. Walking into
 # the cliff pays -100 and puts the agent back at the start, and the episode
@@ -192,6 +196,123 @@ def frozen_lake(rng: Rng, size: int = 4, slip: float = 2.0 / 3.0) -> GridWorld:
     )
 
 
+class RandomWalk(TabularEnv):
+    """A line of cells with a terminal at each end. Left pays nothing, right pays 1.
+
+    This is Sutton and Barto, example 6.2, and it is here for one reason: it is
+    the only environment in this project whose values are known in closed form.
+
+    Under a policy that goes each way half the time, the value of the k-th cell
+    from the left is exactly k / (size + 1). Every other measurement here
+    compares an agent against dynamic programming over the same model, which is
+    a strong check and still a check against another computation. This is a
+    check against arithmetic.
+
+    ## Why it is not a grid
+
+    A one row grid would have four actions, two of which walk into a wall, and
+    a policy that goes each way half the time would then be standing still half
+    the time. That is a different problem with a different answer, and the
+    answer above is the reason this environment exists.
+
+    ## The states
+
+    `0` and `size + 1` are the two endings and the cells between them are the
+    walk. The episode starts in the middle, which is why an odd `size` is the
+    usual choice: with an even one there is no middle and the start is left of
+    centre.
+    """
+
+    LEFT = 0
+    RIGHT = 1
+
+    def __init__(self, rng: Rng, size: int = 5) -> None:
+        super().__init__(rng)
+
+        if size < 1:
+            raise ValueError("A walk needs at least one cell between its endings.")
+        self.size = size
+
+        self.observation_space = Discrete(size + 2)
+        self.action_space = Discrete(2)
+        self.action_names = ("left", "right")
+        self.spec = EnvSpec(
+            name="walk",
+            summary=(
+                f"{size} cells in a line between two endings. "
+                f"The right one pays 1 and nothing else pays anything."
+            ),
+            max_episode_steps=1000,
+        )
+
+        self.start = (size + 1) // 2
+        self.at = self.start
+
+    # -- What it is worth ---------------------------------------------------
+
+    def true_values(self) -> tuple[float, ...]:
+        """What each state is worth under a policy that goes each way equally.
+
+        Worked out rather than estimated. A walk on a line is a fair game, so
+        the chance of reaching the right ending from the k-th cell is k over
+        the number of gaps, and the value is that chance because the right
+        ending pays 1 and nothing else pays anything.
+        """
+        gaps = self.size + 1
+        return tuple(
+            0.0 if state in (0, self.size + 1) else state / gaps
+            for state in range(self.size + 2)
+        )
+
+    def is_ending(self, state: int) -> bool:
+        return state in (0, self.size + 1)
+
+    # -- The contract -------------------------------------------------------
+
+    def _reset(self) -> int:
+        self.at = self.start
+        return self.at
+
+    def _step(self, action: int) -> Step[int]:
+        landed, reward, ended = self._resolve(self.at, action)
+        self.at = landed
+        return Step(
+            observation=landed, reward=reward, terminated=ended, truncated=False
+        )
+
+    def _resolve(self, state: int, action: int) -> tuple[int, float, bool]:
+        if self.is_ending(state):
+            return state, 0.0, True
+
+        landed = state - 1 if action == self.LEFT else state + 1
+        if landed == self.size + 1:
+            return landed, 1.0, True
+        return landed, 0.0, landed == 0
+
+    def transitions(self, state: int, action: int) -> Sequence[Outcome]:
+        landed, reward, ended = self._resolve(state, action)
+        return (Outcome(1.0, landed, reward, ended),)
+
+    def start_states(self) -> Sequence[tuple[float, int]]:
+        return ((1.0, self.start),)
+
+    def render(self) -> str:
+        cells = []
+        for state in range(self.size + 2):
+            if self.is_ending(state):
+                cells.append("|")
+            elif state == self.at:
+                cells.append("o")
+            else:
+                cells.append("-")
+        return "".join(cells)
+
+
+def random_walk(rng: Rng, size: int = 5) -> RandomWalk:
+    """The random walk of Sutton and Barto, example 6.2."""
+    return RandomWalk(rng, size=size)
+
+
 __all__ = [
     "CLIFF",
     "DYNA_MAZE",
@@ -200,9 +321,11 @@ __all__ = [
     "LAKE_8",
     "WINDY",
     "WINDY_STRENGTH",
+    "RandomWalk",
     "cliff_walk",
     "dyna_maze",
     "four_rooms",
     "frozen_lake",
+    "random_walk",
     "windy_grid",
 ]

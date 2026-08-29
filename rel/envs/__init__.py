@@ -34,6 +34,7 @@ from rel.envs.classic import (
     dyna_maze,
     four_rooms,
     frozen_lake,
+    random_walk,
     windy_grid,
 )
 from rel.envs.control import CartPole, MountainCar
@@ -86,6 +87,12 @@ ENVIRONMENTS: Registry[Env[Any]] = Registry(
             "Six by nine with seven blocked cells. Only the goal pays.",
             dyna_maze,
             tags=("tabular", "grid"),
+        ),
+        Entry(
+            "walk",
+            "Five cells in a line between two endings. The right one pays 1.",
+            random_walk,
+            tags=("tabular",),
         ),
         Entry(
             "lake",
