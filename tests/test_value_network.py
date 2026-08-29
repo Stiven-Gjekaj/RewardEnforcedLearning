@@ -190,3 +190,51 @@ class TestItLearns:
 
         assert digest(4) == digest(4)
         assert digest(4) != digest(5)
+
+
+class TestBothPiecesAreNeededOnTheCartPole:
+    """The ablation, cut down to a test.
+
+    Neither piece alone is distinguishable from neither. That is the finding
+    `scripts/measure_value_network.py` measures over ten seeds, and this holds
+    three of them to the part of it that is not close: with both, the agent
+    keeps the pole up several times longer than a policy that has learned
+    nothing.
+    """
+
+    EPISODES = 300
+    SEEDS = (1, 2, 3)
+
+    def _kept_up(self, replay: int, refresh: int) -> float:
+        lasts = []
+        for seed in self.SEEDS:
+            root = Rng(seed)
+            env = ENVIRONMENTS.make("cartpole", root.stream("env"))
+            encoder, features = encoder_for(env.observation_space)
+            agent = DeepQ(
+                root.stream("agent"),
+                env.action_space,
+                encoder,
+                features,
+                step_size=0.02,
+                discount=0.99,
+                epsilon=0.1,
+                replay=replay,
+                target_refresh=refresh,
+            )
+            record = train(env, agent, self.EPISODES, discount=0.99)
+            lasts.append(sum(record.lengths[-30:]) / 30)
+        return sum(lasts) / len(lasts)
+
+    def test_with_both_it_learns_something(self) -> None:
+        assert self._kept_up(2000, 200) > 20.0
+
+    def test_with_neither_it_does_not(self) -> None:
+        # A pole that is not being balanced falls in about nine steps.
+        assert self._kept_up(0, 0) < 15.0
+
+    def test_replay_alone_is_not_enough(self) -> None:
+        assert self._kept_up(2000, 0) < 20.0
+
+    def test_a_target_network_alone_is_not_enough(self) -> None:
+        assert self._kept_up(0, 200) < 15.0
