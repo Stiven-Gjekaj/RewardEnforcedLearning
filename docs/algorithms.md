@@ -360,6 +360,178 @@ property rather than blurring it away.
 
 ---
 
+## Four ways of exploring, and the one thing that separates them
+
+```console
+$ python scripts/measure_exploration.py
+$ python scripts/measure_exploration.py --env maze
+$ python scripts/measure_exploration.py --rules count-bonus:0.1,count-bonus:2
+$ rel sweep q-learning --env corridor --set discount=0.95 --over explore=epsilon-greedy,count-bonus:0.5
+```
+
+Every agent above explores the same way. It takes the best action, and with
+probability epsilon it takes any action instead. That rule ignores everything
+the agent knows: a move it has made a thousand times and a move it has never
+tried are equally likely to be the one it tries.
+
+`explore` is a setting on every tabular agent, and three rules answer it.
+
+| `--set explore=` | ranks actions by |
+| --- | --- |
+| `epsilon-greedy` | what they are worth, with a fixed chance of ignoring that |
+| `softmax:0.02` | what they are worth, smoothly |
+| `count-bonus:0.5` | what they are worth, plus a term that shrinks as an action is taken |
+
+There is a fourth way and it is not a rule. **Optimistic initialisation** is a
+starting value. `--set optimism=1` makes every action of a state nobody has
+visited worth the best outcome there is, so a greedy agent walks towards
+whatever it has not tried and stops as soon as the numbers come down to the
+truth. It answers the same question in the other place, and a comparison that
+left it out would be a comparison of three answers to a question that has four.
+
+### On the grids this project already had, all four are the same
+
+Ten seeds and three hundred episodes of `q-learning`, each grid at its own
+suggested discount. The four numbers in each cell are the four rules in the
+order above, with optimism last.
+
+| grid | first episode that reached the goal | settled | value of the policy found |
+| --- | --- | ---: | --- |
+| cliff | 2, 1, 1, 1 | 17, 13, 13, 13 | -13.00 by all four |
+| rooms | 1, 1, 1, 1 | 23, 20, 20, 20 | -20.00 by all four |
+| maze | 1, 1, 1, 1 | 16, 15, 16, 14 | 0.5133, 0.4883, 0.4883, 0.5133 |
+
+**Every rule finds the goal on the first episode of nearly every seed.** The
+settled column, which is the mean episode length over the last fifty, only says
+how much exploring each is still doing at the end: epsilon-greedy is still
+taking a random action one step in ten and the other three have stopped.
+
+That is not a result about exploring. It is a result about these grids. The
+goal of the cliff walk is thirteen steps from the start and so is the goal of
+the Dyna maze, so an agent that has learned nothing arrives anyway and there is
+nothing for a better rule to be better at.
+
+### The corridor was built to have something to be better at
+
+One folded path, nine by nine, no branch anywhere in it. The route is forty
+seven steps and nothing pays until the end of it. A random policy covers a line
+of length n in about n squared steps, so an agent that has learned nothing
+spends a whole episode not finding out that there is anything to find.
+
+| rule | first end | steps to it | settled | value found | time |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `epsilon-greedy` | 18 | 17,500 | 53 | 0.0897 | 24s |
+| `softmax:0.02` | 21 | 20,000 | 104 | 0.0897 | 31s |
+| `count-bonus:0.5` | 6 | 5,000 | 49 | 0.0897 | 23s |
+| optimism 1 | **1** | **0** | 48 | 0.0897 | 2s |
+
+*Ten seeds, three hundred episodes, discount 0.95. The best possible return
+from the start is 0.0897, which is 0.95 raised to the forty seven.*
+
+The episode each seed first reached the goal on:
+
+```
+epsilon-greedy   13   2  36  16  24  18  35  13  19  22
+softmax:0.02     12  29  13  19  16  29  97  27  23   2
+count-bonus:0.5   6   4   9  29   3   3   7   3   8   6
+optimism 1        1   1   1   1   1   1   1   1   1   1
+```
+
+**All four end with the same policy.** The value column is what each learned,
+worked out exactly from the model, and it is the optimum in every row. What
+differs is the seventeen thousand five hundred steps epsilon-greedy spent
+before there was anything to learn from.
+
+### Neither dial matters, and the digest says so exactly
+
+The obvious reply to that table is that softmax was set wrongly. It was not.
+Three episodes of the corridor on seed 1, and the digest of the path each one
+walked:
+
+```
+epsilon-greedy:0.0   8ecde0e097a33e50
+epsilon-greedy:0.1   a9e79fa6af4c3715
+epsilon-greedy:0.5   a9e79fa6af4c3715
+epsilon-greedy:0.9   a9e79fa6af4c3715
+epsilon-greedy:1.0   8ecde0e097a33e50
+softmax:0.02         83a3e33beaed3144
+softmax:0.001        83a3e33beaed3144
+```
+
+Not similar runs. The same run, step for step.
+
+**Before anything pays, every value in the table is the starting number.** A
+rule that ranks actions by value is ranking a row of equal numbers, so it takes
+a uniform action whatever its dial says. At an epsilon of 0.1 the agent takes a
+random action one time in ten and breaks a four way tie the other nine, and
+both of those are one uniform draw over four actions, so the run does not
+depend on which of them happened.
+
+The two ends of that ladder have an identity of their own for a smaller reason.
+`Rng.chance` answers 0 and 1 without drawing, so those two runs spend one draw
+fewer per step. They are still uniform and they are still identical to each
+other.
+
+The count bonus does the same thing from the other side. A confidence of 0.1,
+0.5 and 2 gives the same ten seeds:
+
+```
+count-bonus:0.1   6   4   9  29   3   3   7   3   8   6
+count-bonus:0.5   6   4   9  29   3   3   7   3   8   6
+count-bonus:2     6   4   9  29   3   3   7   3   8   6
+```
+
+Multiplying every count-based bonus by a constant does not reorder them, and
+with the values all equal the bonus is the whole score.
+
+**The dial of a rule cannot help find a first reward. Only what the rule ranks
+by can.** That is why the four rows above split two and two rather than four
+ways.
+
+The dials do their work afterwards, once the values are real, and what they
+decide is how much exploring carries on. That is the settled column: 48, 49 and
+77 steps at a confidence of 0.1, 0.5 and 2, against a route that is 47.
+
+### What the alternatives cost
+
+`count-bonus` keeps a second dictionary the size of the table and writes to it
+on every step. Nothing else here keeps one, so the agent asks the rule whether
+to count rather than counting always.
+
+`count-bonus` also cannot be the behaviour policy of an importance sampling
+method. It explores by ranking rather than by chance, so every action but its
+choice has a probability of zero, and `off-policy-mc` divides by exactly that
+number. Nothing is wrong with either piece and they cannot be used together.
+The error says so rather than learning from a correction that is not defined.
+Softmax gives every action a share and works.
+
+### Where each one is weak
+
+**A temperature is in the units of the value.** Epsilon means the same thing on
+every problem because it is a probability. A temperature divides a difference
+between two values, so what counts as hot depends on how far apart the values
+of that environment are. On the cliff walk neighbouring actions differ by ones
+and a temperature of one already follows the ordering closely. On the corridor
+they differ by thousandths and the same setting is uniform. A setting carried
+from one environment to another is not the same setting.
+
+**Optimism has to know the scale of the answer.** An optimism of 1 is right for
+a grid that pays 1 at the goal and nothing else. On the cliff walk, where every
+reward is negative, a table of zeros is already above every true value, so an
+agent there is optimistic whether or not anybody asked for it. Ten seeds and
+three hundred episodes read -50.25 at an optimism of 0 and -49.78 at 1, which
+is the same number.
+
+**The count bonus is the bandit rule once per state, and the guarantee does not
+come with it.** A bandit's arms pay out on their own and a grid's actions pay
+out through the states they lead to. So it drives the agent to try every action
+of the states it stands in, and nothing in it drives the agent towards a state
+it has never reached. Once every action of a state has been taken a few times
+the bonus there is small and the agent is greedy again, whatever is still
+unexplored two rooms away.
+
+---
+
 ## Learning about one policy while following another
 
 Every agent above learns about the policy it is following, or about the greedy
