@@ -15,7 +15,7 @@ import pytest
 
 from rel.agents.search import Node, TreeSearch
 from rel.core import EnvSpec, Outcome, Step, TabularEnv
-from rel.envs.classic import dyna_maze
+from rel.envs.classic import cliff_walk, dyna_maze
 from rel.rng import Rng
 from rel.spaces import Discrete
 from rel.training import train
@@ -255,3 +255,44 @@ class TestOneSeedIsOneRun:
 
     def test_another_seed_does_not(self) -> None:
         assert self._digest(4) != self._digest(5)
+
+
+class TestWhatARolloutCanAndCannotSee:
+    """A rollout that reaches no ending gives the search nothing to rank by.
+
+    This is the explanation for where `mcts` fails, and it is measurable
+    without running the agent at all. On the cliff walk every step pays -1 and
+    the discount is one, so a rollout that stops at the depth limit is worth
+    exactly minus the depth wherever it went. The only thing that can separate
+    two branches is reaching an ending, and a random policy does not.
+    """
+
+    @staticmethod
+    def _arrivals(env: TabularEnv, budget: int, tries: int = 200) -> int:
+        rng = Rng(2)
+        arrived = 0
+        for _ in range(tries):
+            env.reset()
+            for _ in range(budget):
+                outcome = env.step(rng.below(env.action_space.n))
+                if outcome.terminated:
+                    arrived += 1
+                    break
+                if outcome.truncated:
+                    break
+        return arrived
+
+    def test_thirty_random_steps_reach_no_ending_on_the_cliff_walk(self) -> None:
+        assert self._arrivals(cliff_walk(Rng(1)), 30) == 0
+
+    def test_thirty_random_steps_reach_no_ending_on_the_maze_either(self) -> None:
+        """So the rollout is not what makes the search work on the maze.
+
+        What works there is the tree, which keeps what the real steps found.
+        """
+        assert self._arrivals(dyna_maze(Rng(1)), 30) == 0
+
+    def test_a_much_longer_rollout_does_arrive_sometimes(self) -> None:
+        """The depth that would be needed, which is why this is a weakness
+        rather than a setting somebody forgot to turn up."""
+        assert self._arrivals(dyna_maze(Rng(1)), 500) > 20
