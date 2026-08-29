@@ -52,7 +52,7 @@ from rel.agents.features import encoder_for
 from rel.agents.linear import SemiGradientQ, SemiGradientSarsa
 from rel.agents.monte_carlo import MonteCarloControl
 from rel.agents.off_policy import Estimator, OffPolicyMonteCarlo
-from rel.agents.options import OptionsQ
+from rel.agents.options import IntraOptionQ, OptionsQ
 from rel.agents.policy import ActorCritic, Reinforce
 from rel.agents.sweeping import PrioritisedSweeping
 from rel.agents.td import DoubleQ, ExpectedSarsa, NStepSarsa, QLearning, Sarsa
@@ -319,14 +319,34 @@ def _doorways(env: TabularEnv) -> list[int]:
     return list(describe()) if callable(describe) else []
 
 
-def _options(
+def _options(cls: type[OptionsQ]) -> AgentBuilder:
+    """A builder for the two agents that choose options."""
+
+    def build(
+        rng: Rng,
+        env: Env[Any],
+        hallways: bool = True,
+        step_size: float | Schedule = 0.5,
+        discount: float = 0.95,
+        epsilon: float | Schedule = 0.1,
+        optimism: float = 0.0,
+    ) -> Agent[Any]:
+        return _built_options(
+            cls, rng, env, hallways, step_size, discount, epsilon, optimism
+        )
+
+    return build
+
+
+def _built_options(
+    cls: type[OptionsQ],
     rng: Rng,
     env: Env[Any],
-    hallways: bool = True,
-    step_size: float | Schedule = 0.5,
-    discount: float = 0.95,
-    epsilon: float | Schedule = 0.1,
-    optimism: float = 0.0,
+    hallways: bool,
+    step_size: float | Schedule,
+    discount: float,
+    epsilon: float | Schedule,
+    optimism: float,
 ) -> Agent[Any]:
     #: `hallways=False` leaves the agent with its primitive actions only, which
     #: is Q-learning. That is the comparison the whole method is measured by,
@@ -344,7 +364,7 @@ def _options(
     if hallways:
         built.extend(hallway_options(env, _doorways(env)))
 
-    return OptionsQ(
+    return cls(
         rng,
         env.action_space,
         built,
@@ -555,7 +575,13 @@ AGENTS: Registry[Agent[Any]] = Registry(
         Entry(
             "options-q",
             "Q-learning that can choose to walk to a doorway and stop there.",
-            _options,
+            _options(OptionsQ),
+            tags=("tabular", "planning", "off-policy"),
+        ),
+        Entry(
+            "intra-option-q",
+            "Options, with every state an option passed through credited too.",
+            _options(IntraOptionQ),
             tags=("tabular", "planning", "off-policy"),
         ),
         Entry(
