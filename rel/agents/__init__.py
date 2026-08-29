@@ -65,6 +65,7 @@ from rel.agents.td import DoubleQ, ExpectedSarsa, NStepSarsa, QLearning, Sarsa
 from rel.agents.tiles import TileCoder
 from rel.agents.traces import Kind, SarsaLambda, WatkinsQLambda
 from rel.agents.tree import Target, TreeBackup
+from rel.agents.value_network import DeepQ
 from rel.core import Env, TabularEnv
 from rel.options import Option, hallway_options, primitives
 from rel.registry import Entry, Registry
@@ -483,6 +484,38 @@ def _mc_prediction(
     )
 
 
+def _deep_q(
+    rng: Rng,
+    env: Env[Any],
+    hidden: int = 16,
+    step_size: float = 0.01,
+    discount: float = 0.99,
+    epsilon: float | Schedule = 0.1,
+    replay: int = 2000,
+    batch: int = 8,
+    target_refresh: int = 200,
+    clip: float = 1.0,
+) -> Agent[Any]:
+    #: `replay=0` and `target_refresh=0` are the two ablations, so the four
+    #: combinations are settings of one agent rather than four entries. Both
+    #: sides of a comparison are then the same code.
+    encoder, features = encoder_for(env.observation_space)
+    return DeepQ(
+        rng,
+        env.action_space,
+        encoder,
+        features,
+        hidden=hidden,
+        step_size=step_size,
+        discount=discount,
+        epsilon=epsilon,
+        replay=replay,
+        batch=batch,
+        target_refresh=target_refresh,
+        clip=clip,
+    )
+
+
 def _policy_gradient(cls: type[Reinforce[Any]]) -> AgentBuilder:
     #: The entropy bonus here is 0.05 and the classes default to less. The
     #: registry is where a default is chosen by measurement rather than by the
@@ -727,6 +760,12 @@ AGENTS: Registry[Agent[Any]] = Registry(
             "Q-learning over a tile coder.",
             _linear(SemiGradientQ),
             tags=("linear", "off-policy"),
+        ),
+        Entry(
+            "deep-q",
+            "Q-learning over a network, with a replay buffer and a target copy.",
+            _deep_q,
+            tags=("network", "off-policy"),
         ),
         Entry(
             "reinforce",
