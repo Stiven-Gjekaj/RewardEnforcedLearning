@@ -90,7 +90,16 @@ def main() -> int:
     parser.add_argument("--env", default="cartpole")
     parser.add_argument("--agent", default="reinforce")
     parser.add_argument("--episodes", type=int, default=30)
-    parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument(
+        "--repeats",
+        type=int,
+        default=5,
+        help=(
+            "how many times to run the agent. A whole run here is under a "
+            "second, which is short enough that the best of a few is a much "
+            "steadier number than any one of them"
+        ),
+    )
     parser.add_argument("--passes", type=int, default=20_000)
     args = parser.parse_args()
 
@@ -109,8 +118,8 @@ def main() -> int:
     print()
 
     rows = [
-        ("a whole run, best", f"{min(times):.2f}s"),
-        ("a whole run, median", f"{statistics.median(times):.2f}s"),
+        ("a whole run, best", f"{min(times):.3f}s"),
+        ("a whole run, median", f"{statistics.median(times):.3f}s"),
         (f"4 to 16 forward, {args.passes:,} passes", f"{forward:.2f}s"),
         (f"4 to 16 backward, {args.passes:,} passes", f"{backward:.2f}s"),
         (f"48 to 16 forward, {args.passes:,} passes", f"{wide_forward:.2f}s"),
