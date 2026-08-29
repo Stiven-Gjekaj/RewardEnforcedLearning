@@ -38,6 +38,7 @@ from rel.envs.classic import (
     random_walk,
     windy_grid,
 )
+from rel.envs.continuing import two_loops
 from rel.envs.control import CartPole, MountainCar
 from rel.envs.gaming import (
     BoatRace,
@@ -57,13 +58,13 @@ ENVIRONMENTS: Registry[Env[Any]] = Registry(
             "bandit",
             "Ten levers with no state. New true values every episode.",
             stationary_bandit,
-            tags=("bandit",),
+            tags=("bandit", "endless"),
         ),
         Entry(
             "bandit-drift",
             "Ten levers that all start equal and then wander.",
             drifting_bandit,
-            tags=("bandit",),
+            tags=("bandit", "endless"),
         ),
         Entry(
             "cliff",
@@ -96,6 +97,13 @@ ENVIRONMENTS: Registry[Env[Any]] = Registry(
             tags=("tabular", "grid"),
         ),
         Entry(
+            "loops",
+            "A junction between a short loop that pays a little often and a "
+            "long one that pays a lot rarely.",
+            two_loops,
+            tags=("tabular", "endless"),
+        ),
+        Entry(
             "walk",
             "Five cells in a line between two endings. The right one pays 1.",
             random_walk,
@@ -123,7 +131,7 @@ ENVIRONMENTS: Registry[Env[Any]] = Registry(
             "boatrace",
             "A boat paid for touching checkpoints, two of which sit side by side.",
             boat_race,
-            tags=("tabular", "gaming"),
+            tags=("tabular", "gaming", "endless"),
         ),
         Entry(
             "vase",
@@ -135,7 +143,7 @@ ENVIRONMENTS: Registry[Env[Any]] = Registry(
             "thermostat",
             "A room to keep warm, with a dial that makes the sensor report comfort.",
             thermostat,
-            tags=("tabular", "gaming"),
+            tags=("tabular", "gaming", "endless"),
         ),
     ],
 )

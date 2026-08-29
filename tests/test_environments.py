@@ -27,7 +27,7 @@ from rel.spaces import Box, Discrete
 from rel.training import train
 
 NAMES = ENVIRONMENTS.names()
-KNOWN_TAGS = frozenset({"bandit", "continuous", "gaming", "grid", "tabular"})
+KNOWN_TAGS = frozenset({"bandit", "continuous", "endless", "gaming", "grid", "tabular"})
 
 
 def build(name: str, seed: int = 1) -> Env[Any]:
@@ -63,6 +63,17 @@ class TestTheTable:
     def test_every_tag_is_one_this_project_uses(self) -> None:
         for entry in ENVIRONMENTS:
             assert set(entry.tags) <= KNOWN_TAGS, entry.name
+
+    def test_the_endless_tag_says_what_the_spec_says(self) -> None:
+        """A tag that is only a label goes stale on the first change.
+
+        This one is a claim the environment already makes in its spec, so the
+        two are held together and `ENVIRONMENTS.tagged('endless')` is a fact
+        rather than a list somebody kept up to date by hand.
+        """
+        for entry in ENVIRONMENTS:
+            env = ENVIRONMENTS.make(entry.name, Rng(1).stream("env"))
+            assert ("endless" in entry.tags) == (not env.spec.ends), entry.name
 
     def test_every_environment_carries_a_tag(self) -> None:
         for entry in ENVIRONMENTS:
