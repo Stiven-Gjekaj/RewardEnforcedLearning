@@ -19,6 +19,32 @@ questions. Everything here that has a number behind it says what was measured.
 
 ## Built since that table was written
 
+**Average reward**, as `differential-q`, and a task with no ending to need it.
+Every grid here has a goal, so an episode ends and the discount changes what a
+run is worth without changing which policy is best. On a task that never ends
+it changes which policy is best.
+
+`loops` is one decision made over and over. A short loop pays 1 a step and a
+long one pays 2 a step, and their discounted values are equal at 0.7394. Below
+that the exactly optimal policy takes the loop paying half as much, which is
+the correct answer to the question the discount asked.
+
+The threshold depends on the environment. Lengthen the long loop to eight steps
+and it still pays a quarter more per step, and a discount of 0.9 takes the
+short one. That is the same shape as `kappa` on Dyna-Q+, met a second time from
+a different direction: **a setting that has to be right against numbers the
+agent cannot see is a setting that will be wrong somewhere.**
+
+`differential-q` subtracts the rate it is collecting instead of discounting,
+and takes the better loop at every setting tried. The rate it learns is the
+rate it collects, 2.000 against a true 2.000, so it is an estimate of something
+real rather than a bias term that happens to work.
+
+Writing that section found a fault in the environment itself. Its suggested
+discount was a fixed 0.9, which is right at the default length and takes the
+worse loop at a length of eight. It is computed from the crossover now, and the
+environment can only do that because it is a toy that knows its own answer.
+
 **Planning at the moment of choosing**, as `mcts`. It runs simulations from the
 state it is standing in and acts on what they said, where `dyna-q` and
 `prioritised-sweeping` spend the same work in the background on a table. All
