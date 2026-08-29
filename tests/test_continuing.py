@@ -133,9 +133,38 @@ class TestTheCrossover:
         crossovers = [TwoLoops(Rng(1), length=n).crossover() for n in (3, 5, 8)]
         assert crossovers == sorted(crossovers)
 
-    def test_the_suggested_discount_is_on_the_right_side_of_it(self) -> None:
-        env = two_loops(Rng(1))
+    @pytest.mark.parametrize("length", [2, 3, 5, 8])
+    def test_the_suggested_discount_works_at_every_length(self, length: int) -> None:
+        """A caller who gives no discount has to get one that works.
+
+        A fixed 0.9 works at the default length and takes the worse loop at a
+        length of eight, which is why the suggestion is computed rather than
+        typed. This environment can do that because it knows its own answer.
+        A real task that never ends has the same threshold and no way to find
+        it, and that is the point rather than an aside.
+        """
+        env = TwoLoops(Rng(1), length=length)
+        assert env.per_step(LONG) > env.per_step(SHORT)
         assert env.spec.suggested_discount > env.crossover()
+        assert (
+            value_iteration(env, discount=env.spec.suggested_discount).policy[0] == LONG
+        )
+
+    def test_a_fixed_nine_tenths_would_not_have(self) -> None:
+        """The fault the computed suggestion removes, kept as a test.
+
+        At a length of eight the long loop still pays a quarter more per step
+        and a discount of 0.9 takes the short one.
+        """
+        env = TwoLoops(Rng(1), length=8)
+        assert env.per_step(LONG) > env.per_step(SHORT)
+        assert value_iteration(env, discount=0.9).policy[0] == SHORT
+
+    def test_a_loop_that_is_no_better_gets_no_special_treatment(self) -> None:
+        """At ten steps the two pay the same, so preferring neither is right."""
+        env = TwoLoops(Rng(1), length=10)
+        assert env.per_step(LONG) == pytest.approx(env.per_step(SHORT))
+        assert env.spec.suggested_discount <= 0.99
 
 
 class TestWhatItReports:

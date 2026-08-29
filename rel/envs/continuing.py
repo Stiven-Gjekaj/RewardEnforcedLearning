@@ -93,7 +93,7 @@ class TwoLoops(TabularEnv):
             ),
             max_episode_steps=steps,
             ends=False,
-            suggested_discount=0.9,
+            suggested_discount=self._working_discount(),
         )
 
         self.at = 0
@@ -111,6 +111,22 @@ class TwoLoops(TabularEnv):
         if loop == SHORT:
             return self.short_pay
         return self.long_pay / self.length
+
+    def _working_discount(self) -> float:
+        """A discount that gets this environment's answer right.
+
+        Halfway between the crossover and one, so a caller who gives no
+        discount gets a working one rather than a number that happened to be
+        typed. A fixed 0.9 works at the default length and takes the worse loop
+        at a length of eight, which is the fault this method exists to remove.
+
+        **This environment can only offer a working default because it knows
+        its own answer.** It is a toy with a closed form. A real task that never
+        ends has the same threshold and no way to compute it, and that is the
+        point rather than an aside: the setting has to be right against numbers
+        nobody can see.
+        """
+        return min(0.99, (1.0 + self.crossover()) / 2.0)
 
     def crossover(self) -> float:
         """The discount at which a discounted agent changes its mind.
