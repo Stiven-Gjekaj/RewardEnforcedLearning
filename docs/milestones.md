@@ -19,6 +19,31 @@ questions. Everything here that has a number behind it says what was measured.
 
 ## Built since that table was written
 
+**A comparison rather than two descriptions**, in `rel compare`. It printed two
+means and two standard errors, which describe two sets of numbers, and a reader
+takes a comparison from them anyway. It prints the paired difference, a 95%
+bootstrap interval and a permutation p value now.
+
+The findings are about this project rather than about any agent, and two of
+them are uncomfortable.
+
+**A paired test over five seeds cannot report a p below 0.0625**, whatever the
+difference is, because there are only thirty two ways to arrange five signs.
+Several measurements here ran five seeds, so none of them could have reached
+0.05. Six is the fewest that can.
+
+**A 95% bootstrap interval on five seeds excludes zero about one time in five
+when there is nothing there.** Measured by running `q-learning` against a copy
+of itself two hundred times: 39 of 200 rather than the 10 a calibrated interval
+would give. At ten seeds it is 12 of 200, which is right.
+
+The same measurement gives the number a claimed difference has to beat. Two
+identical agents on the cliff walk differ by a median of 3.14 over five seeds
+and by up to 16.63, and over ten seeds by 2.32 and up to 8.99.
+
+**So ten seeds rather than five.** It costs twice the time and it moves the
+interval from wrong one time in five to wrong one time in seventeen.
+
 **Average reward**, as `differential-q`, and a task with no ending to need it.
 Every grid here has a goal, so an episode ends and the discount changes what a
 run is worth without changing which policy is best. On a task that never ends
