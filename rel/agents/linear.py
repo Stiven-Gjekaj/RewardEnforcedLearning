@@ -20,27 +20,75 @@ convergence guarantee off-policy.
 
 ## The step size
 
-A step size for a tile coder is divided by the number of grids.
+A step size is divided by the features of the point, dotted with themselves.
 
-The reason is arithmetic rather than taste. The value is a sum over one switch
-per grid, so adding `a` to each of eight active weights moves the value by
+The reason is arithmetic rather than taste. The value is a sum over the active
+features, so adding `a` to each of eight active weights moves the value by
 `8a`. A step size of 0.5 with eight grids would move the value four times the
 error and the weights would grow without limit. `step_size` here means the
 share of the error the value moves by, which is the same thing it means for the
 tabular agents, and the division happens inside.
+
+Each coder answers for itself, in `squared_length`. For a tile coder the answer
+is the number of grids whatever the point is. For a radial basis it changes
+from point to point, because the values do.
+
+## Two coders, one agent
+
+The agent asks a coder for two things: which features are on, and how strongly.
+A tile coder answers with a one for each switch, because a switch is on or off.
+A radial basis answers with how close the point is to each centre.
+
+Nothing about the agent knows which it is talking to. `Coder` below is the
+whole of what it needs, and both satisfy it without either one importing the
+other or this module.
+
+**A run over a tile coder gives the same numbers it gave before this was
+generalised, to the last bit.** Multiplying a weight by one is exact, adding
+zero terms in the same order is exact, and a step size divided by `grids` is
+the same float whether `grids` arrived as an attribute or as an answer. The
+digests in `docs/algorithms.md` are the ones from before the change.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
+from typing import Protocol
 
 from rel.agents.base import Agent, Transition, rows_of
-from rel.agents.tiles import TileCoder
 from rel.rng import Rng
 from rel.schedules import Schedule, as_schedule
 from rel.spaces import Discrete
 
 Observation = tuple[float, ...]
+
+#: The features that are on for a point, and how strongly each one is on.
+#: Two parallel tuples rather than pairs, because the agent walks them together
+#: in the inner loop of every step and pairs would allocate a tuple for each.
+Encoded = tuple[tuple[int, ...], tuple[float, ...]]
+
+
+class Coder(Protocol):
+    """Everything a linear agent needs from whatever makes its features.
+
+    Written here, next to the only thing that uses it, rather than in a module
+    of its own. A coder does not have to know it is one: `TileCoder` and
+    `RadialBasis` both satisfy this without importing it, and adding a third
+    means writing four methods rather than joining a hierarchy.
+    """
+
+    @property
+    def features(self) -> int:
+        """How many weights an agent needs for each action."""
+
+    def encode(self, observation: Sequence[float]) -> Encoded:
+        """Which features are on for this point, and how strongly."""
+
+    def squared_length(self, values: Sequence[float]) -> float:
+        """The features of a point dotted with themselves, for the step size."""
+
+    def starting_weight(self, optimism: float) -> float:
+        """The weight that makes a state nothing is known about worth this."""
 
 
 class LinearAgent(Agent[Observation]):
@@ -50,7 +98,7 @@ class LinearAgent(Agent[Observation]):
         self,
         rng: Rng,
         actions: Discrete,
-        coder: TileCoder,
+        coder: Coder,
         *,
         step_size: float | Schedule = 0.5,
         discount: float = 1.0,
@@ -64,10 +112,11 @@ class LinearAgent(Agent[Observation]):
         self.discount = discount
         self.epsilon = as_schedule(epsilon)
 
-        # One weight for each switch, for each action. Started at the share of
-        # the optimistic value that one switch carries, so that the value of an
-        # unseen state is the optimistic value rather than a multiple of it.
-        share = optimism / coder.grids
+        # One weight for each feature, for each action. Started at the share of
+        # the optimistic value that one feature carries, so that the value of
+        # an unseen state is the optimistic value rather than a multiple of it.
+        # How large a share that is depends on the coder, so the coder says.
+        share = coder.starting_weight(optimism)
         self.weights: list[list[float]] = [
             [share] * coder.features for _ in range(actions.n)
         ]
@@ -81,16 +130,19 @@ class LinearAgent(Agent[Observation]):
     def current_epsilon(self) -> float:
         return self.epsilon(self.episodes)
 
-    def current_step_size(self) -> float:
-        return self.step_size(self.steps) / self.coder.grids
+    def current_step_size(self, values: Sequence[float]) -> float:
+        return self.step_size(self.steps) / self.coder.squared_length(values)
 
-    def value(self, switches: Sequence[int], action: int) -> float:
+    def value(self, encoded: Encoded, action: int) -> float:
         row = self.weights[action - self.actions.start]
-        return sum(row[switch] for switch in switches)
+        indices, values = encoded
+        return sum(
+            row[index] * value for index, value in zip(indices, values, strict=True)
+        )
 
     def action_values(self, observation: Observation) -> Sequence[float]:
-        switches = self.coder.active(observation)
-        return [self.value(switches, action) for action in self.actions]
+        encoded = self.coder.encode(observation)
+        return [self.value(encoded, action) for action in self.actions]
 
     def act(self, observation: Observation) -> int:
         if self.rng.chance(self.current_epsilon()):
@@ -98,21 +150,22 @@ class LinearAgent(Agent[Observation]):
         return self.greedy(observation)
 
     def greedy(self, observation: Observation) -> int:
-        return self._best(self.coder.active(observation))
+        return self._best(self.coder.encode(observation))
 
-    def _best(self, switches: Sequence[int]) -> int:
-        scores = [self.value(switches, action) for action in self.actions]
+    def _best(self, encoded: Encoded) -> int:
+        scores = [self.value(encoded, action) for action in self.actions]
         best = max(scores)
         tied = [index for index, score in enumerate(scores) if score == best]
         if len(tied) == 1:
             return self.actions.start + tied[0]
         return self.actions.start + tied[self.rng.below(len(tied))]
 
-    def _nudge(self, switches: Sequence[int], action: int, error: float) -> None:
+    def _nudge(self, encoded: Encoded, action: int, error: float) -> None:
         row = self.weights[action - self.actions.start]
-        change = self.current_step_size() * error
-        for switch in switches:
-            row[switch] += change
+        indices, values = encoded
+        change = self.current_step_size(values) * error
+        for index, value in zip(indices, values, strict=True):
+            row[index] += change * value
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.coder!r})"
@@ -155,16 +208,16 @@ class SemiGradientSarsa(LinearAgent):
     def _learn(
         self, transition: Transition[Observation], next_action: int | None
     ) -> None:
-        switches = self.coder.active(transition.observation)
-        current = self.value(switches, transition.action)
+        encoded = self.coder.encode(transition.observation)
+        current = self.value(encoded, transition.action)
 
         if next_action is None:
             target = transition.reward
         else:
-            ahead = self.coder.active(transition.next_observation)
+            ahead = self.coder.encode(transition.next_observation)
             target = transition.reward + self.discount * self.value(ahead, next_action)
 
-        self._nudge(switches, transition.action, target - current)
+        self._nudge(encoded, transition.action, target - current)
 
 
 class SemiGradientQ(LinearAgent):
@@ -177,17 +230,17 @@ class SemiGradientQ(LinearAgent):
     def observe(self, transition: Transition[Observation]) -> None:
         super().observe(transition)
 
-        switches = self.coder.active(transition.observation)
-        current = self.value(switches, transition.action)
+        encoded = self.coder.encode(transition.observation)
+        current = self.value(encoded, transition.action)
 
         if transition.terminated:
             target = transition.reward
         else:
-            ahead = self.coder.active(transition.next_observation)
+            ahead = self.coder.encode(transition.next_observation)
             best = max(self.value(ahead, action) for action in self.actions)
             target = transition.reward + self.discount * best
 
-        self._nudge(switches, transition.action, target - current)
+        self._nudge(encoded, transition.action, target - current)
 
 
-__all__ = ["LinearAgent", "SemiGradientQ", "SemiGradientSarsa"]
+__all__ = ["Coder", "Encoded", "LinearAgent", "SemiGradientQ", "SemiGradientSarsa"]

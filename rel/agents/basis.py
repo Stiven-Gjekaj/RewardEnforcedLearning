@@ -193,6 +193,30 @@ class RadialBasis:
 
         return tuple(chosen), tuple(values[index] / total for index in chosen)
 
+    def squared_length(self, values: Sequence[float]) -> float:
+        """The features of a point, dotted with themselves.
+
+        A step size is divided by this, so that it means the share of the
+        error the value moves by, which is what it means everywhere else in
+        the project. `TileCoder.squared_length` has the arithmetic.
+
+        Here the answer changes from point to point, because the values do. A
+        point sitting on a centre puts almost everything into one feature and
+        the answer is near one; a point equally far from many centres spreads
+        it out and the answer is near one over their count. So the step the
+        weights take is larger where the features are spread out, by exactly
+        the factor that keeps the value moving by the same share of the error.
+        """
+        return sum(value * value for value in values)
+
+    def starting_weight(self, optimism: float) -> float:
+        """The weight that makes a state nothing is known about worth this.
+
+        The optimism itself. The values of a point add to one, so a weight of
+        `optimism` in every feature makes the value `optimism` times one.
+        """
+        return optimism
+
     def __repr__(self) -> str:
         return (
             f"RadialBasis(bins={self.bins}, width={self.width:g}, "

@@ -69,7 +69,15 @@ def _displacement(dimensions: int) -> tuple[int, ...]:
 class TileCoder:
     """Turns a point in a box into the switches that are on for it."""
 
-    __slots__ = ("_cells", "_displacement", "_per_grid", "bins", "box", "grids")
+    __slots__ = (
+        "_cells",
+        "_displacement",
+        "_ones",
+        "_per_grid",
+        "bins",
+        "box",
+        "grids",
+    )
 
     def __init__(self, box: Box, bins: int = 8, grids: int = 8) -> None:
         if bins < 1:
@@ -87,6 +95,11 @@ class TileCoder:
         self._cells = bins + 1
         self._per_grid = self._cells**box.dimensions
         self._displacement = _displacement(box.dimensions)
+
+        # A switch is on or off, so every value `encode` reports is one.
+        # Built once rather than per call: this is the hot path of every
+        # step of every run over a tile coder.
+        self._ones = (1.0,) * grids
 
     @property
     def features(self) -> int:
@@ -133,6 +146,42 @@ class TileCoder:
                 index = index * self._cells + cell
             switches.append(grid * self._per_grid + index)
         return tuple(switches)
+
+    def encode(
+        self, observation: Sequence[float]
+    ) -> tuple[tuple[int, ...], tuple[float, ...]]:
+        """The switches that are on, and a one for each of them.
+
+        What a linear agent asks for. A tile coder has nothing to say about
+        how strongly a switch is on, so it says one, and multiplying a weight
+        by one is exact. That is what lets the same agent run over this and
+        over a radial basis without a single run over this one changing.
+        """
+        return self.active(observation), self._ones
+
+    def squared_length(self, values: Sequence[float]) -> float:
+        """The features of a point, dotted with themselves.
+
+        A step size is divided by this. The reason is arithmetic: the value is
+        a sum over the active features, so adding `a` to each of eight of them
+        moves the value by `8a`, and a step size of 0.5 over eight grids would
+        move the value four times the error and the weights would grow without
+        limit.
+
+        Every value here is one, so the answer is the count of them and the
+        argument is not read. A coder whose features are not all one has to
+        add up the squares.
+        """
+        return float(self.grids)
+
+    def starting_weight(self, optimism: float) -> float:
+        """The weight that makes a state nothing is known about worth this.
+
+        One grid's share of it. The value of a state is the sum over one
+        switch per grid, so a weight of `optimism` in each would make an
+        unseen state worth `optimism` times the number of grids.
+        """
+        return optimism / self.grids
 
     def __repr__(self) -> str:
         return (
