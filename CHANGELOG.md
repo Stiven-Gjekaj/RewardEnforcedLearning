@@ -169,6 +169,15 @@ Everything below is new.
 
 **The command line**
 
+- **`rel compare` says whether the difference is real**, with a paired
+  bootstrap interval and a permutation test rather than two means and two
+  standard errors. The comparison is paired because both agents meet the same
+  seeds, which matters here: one agent's ten cliff walk seeds run from -20 to
+  -545. A run whose seed count cannot reach 0.05 is told so, and the reason:
+  a paired test over five seeds has thirty two sign patterns and the smallest p
+  it can report is 0.0625. Measuring an agent against a copy of itself two
+  hundred times says the rest. At five seeds a 95% interval excludes zero on
+  39 of 200 when nothing is there, and at ten seeds on 12 of 200.
 - `rel train`, `rel compare`, `rel solve`, `rel demo`, `rel list` and
   `rel gaming`, with learning curves drawn out of braille dots, grid policies
   drawn as arrows, and a value map that says which cells the agent has never
