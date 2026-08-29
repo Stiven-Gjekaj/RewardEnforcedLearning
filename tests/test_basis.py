@@ -123,6 +123,35 @@ class TestTheValues:
         assert basis.all_values((0.4,))[1] == pytest.approx(math.exp(-0.5))
 
 
+class TestTheDefaultWidth:
+    """Three quarters of a spacing, which was measured rather than reasoned.
+
+    One whole spacing is the value that looks right, and it loses on both of
+    the environments this project has to try it on: by 11 points of return on
+    the mountain car over twelve seeds and by 184 on the cart pole over eight,
+    with the bootstrap interval clear of zero both times.
+
+    Written down here so that changing it means reading that.
+    """
+
+    def test_it_is_three_quarters_of_the_spacing_between_centres(self) -> None:
+        basis = RadialBasis(UNIT, bins=6)
+        assert basis.width == 0.75
+        assert basis.spread == pytest.approx(0.75 / 5.0)
+
+    def test_the_registry_agents_use_it_too(self) -> None:
+        # The builder repeats the number rather than reading it off the class,
+        # so the two can drift apart and nothing else would say so.
+        from rel.agents import AGENTS
+        from rel.envs import ENVIRONMENTS
+        from rel.rng import Rng
+
+        env = ENVIRONMENTS.make("mountaincar", Rng(1).stream("env"))
+        for name in ("rbf-sarsa", "rbf-q"):
+            agent = AGENTS.make(name, Rng(1).stream("agent"), env)
+            assert agent.coder.width == RadialBasis(UNIT).width
+
+
 class TestTheWidth:
     def test_wider_makes_the_far_centres_matter_more(self) -> None:
         point = (0.5, 0.5)
@@ -183,17 +212,17 @@ class TestKeeping:
     def test_what_it_drops_is_not_near_zero(self) -> None:
         """The sentence this replaced said the dropped values were near zero.
 
-        Eight of thirty six centres carry about three quarters of the total at
-        the default width. Dividing those eight by their own smaller total
-        moves the largest of them by a twentieth, which is a quarter of itself.
+        Eight of thirty six centres carry ninety percent of the total at the
+        default width. Dividing those eight by their own smaller total moves
+        the largest of them by an eighth of itself.
         """
         point = (0.31, 0.62)
         exact = weights(RadialBasis(UNIT, bins=6), point)
         cheap = weights(RadialBasis(UNIT, bins=6, kept=8), point)
 
-        assert sum(exact[index] for index in cheap) == pytest.approx(0.739, abs=0.001)
+        assert sum(exact[index] for index in cheap) == pytest.approx(0.901, abs=0.001)
         assert max(abs(cheap[i] - exact[i]) for i in cheap) == pytest.approx(
-            0.052, abs=0.001
+            0.026, abs=0.001
         )
 
     def test_a_narrow_enough_width_makes_dropping_nearly_free(self) -> None:
@@ -307,14 +336,14 @@ class TestKeepingBringsTheBoundaryBack:
         """The jump is real and it is not as large as the one it replaces.
 
         A tile coder loses a whole switch of eight, so a value built from
-        switches of equal weight loses an eighth of itself. This loses 0.067
-        where the largest feature at that point is 0.183.
+        switches of equal weight loses an eighth of itself. This loses 0.036
+        where the largest feature at that point is 0.214.
         """
         basis = RadialBasis(UNIT, bins=6, kept=8)
         below = weights(basis, (0.1 - HAIR, 0.5))
         jump = moved(below, weights(basis, (0.1 + HAIR, 0.5)))
-        assert jump == pytest.approx(0.067, abs=0.001)
-        assert max(below.values()) == pytest.approx(0.183, abs=0.001)
+        assert jump == pytest.approx(0.036, abs=0.001)
+        assert max(below.values()) == pytest.approx(0.214, abs=0.001)
         assert jump < 1.0 / 8.0
 
 

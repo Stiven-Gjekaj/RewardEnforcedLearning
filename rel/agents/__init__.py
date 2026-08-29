@@ -666,7 +666,7 @@ def _radial(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder:
         rng: Rng,
         env: Env[Any],
         bins: int = 6,
-        width: float = 1.0,
+        width: float = 0.75,
         kept: int | None = None,
         step_size: float | Schedule = 0.5,
         discount: float = 1.0,

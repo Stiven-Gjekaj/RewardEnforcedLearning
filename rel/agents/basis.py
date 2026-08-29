@@ -14,10 +14,11 @@ different, everywhere.
 ## Where the centres go
 
 On a grid, `bins` of them along each dimension, evenly spaced from one bound to
-the other. That is `bins` raised to the number of dimensions, which is 64 in
-two and 4096 in four, and is the reason this is a demonstration rather than the
-default: the count grows exactly as badly as the naive single grid the tile
-coder exists to avoid.
+the other. That is `bins` raised to the number of dimensions, which is 36 in
+two and 1296 in four at the default, and is the reason this is a demonstration
+rather than the default encoder: the count grows exactly as badly as the naive
+single grid the tile coder exists to avoid, and unlike the tile coder every one
+of them is paid for on every step.
 
 ## How wide each one is
 
@@ -27,34 +28,51 @@ between two centres lights neither, so the agent learns nothing about it. Too
 wide and every centre answers about the same, so the features carry no
 information about where the point is.
 
-`docs/algorithms.md` measures it rather than asserting it.
+The default is three quarters of the spacing, and it is measured rather than
+reasoned. One whole spacing is the value that looks right, and it is worse on
+both of the environments this project has to try it on: by 11 points of return
+on the mountain car over twelve seeds, and by 184 on the cart pole over eight,
+with the interval clear of zero both times. Two and above does not solve the
+mountain car at all. `docs/algorithms.md` has the sweep.
 
-## The nearest few can be kept, and by default are not
+## The nearest few can be kept, and it does not work
 
 A radial basis is dense: every centre answers every point, so a value is a sum
-over every feature and an update touches every weight. At 4096 centres that is
-a hundred times the work of a tile coder's eight switches, for the same
-problem. So `kept` drops all but the largest few values.
+over every feature and an update touches every weight. At 1296 centres that is
+a hundred and sixty times the work of a tile coder's eight switches, for the
+same problem. So `kept` drops all but the largest few values, and it was going
+to be the default, and it was going to buy back the sparse shape of a tile
+coder and with it the cost of a step.
 
-It is off by default. The reason is that measuring it contradicted the two
-sentences that used to stand here.
+It buys eleven percent. It is off by default. Three separate things measuring
+it said, and each one contradicted a sentence that used to stand here.
 
-The first said the dropped values were near zero. They are not. At the default
-width, eight of thirty six centres carry 74 percent of the total, and dividing
-those eight by their own smaller total moves the largest of them by 0.05, which
-is a quarter of itself.
+**The dropped values are not near zero.** At the default width, eight of thirty
+six centres carry 90 percent of the total, and dividing those eight by their
+own smaller total moves the largest of them by 0.026, which is an eighth of
+itself.
 
-The second said this encoder has no boundaries. With `kept` on it has them.
-Between two centres there is a point where the smallest kept value and the
-largest dropped one cross, and on the two sides of it the agent reads a
-different weight for the same feature. The jump there is exactly the size of
-the smallest kept value: at the default width and eight kept it is 0.067, where
-the largest feature of that same point is 0.183.
-
+**Dropping brings the boundary back.** Between two centres there is a point
+where the smallest kept value and the largest dropped one cross, and on the two
+sides of it the agent reads a different weight for the same feature. The jump
+there is exactly the size of the smallest kept value: at the default width and
+eight kept it is 0.036, where the largest feature of that same point is 0.214.
 That is smaller than a tile coder's boundary, which swaps a whole switch out of
-eight, and it is the same kind of thing. A boundary is what this encoder was
-built not to have, so it is not there unless a caller asks for it.
-`docs/algorithms.md` measures what asking costs.
+eight, and it is the same kind of thing.
+
+**And it does not make the encoder cheap, because it cannot.** A radial basis
+has no way of knowing which centres are far away without measuring the distance
+to all of them. Three quarters of a four dimensional step is spent doing
+exactly that, before a single value can be dropped, and the sort that finds the
+largest eight costs about what dropping the other 1288 saves. On the cart pole
+the whole option is worth 3494 microseconds a step against 3149.
+
+That last one is the answer to the question this module was written to ask. A
+tile coder is not cheap because it has few features: it has 52488 on the cart
+pole against this encoder's 1296. It is cheap because it works out which eight
+switches are on directly, and never asks the other 52480 anything.
+
+`docs/algorithms.md` has the table.
 
 ## They are normalised
 
@@ -80,7 +98,7 @@ class RadialBasis:
     __slots__ = ("_centres", "_divisor", "bins", "box", "kept", "width")
 
     def __init__(
-        self, box: Box, bins: int = 6, width: float = 1.0, kept: int | None = None
+        self, box: Box, bins: int = 6, width: float = 0.75, kept: int | None = None
     ) -> None:
         if bins < 2:
             raise ValueError("A radial basis needs at least two centres a side.")
