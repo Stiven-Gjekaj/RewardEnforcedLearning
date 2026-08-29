@@ -162,26 +162,44 @@ def linear(x: Tensor, weight: Tensor, bias: Tensor) -> Tensor:
     if len(bias) != rows:
         raise ValueError(f"A weight of {weight.shape} needs a bias of {rows}.")
 
+    # The lists are pulled into locals before the loops. Every `weight.data`
+    # inside an inner loop is an attribute lookup, and this layer runs one for
+    # each of `rows * columns` elements on every pass. Nothing about the
+    # arithmetic changes: the same numbers are added in the same order, which
+    # is what lets the digest say so.
+    weights = weight.data
+    inputs = x.data
+    biases = bias.data
+
     out = [0.0] * rows
+    base = 0
     for row in range(rows):
-        base = row * columns
-        total = bias.data[row]
+        total = biases[row]
         for column in range(columns):
-            total += weight.data[base + column] * x.data[column]
+            total += weights[base + column] * inputs[column]
         out[row] = total
+        base += columns
 
     result = Tensor(out, (rows,), parents=(x, weight, bias))
 
     def backward() -> None:
+        shares = result.grad
+        weight_grad = weight.grad
+        input_grad = x.grad
+        bias_grad = bias.grad
+
+        base = 0
         for row in range(rows):
-            share = result.grad[row]
+            share = shares[row]
             if share == 0.0:
+                base += columns
                 continue
-            base = row * columns
-            bias.grad[row] += share
+
+            bias_grad[row] += share
             for column in range(columns):
-                weight.grad[base + column] += x.data[column] * share
-                x.grad[column] += weight.data[base + column] * share
+                weight_grad[base + column] += inputs[column] * share
+                input_grad[column] += weights[base + column] * share
+            base += columns
 
     result._backward = backward
     return result
