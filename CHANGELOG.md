@@ -56,6 +56,19 @@ Everything below is new.
 
 **Agents**
 
+- **Planning at the moment of choosing**, as `mcts`. It runs simulations from
+  the state it is standing in and acts on what they said, where `dyna-q` and
+  `prioritised-sweeping` spend the same work in the background on a table. The
+  rule that picks an action inside the tree is the count-based exploration rule
+  above, applied to the means in a node, so upper confidence selection inside a
+  tree and upper confidence exploration in a grid are one piece of code. The
+  tree is keyed by state rather than by path, so two paths that meet pool their
+  evidence. Reading the policy leaves no trace: a copy of the tree, a copy of
+  the generator, and the count of simulated steps put back. On the Dyna maze
+  every setting settles in about the same place at two orders of magnitude
+  apart in cost, and more simulations buy nothing, because what carries the
+  agent is the tree rather than the search. With `reuse=off` the same code with
+  the same model never settles at all.
 - **Exploring by something other than chance.** `explore` is a setting on every
   tabular agent, and three rules answer it: epsilon-greedy, softmax, and a
   count-based bonus that adds a term shrinking as an action is taken.
