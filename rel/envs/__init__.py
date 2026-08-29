@@ -31,6 +31,7 @@ from rel.core import Env
 from rel.envs.bandit import KArmedBandit, drifting_bandit, stationary_bandit
 from rel.envs.classic import (
     cliff_walk,
+    corridor,
     dyna_maze,
     four_rooms,
     frozen_lake,
@@ -86,6 +87,12 @@ ENVIRONMENTS: Registry[Env[Any]] = Registry(
             "maze",
             "Six by nine with seven blocked cells. Only the goal pays.",
             dyna_maze,
+            tags=("tabular", "grid"),
+        ),
+        Entry(
+            "corridor",
+            "Nine by nine, one path with no branch, and only the goal pays.",
+            corridor,
             tags=("tabular", "grid"),
         ),
         Entry(

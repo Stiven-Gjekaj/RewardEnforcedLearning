@@ -82,6 +82,31 @@ DYNA_MAZE = (
     ".........",
 )
 
+# One path, folded. Nine by nine with no branch anywhere in it, so there is
+# exactly one route from the start to the goal and it is forty seven steps
+# long. Nothing pays until the goal, which pays 1.
+#
+# This grid is here to make exploring the problem. Every other grid in this
+# project can be solved by an agent that wanders: the goal of the cliff walk is
+# thirteen steps from the start and so is the goal of the Dyna maze. A policy
+# that moves at random covers a line of length n in about n squared steps, so
+# forty seven is about two thousand two hundred, and an agent that has learned
+# nothing spends a whole episode not finding out that there is anything to
+# find.
+#
+# Nothing here is deep. It is long, and long is enough.
+CORRIDOR = (
+    "S........",
+    "########.",
+    ".........",
+    ".########",
+    ".........",
+    "########.",
+    ".........",
+    ".########",
+    "........G",
+)
+
 # The frozen lake, four by four and eight by eight. A hole ends the episode
 # with nothing paid. The goal pays 1. There is no step cost at all, so the only
 # thing that separates two policies is how often each one arrives.
@@ -161,6 +186,20 @@ def dyna_maze(rng: Rng) -> GridWorld:
         max_episode_steps=2000,
         name="maze",
         summary="Six by nine with seven blocked cells. Only the goal pays.",
+        suggested_discount=0.95,
+    )
+
+
+def corridor(rng: Rng) -> GridWorld:
+    """One folded path, forty seven steps long. Only the goal pays."""
+    return GridWorld(
+        rng,
+        CORRIDOR,
+        step_reward=0.0,
+        goal_reward=1.0,
+        max_episode_steps=1000,
+        name="corridor",
+        summary="Nine by nine, one path with no branch, and only the goal pays.",
         suggested_discount=0.95,
     )
 
@@ -328,6 +367,7 @@ def random_walk(rng: Rng, size: int = 5) -> RandomWalk:
 
 __all__ = [
     "CLIFF",
+    "CORRIDOR",
     "DYNA_MAZE",
     "FOUR_ROOMS",
     "LAKE_4",
@@ -336,6 +376,7 @@ __all__ = [
     "WINDY_STRENGTH",
     "RandomWalk",
     "cliff_walk",
+    "corridor",
     "dyna_maze",
     "four_rooms",
     "frozen_lake",

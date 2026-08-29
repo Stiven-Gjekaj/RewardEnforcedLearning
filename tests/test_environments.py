@@ -17,10 +17,14 @@ from typing import Any
 
 import pytest
 
+from rel.agents import AGENTS
+from rel.agents.dp import value_iteration
 from rel.core import Env, TabularEnv
 from rel.envs import ENVIRONMENTS
+from rel.envs.gridworld import GridWorld
 from rel.rng import Rng
 from rel.spaces import Box, Discrete
+from rel.training import train
 
 NAMES = ENVIRONMENTS.names()
 KNOWN_TAGS = frozenset({"bandit", "continuous", "gaming", "grid", "tabular"})
@@ -229,3 +233,56 @@ class TestEveryContinuousEnvironment:
         for index in range(tiling.dimensions):
             assert env.observation_space.low[index] <= tiling.low[index]
             assert tiling.high[index] <= env.observation_space.high[index]
+
+
+class TestTheCorridor:
+    """One folded path, and the reason it is here.
+
+    Every other grid in this project can be solved by an agent that wanders.
+    This one cannot, and the tests say what that means precisely rather than
+    leaving it as a claim in a comment.
+    """
+
+    @staticmethod
+    def _made() -> GridWorld:
+        env = ENVIRONMENTS.make("corridor", Rng(1).stream("env"))
+        assert isinstance(env, GridWorld)
+        return env
+
+    def test_the_only_route_is_forty_seven_steps(self) -> None:
+        env = self._made()
+        best = value_iteration(env, discount=0.95)
+        # A discounted 1 at the goal and nothing on the way, so the value of
+        # the start is the discount raised to the length of the route.
+        length = math.log(best.start_value) / math.log(0.95)
+        assert round(length) == 47
+
+    def test_it_is_further_than_every_other_grid(self) -> None:
+        """The claim the grid exists to make."""
+        maze = ENVIRONMENTS.make("maze", Rng(1).stream("env"))
+        assert isinstance(maze, GridWorld)
+        theirs = value_iteration(maze, discount=0.95)
+        assert math.log(theirs.start_value) / math.log(0.95) < 47
+
+    def test_nothing_pays_until_the_goal(self) -> None:
+        env = self._made()
+        paid = {
+            outcome.reward
+            for state in range(env.observation_space.n)
+            for action in range(env.action_space.n)
+            for outcome in env.transitions(state, action)
+        }
+        assert paid == {0.0, 1.0}
+
+    def test_a_random_policy_rarely_arrives(self) -> None:
+        """What makes exploring the problem here.
+
+        A policy that has learned nothing reaches the goal on almost no
+        episode of the step limit, where on the cliff walk and the Dyna maze
+        it reaches the goal on most of them.
+        """
+        root = Rng(4)
+        env = ENVIRONMENTS.make("corridor", root.stream("env"))
+        agent = AGENTS.make("random", root.stream("agent"), env)
+        record = train(env, agent, 20, discount=0.95)
+        assert sum(1 for one in record.returns if one > 0.0) <= 2

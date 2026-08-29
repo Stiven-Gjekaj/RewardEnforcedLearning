@@ -1,0 +1,21 @@
+# One path, folded. There is no branch anywhere in it, so the route from
+# the start to the goal is the only route and it is forty seven steps
+# long. Nothing pays until the goal, which pays 1.
+#
+# This grid exists to make exploring the problem rather than learning.
+name: corridor
+summary: Nine by nine, one path with no branch, and only the goal pays.
+step_reward: 0.0
+goal_reward: 1.0
+max_episode_steps: 1000
+suggested_discount: 0.95
+
+S........
+########.
+.........
+.########
+.........
+########.
+.........
+.########
+........G
