@@ -232,6 +232,42 @@ def evaluate_policy(
     )
 
 
+def average_reward(env: TabularEnv, policy: Sequence[int]) -> float | None:
+    """The reward per step of following this policy for ever.
+
+    The number a task with no ending is really scored by. A discounted value
+    answers "what is the future worth from here, with later worth less", and on
+    a task that never ends that question has an answer for every discount and a
+    different one for each. This asks what the policy collects per step, which
+    has one answer and no setting in it.
+
+    `None` when the policy is not deterministic enough to walk, which here
+    means when a transition it takes has more than one branch. Averaging over a
+    stationary distribution would answer that case, and it needs a linear solve
+    this project does not have. The environments with no ending in it are
+    deterministic, so the walk is the whole of what is needed and it is exact.
+
+    The walk goes forward from a start until a state repeats. What lies between
+    the first visit and the second is the cycle the policy settles into, and
+    the average over that cycle is the answer: the steps before the cycle are
+    finitely many and a per step average over for ever does not see them.
+    """
+    seen: dict[int, int] = {}
+    rewards: list[float] = []
+
+    state = env.start_states()[0][1]
+    while state not in seen:
+        branches = env.transitions(state, policy[state])
+        if len(branches) != 1:
+            return None
+        seen[state] = len(rewards)
+        rewards.append(branches[0].reward)
+        state = branches[0].observation
+
+    cycle = rewards[seen[state] :]
+    return sum(cycle) / len(cycle)
+
+
 def reaches_end(env: TabularEnv, policy: Sequence[int]) -> bool:
     """True if the policy reaches an ending from every state it can be in.
 
@@ -488,6 +524,7 @@ __all__ = [
     "FixedPolicyAgent",
     "PolicyReport",
     "Solution",
+    "average_reward",
     "evaluate_policy",
     "policy_iteration",
     "reaches_end",

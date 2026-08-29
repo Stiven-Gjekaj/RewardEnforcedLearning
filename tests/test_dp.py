@@ -16,12 +16,13 @@ import pytest
 from rel.agents.dp import (
     DidNotSettleError,
     FixedPolicyAgent,
+    average_reward,
     evaluate_policy,
     policy_iteration,
     reaches_end,
     value_iteration,
 )
-from rel.core import Outcome, Step, TabularEnv
+from rel.core import EnvSpec, Outcome, Step, TabularEnv
 from rel.envs.classic import (
     cliff_walk,
     dyna_maze,
@@ -29,7 +30,9 @@ from rel.envs.classic import (
     frozen_lake,
     windy_grid,
 )
+from rel.envs.continuing import LONG, SHORT, two_loops
 from rel.rng import Rng
+from rel.spaces import Discrete
 from rel.training import evaluate
 
 # name, builder, discount, and how many episodes are needed to see the value.
@@ -306,3 +309,77 @@ class TestFixedPolicyAgent:
         env = cliff_walk(Rng(1))
         agent = FixedPolicyAgent(Rng(1), env.action_space, [2] * 48)
         assert {agent.act(0) for _ in range(200)} == {2}
+
+
+class TestTheAverageRewardOfAPolicy:
+    """What a task with no ending is really scored by.
+
+    A discounted value answers "what is the future worth from here, with later
+    worth less", and on a task that never ends it has a different answer for
+    every discount. This has one answer and no setting in it.
+    """
+
+    def test_each_loop_is_worth_what_it_pays_per_step(self) -> None:
+        env = two_loops(Rng(1))
+        states = env.observation_space.n
+        assert average_reward(env, [SHORT] * states) == pytest.approx(1.0)
+        assert average_reward(env, [LONG] * states) == pytest.approx(2.0)
+
+    @pytest.mark.parametrize(("discount", "collected"), [(0.7, 1.0), (0.9, 2.0)])
+    def test_it_scores_what_a_discount_chose(
+        self, discount: float, collected: float
+    ) -> None:
+        """The finding of the two loops, said in the units that matter.
+
+        At a discount of 0.7 the best policy under that discount collects half
+        as much per step as the other one. Nothing went wrong: the discount
+        was part of the question.
+        """
+        env = two_loops(Rng(1))
+        chosen = list(value_iteration(env, discount=discount).policy)
+        assert average_reward(env, chosen) == pytest.approx(collected)
+
+    def test_the_steps_before_the_cycle_do_not_count(self) -> None:
+        """A per step average over for ever does not see a finite prefix."""
+
+        class LeadIn(TabularEnv):
+            """A large payment once, then a cycle worth one a step."""
+
+            def __init__(self, rng: Rng) -> None:
+                super().__init__(rng)
+                self.observation_space = Discrete(3)
+                self.action_space = Discrete(1)
+                self.spec = EnvSpec("leadin", "One payment, then a cycle.")
+                self.at = 0
+
+            def _reset(self) -> int:
+                self.at = 0
+                return 0
+
+            def _step(self, action: int) -> Step[int]:
+                branch = self.transitions(self.at, action)[0]
+                self.at = branch.observation
+                return Step(branch.observation, branch.reward, False, False)
+
+            def transitions(self, state: int, action: int) -> Sequence[Outcome]:
+                if state == 0:
+                    return [Outcome(1.0, 1, 100.0, terminated=False)]
+                if state == 1:
+                    return [Outcome(1.0, 2, 0.0, terminated=False)]
+                return [Outcome(1.0, 1, 2.0, terminated=False)]
+
+            def start_states(self) -> Sequence[tuple[float, int]]:
+                return [(1.0, 0)]
+
+        assert average_reward(LeadIn(Rng(1)), [0, 0, 0]) == pytest.approx(1.0)
+
+    def test_a_branching_step_has_no_answer_here(self) -> None:
+        """The frozen lake slips, so a walk is not what it is worth.
+
+        Averaging over a stationary distribution would answer it, and that
+        needs a linear solve this project does not have. Saying `None` is
+        better than walking one branch and calling it the answer.
+        """
+        env = frozen_lake(Rng(1))
+        policy = [0] * env.observation_space.n
+        assert average_reward(env, policy) is None
