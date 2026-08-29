@@ -19,6 +19,13 @@ Everything below is new.
 
 **The core**
 
+- **A faster gradient engine that computes the same numbers.** The lists an
+  inner loop reads are pulled into locals in `linear` and in `Adam`, and an
+  internal constructor skips the copy and the shape check the public one owes a
+  caller. Adam is 18% faster and a 48 to 16 backward pass 9%, and both digests
+  are unchanged. `scripts/measure_engine.py` prints the timings and the digests
+  together, because a faster engine that computes different numbers looks
+  exactly like the same agent on another seed.
 - **A seeded source of chance**, PCG-XSH-RR written out, with named
   independent streams. An environment and an agent take different streams of
   one seed, so the number of draws one makes cannot move what the other faces.
