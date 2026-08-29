@@ -36,7 +36,7 @@ environments where the reward is not the point_
 **A reinforcement learning laboratory that runs in a terminal and needs
 nothing installed.**
 
-Fourteen environments, thirty one agents, a gradient engine, a dynamic
+Fifteen environments, thirty two agents, a gradient engine, a dynamic
 programming solver that says what the best possible policy is worth, and a
 command line that draws a learning curve out of braille dots.
 
@@ -200,6 +200,9 @@ the path digest rather than trusting it.
   until the end, so an agent that has learned nothing does not arrive. It is
   here because every other grid can be solved by wandering, which makes them
   useless for comparing ways of exploring.
+- **A task with no ending.** Two loops paying 1 and 2 a step, where any
+  discount below 0.7394 makes the worse one the right answer. The reward there
+  says exactly what was meant and the discount is the part that does not.
 - **A random walk.** The one environment here whose values are arithmetic
   rather than another computation, which is what makes a prediction checkable
   against the answer.
@@ -231,6 +234,9 @@ package: see [docs/grids.md](docs/grids.md).
   step that matters rather than a random one. Beside them a tree search that
   plans at the moment of choosing instead, by running simulations from the
   state it is standing in.
+- **Average reward.** Q-learning with no discount at all, which subtracts the
+  rate it is collecting instead. On a task that never ends the discount decides
+  which policy is best, and this agent has none to get wrong.
 - **Options.** Q-learning whose choices can last several steps, over hallway
   options read off the layout rather than written down, with and without
   credit for the states an option passed through.
@@ -320,13 +326,14 @@ an agent when it is fifty times too large.
 ```
 rel/core.py         the contract: what an environment is, what a step is
 rel/rng.py          PCG written out, with named independent streams
-rel/envs/           fourteen environments. Never import an agent.
-rel/agents/         thirty one agents. Never import an environment.
+rel/envs/           fifteen environments. Never import an agent.
+rel/agents/         thirty two agents. Never import an environment.
   dp.py             value iteration, policy iteration, exact policy values
   td.py             SARSA, Q-learning, Expected SARSA, Double Q, n-step
   tiles.py          tile coding, worked out exactly rather than hashed
   explore.py        how an agent picks an action from what it knows
   policy.py         REINFORCE and an actor critic
+  average.py        learning with no discount, by subtracting the rate
   search.py         a tree search that plans at the moment of choosing
   value_network.py  Q-learning over a network, with replay and a target
 rel/options.py      an action that lasts several steps, built from a model
@@ -343,15 +350,15 @@ scripts/            the scripts that produce the numbers in the documentation
 | Area | Files | Lines |
 | --- | ---: | ---: |
 | Core | 5 | 910 |
-| Environments | 7 | 2270 |
-| Agents | 22 | 6441 |
+| Environments | 8 | 2489 |
+| Agents | 23 | 6654 |
 | Network | 4 | 720 |
 | Running | 5 | 1026 |
 | Interface | 6 | 1022 |
 | Command line | 3 | 1595 |
-| **Total** | **52** | **13984** |
+| **Total** | **54** | **14416** |
 
-Not counting 12070 lines of tests and 2441 of measurement scripts. Run
+Not counting 12592 lines of tests and 2591 of measurement scripts. Run
 `python scripts/lines.py` for the current numbers.
 
 Three rules about who may import whom are enforced by a test that reads the
@@ -421,7 +428,7 @@ what it was for.
 
 ## Status
 
-Alpha, and complete enough to be useful. Fourteen environments and thirty one
+Alpha, and complete enough to be useful. Fifteen environments and thirty two
 agents, all of them covered by a suite that runs in about eight minutes with no
 browser, no display and no network.
 
