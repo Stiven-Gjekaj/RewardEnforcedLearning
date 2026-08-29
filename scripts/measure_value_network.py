@@ -44,8 +44,8 @@ def measure(
     replay: int,
     refresh: int,
     settings: dict[str, object],
-) -> tuple[float, float, float]:
-    """The last fifty episodes, the spread over seeds, and the seconds spent."""
+) -> tuple[list[float], float]:
+    """What every seed ended at, and the seconds the whole row took."""
     finals: list[float] = []
     started = time.perf_counter()
 
@@ -64,8 +64,7 @@ def measure(
         record = train(env, agent, episodes, discount=discount)
         finals.append(statistics.mean(record.returns[-50:]))
 
-    spread = statistics.stdev(finals) if len(finals) > 1 else 0.0
-    return statistics.mean(finals), spread, time.perf_counter() - started
+    return finals, time.perf_counter() - started
 
 
 def main() -> int:
@@ -80,6 +79,11 @@ def main() -> int:
         action="append",
         metavar="NAME=VALUE",
         help="a setting held fixed across all four rows, repeatable",
+    )
+    parser.add_argument(
+        "--each-seed",
+        action="store_true",
+        help="print the number every seed ended at, under the table",
     )
     args = parser.parse_args()
 
@@ -104,33 +108,45 @@ def main() -> int:
         print("Held fixed: " + ", ".join(f"{k}={v}" for k, v in settings.items()))
 
     rows = []
+    every: list[tuple[str, list[float]]] = []
     for replay in (args.replay, 0):
         for refresh in (args.refresh, 0):
-            mean, spread, seconds = measure(
+            finals, seconds = measure(
                 args.env, args.episodes, args.runs, replay, refresh, settings
             )
+            label = f"{'on' if replay else 'off'} / {'on' if refresh else 'off'}"
+            every.append((label, finals))
             rows.append(
                 (
                     "on" if replay else "off",
                     "on" if refresh else "off",
-                    f"{mean:.2f}",
-                    f"+/- {spread:.2f}",
+                    f"{statistics.median(finals):.1f}",
+                    f"{statistics.mean(finals):.1f}",
+                    f"{min(finals):.1f}",
+                    f"{max(finals):.1f}",
                     f"{seconds:.0f}s",
                 )
             )
 
     print()
     for line in table(
-        ["replay", "target", "last 50", "spread", "time"],
+        ["replay", "target", "median", "mean", "worst", "best", "time"],
         rows,
-        align=["right", "right", "right", "left", "right"],
+        align=["right"] * 7,
     ):
         print(f"  {line}")
 
+    if args.each_seed:
+        print()
+        for label, finals in every:
+            numbers = " ".join(f"{one:8.1f}" for one in finals)
+            print(f"  {label:9s} {numbers}")
+
     print(
-        "\n'last 50' is the mean return of the last fifty episodes, averaged\n"
-        "over the seeds, and 'spread' is the standard deviation across them.\n"
-        "A wide spread is the instability these two pieces exist to remove."
+        "\n'median' rather than 'mean' first, and 'worst' beside it. A value\n"
+        "network that diverges on one seed of ten moves a mean by more than\n"
+        "the difference between any two of these rows, so the mean is the\n"
+        "number least worth reading here. --each-seed prints them all."
     )
     return 0
 
