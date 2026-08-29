@@ -210,6 +210,20 @@ And in all three, the place where the proxy stops standing in for the thing is
 it correlates with the thing under normal behaviour, and optimising hard is by
 definition leaving normal behaviour.
 
+### The reward is not the only part that can be wrong
+
+A specification is a reward and a discount. All three environments here put the
+fault in the reward, because that is where it is easiest to see, and the same
+fault fits in the discount without anybody writing down a payment they would
+disown.
+
+`loops`, in [algorithms.md](algorithms.md), is one decision made over and over
+between a policy collecting 1 a step and one collecting 2. Below a discount of
+0.7394 the first has the higher discounted value, so the exactly optimal policy
+under that discount takes it. The reward there is not a proxy for anything. It
+says exactly what was meant. **The discount is the part that says something
+else**, and 0.7 is a number chosen because it converges quickly.
+
 ---
 
 ## The gap is not a point, it is a slope
