@@ -45,8 +45,21 @@ SUITABLE = {
 }
 DEFAULT_ENVIRONMENT = "cliff"
 
+#: One agent at a time, where the tag is not the reason.
+#:
+#: `mcts` spends `simulations` times `depth` model steps for every action it
+#: takes. On the cliff walk its episodes run to the step limit, because a
+#: random rollout there reaches no ending and a rollout that stops at the
+#: depth limit is worth minus the depth wherever it went. Five episodes then
+#: cost millions of simulated steps, and this file runs several such episodes
+#: for every agent. The Dyna maze exercises the same code, settles in about
+#: sixteen steps, and costs a second.
+INSTEAD = {"mcts": "maze"}
+
 
 def environment_for(name: str, seed: int = 1) -> Env[Any]:
+    if name in INSTEAD:
+        return ENVIRONMENTS.make(INSTEAD[name], Rng(seed).stream("env"))
     entry = AGENTS[name]
     for tag, environment in SUITABLE.items():
         if tag in entry.tags:
