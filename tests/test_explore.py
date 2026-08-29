@@ -546,3 +546,58 @@ class TestTheRuleReachesTheAgent:
         )
         record = train(env, agent, 10)
         assert len(record.returns) == 10
+
+
+class TestOnTheCorridorTheRulesSeparate:
+    """The finding of `scripts/measure_exploration.py`, cut down to a test.
+
+    Over ten seeds and three hundred episodes, the median run of q-learning
+    first reaches the goal on episode 18 with epsilon-greedy, episode 21 with
+    softmax, episode 6 with the count bonus and episode 1 with optimistic
+    initialisation. Three seeds and the part of it that is not close.
+
+    Every one of the four ends up with the same policy. What differs is the
+    steps spent before there was anything to learn from.
+    """
+
+    EPISODES = 40
+    SEEDS = (1, 2, 3)
+
+    def _steps_before_arriving(self, explore: str, optimism: float) -> int:
+        """Over the seeds, the steps taken before the first episode that ends."""
+        total = 0
+        for seed in self.SEEDS:
+            root = Rng(seed)
+            env = ENVIRONMENTS.make("corridor", root.stream("env"))
+            agent = AGENTS.make(
+                "q-learning",
+                root.stream("agent"),
+                env,
+                discount=0.95,
+                explore=explore,
+                optimism=optimism,
+            )
+            record = train(env, agent, self.EPISODES, discount=0.95)
+            for ended, length in zip(record.terminated, record.lengths, strict=True):
+                if ended:
+                    break
+                total += length
+        return total
+
+    def test_optimism_arrives_on_the_first_episode_of_every_seed(self) -> None:
+        assert self._steps_before_arriving("epsilon-greedy:0.0", 1.0) == 0
+
+    def test_ranking_by_value_wanders_until_something_pays(self) -> None:
+        """The reason the two value-ranking rules cannot help here.
+
+        Before the goal is first reached every value in the table is the
+        starting number, so both of them rank a row of equal numbers. They are
+        a random walk with extra arithmetic until something pays.
+        """
+        assert self._steps_before_arriving("epsilon-greedy", 0.0) > 5000
+        assert self._steps_before_arriving("softmax:0.02", 0.0) > 5000
+
+    def test_ranking_by_novelty_costs_less_than_ranking_by_value(self) -> None:
+        counting = self._steps_before_arriving("count-bonus:0.5", 0.0)
+        valuing = self._steps_before_arriving("epsilon-greedy", 0.0)
+        assert counting < valuing
