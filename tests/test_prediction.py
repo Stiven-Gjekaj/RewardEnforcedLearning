@@ -315,3 +315,76 @@ class TestTheyLearnTheWalk:
         assert agent.error_against(env.values_to_score()) == pytest.approx(
             0.2357, abs=1e-3
         )
+
+
+class TestTDBeatsMonteCarloOnTheWalk:
+    """The finding the random walk is here to make.
+
+    Sutton and Barto, example 6.2. Both methods are estimating the same thing
+    from the same episodes, and the one that uses what it already believes
+    about where it ended up gets closer than the one that waits to find out.
+
+    Twenty runs rather than fifty, and one step size rather than a ladder, so
+    that this stays a test. `scripts/measure_prediction.py` is the measurement,
+    and it says the same thing across the whole ladder.
+    """
+
+    STEP = 0.05
+    RUNS = 20
+    EPISODES = 100
+
+    def _error(self, builder) -> float:  # type: ignore[no-untyped-def]
+        errors = []
+        for seed in range(1, self.RUNS + 1):
+            root = Rng(seed)
+            env = random_walk(root.stream("env"))
+            agent = builder(root.stream("agent"), env)
+            train(env, agent, self.EPISODES)
+            errors.append(agent.error_against(env.values_to_score()))
+        return sum(errors) / len(errors)
+
+    def test_it_gets_closer_than_monte_carlo(self) -> None:
+        td = self._error(
+            lambda rng, env: TemporalDifference(
+                rng, env.action_space, step_size=self.STEP, start_value=0.5
+            )
+        )
+        monte_carlo = self._error(
+            lambda rng, env: MonteCarloPrediction(
+                rng, env.action_space, step_size=self.STEP, start_value=0.5
+            )
+        )
+        assert td < monte_carlo
+
+    def test_both_are_better_than_not_learning(self) -> None:
+        # The comparison above is only worth making if both methods are
+        # learning something. An untrained table scores 0.236.
+        for builder in (
+            lambda rng, env: TemporalDifference(
+                rng, env.action_space, step_size=self.STEP, start_value=0.5
+            ),
+            lambda rng, env: MonteCarloPrediction(
+                rng, env.action_space, step_size=self.STEP, start_value=0.5
+            ),
+        ):
+            assert self._error(builder) < 0.15
+
+    def test_every_visit_is_the_worst_of_them_at_this_step_size(self) -> None:
+        # It credits a state once for every time the walk passed through it,
+        # and the random walk doubles back constantly, so one episode can move
+        # a cell several times in the same direction.
+        every = self._error(
+            lambda rng, env: MonteCarloPrediction(
+                rng,
+                env.action_space,
+                first_visit=False,
+                step_size=self.STEP,
+                start_value=0.5,
+            )
+        )
+        first = self._error(
+            lambda rng, env: MonteCarloPrediction(
+                rng, env.action_space, step_size=self.STEP, start_value=0.5
+            )
+        )
+        assert every > first
