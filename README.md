@@ -344,14 +344,14 @@ scripts/            the scripts that produce the numbers in the documentation
 | --- | ---: | ---: |
 | Core | 5 | 910 |
 | Environments | 7 | 2270 |
-| Agents | 21 | 6077 |
+| Agents | 22 | 6441 |
 | Network | 4 | 720 |
 | Running | 5 | 1026 |
 | Interface | 6 | 1022 |
 | Command line | 3 | 1595 |
-| **Total** | **51** | **13620** |
+| **Total** | **52** | **13984** |
 
-Not counting 11588 lines of tests and 2240 of measurement scripts. Run
+Not counting 12070 lines of tests and 2441 of measurement scripts. Run
 `python scripts/lines.py` for the current numbers.
 
 Three rules about who may import whom are enforced by a test that reads the
