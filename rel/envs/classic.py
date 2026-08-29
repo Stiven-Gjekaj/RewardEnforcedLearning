@@ -264,6 +264,19 @@ class RandomWalk(TabularEnv):
             for state in range(self.size + 2)
         )
 
+    def values_to_score(self) -> dict[int, float]:
+        """The true values of the states an agent can actually be in.
+
+        The two endings are left out. An agent is never in one, so its entry
+        there never moves off whatever it started at, and scoring it would
+        measure the starting value rather than the learning.
+        """
+        return {
+            state: worth
+            for state, worth in enumerate(self.true_values())
+            if not self.is_ending(state)
+        }
+
     def is_ending(self, state: int) -> bool:
         return state in (0, self.size + 1)
 
