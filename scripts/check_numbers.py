@@ -35,6 +35,22 @@ asking whether it is the right number in the right cell, and it is the question
 that can be asked of a page which nowhere says which column of which run a cell
 came from. A number that moved disappears from every output, so it is caught. A
 number that swapped places with another number in the same table is not.
+
+Three things it reports that are not the page being wrong.
+
+**A table that rounds.** The digits are compared as text, so a page writing
+1,970,224,597,202 where the command prints 1970224597202.702 states a number
+the output does not contain. Matching a rounded number would mean deciding how
+near is near enough, and a rule loose enough to catch a truncation is loose
+enough to confirm a number that really moved. The page is written to print what
+the command prints instead.
+
+**A timing.** `measure_engine.py` reports seconds, and seconds belong to the
+machine. Those lines will differ on every run and there is nothing to fix.
+
+**A command that takes longer than the budget.** Nothing ran, so nothing
+accounts for its tables, and they are reported as unaccounted for. The summary
+names those commands separately.
 """
 
 from __future__ import annotations

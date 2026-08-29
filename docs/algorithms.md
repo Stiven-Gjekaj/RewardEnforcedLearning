@@ -556,18 +556,24 @@ saw, and is biased with far less.
 number.
 
 ```console
-$ python scripts/measure_importance.py
+$ python scripts/measure_importance.py --episodes 1200
 ```
 
 Ten seeds, 1200 episodes, a behaviour policy that explores a fifth of the time.
 `spread` is how far apart the ten seeds' estimates of one cell are, averaged
 over every cell all ten of them credited.
 
+The episode count is on the command line because it is not the default. This
+block said `python scripts/measure_importance.py` for five tracks, which runs
+1500 episodes and prints a different table, and the prose beside it said 1200
+the whole time. `python scripts/check_numbers.py --only importance` is what
+noticed.
+
 | grid | estimator | cells | spread | widest | policy |
 | --- | --- | ---: | ---: | ---: | ---: |
 | frozen lake, best 0.824 | ordinary | 10 | 4.194 | 13.204 | 0.237 |
 | frozen lake | **weighted** | 10 | **0.710** | **0.913** | **0.369** |
-| maze, best 0.513 | ordinary | 2 | 1,970,224,597,202 | 3,928,201,830,698 | never finishes |
+| maze, best 0.513 | ordinary | 2 | 1,970,224,597,202.702 | 3,928,201,830,698.047 | never finishes |
 | maze | **weighted** | 34 | **0.058** | **0.136** | **0.498** |
 
 **The ordinary estimator's worst cell on the maze reads about four trillion,
