@@ -745,6 +745,125 @@ Ordered replay stops, and stopping is what makes the answer final.
 
 ---
 
+## Planning at the moment of choosing
+
+```console
+$ rel train mcts --env maze
+$ rel train mcts --env maze --set reuse=off
+$ python scripts/measure_search.py --episodes 40 --runs 3
+```
+
+The two planners above spend a model in the background. They improve a table,
+and when the moment comes to act they read it. The work is done before the
+question is asked, and it is done for every state whether or not the agent will
+ever stand there.
+
+`mcts` does the opposite. It spends the model on the state it is standing in,
+right now, and on the futures that follow from there. Four steps, repeated
+`simulations` times:
+
+    descend    from the state, take the action the tree ranks highest, until
+               a state the tree has not seen
+    expand     put that state in the tree
+    roll out   act at random from there until an ending or a depth limit
+    back up    credit every state and action on the way down with the return
+
+Then take the action with the most visits at the root. The most visits rather
+than the best mean: a mean over three samples is high by luck often enough to
+matter, and the count is what the descent has already agreed with.
+
+The rule that picks an action inside the tree is the `count-bonus` of the
+exploration section, applied to the means in a node rather than to a learned
+table. Upper confidence selection inside a tree and upper confidence
+exploration in a grid are the same rule, and this project writes it once so the
+two cannot drift apart.
+
+**It is handed the model rather than learning one.** `dyna-q` builds its model
+out of the steps it takes. `mcts` here is given the environment's own. That is
+not a fair fight, and the direction it is unfair in is the interesting one: the
+agent that was handed the answer is the one to beat.
+
+### Counted in model steps, because that is what all three spend
+
+| agent | settled | policy found | stuck | model steps | time |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `mcts`, 10 simulations | 16 | 0.4633 | | 94,296 | 2s |
+| `mcts`, 25 simulations | 16 | 0.4633 | | 180,736 | 4s |
+| `mcts`, 50 simulations | 16 | 0.4633 | | 309,069 | 7s |
+| `mcts`, 50, `reuse=off` | 330 | - | 3 of 3 | 42,345,425 | 815s |
+| `dyna-q`, 5 planning steps | 15 | **0.5133** | | **7,345** | 0s |
+| `dyna-q`, 20 planning steps | 16 | **0.5133** | | 26,480 | 0s |
+| `prioritised-sweeping` | 17 | **0.5133** | | **3,575** | 0s |
+
+*The Dyna maze, three seeds, 40 episodes, discount 0.95. `settled` is the mean
+episode length over the last ten and the shortest route is 14 steps. `policy`
+is what the greedy policy is worth, worked out from the model.*
+
+An episode against a table of returns would let an agent that asks a model a
+thousand times a step look free, and against wall clock it would compare the
+speed of the code. Model steps is what each of these is actually spending: a
+replay for the two planners, a simulated step for the search.
+
+**Every row but one settles in about the same place, and they are two orders of
+magnitude apart in what it cost.** The search reaches 16 steps for 94,296 model
+steps at its cheapest. Prioritised sweeping reaches 17 for 3,575, and it had to
+learn its model on the way.
+
+### More simulations buy nothing here
+
+10, 25 and 50 simulations all settle at 16 steps. Three times the budget per
+decision, and the same answer.
+
+The reason is the row underneath. What is carrying this agent is not the search
+from the state it is in, it is the tree left over from the last time it was
+there. Turn that off and there is nothing left.
+
+### Without the tree it is hopeless
+
+`reuse=off` clears the tree before every decision, which is decision-time
+planning with nothing else in it. On this maze that agent never settles: 330
+steps against a shortest route of 14, no seed of three ending with a policy
+that reaches the goal at all, and forty two million model steps to fail.
+
+**The tree is doing the learning.** With it kept, the agent is a planner with a
+memory and it behaves like the other planners. Without it, the same code with
+the same model is worse than Q-learning with no model at all.
+
+### Why the rollout cannot carry it
+
+A simulation that stops at the depth limit is worth what it collected and
+nothing after. There is no estimate of the rest, because there is no value
+function to ask.
+
+That is affordable when a random rollout reaches endings. It does not. Over two
+hundred tries, a random policy of thirty steps reaches an ending **none** of
+those times on the Dyna maze and **none** on the cliff walk. Both goals are
+about fourteen steps away and a random walk does not go in a straight line.
+`tests/test_search.py` measures it.
+
+So the tail of a simulation is nearly always the same number, and on the cliff
+walk it is exactly the same number: every step there pays -1 and the discount
+is one, so a rollout that stops at the depth limit is worth minus the depth
+wherever it went. Nothing separates two branches, the agent wanders, and the
+episode runs to the step limit. That is why the test suite runs this agent on
+the maze rather than on the cliff walk.
+
+### Where it is weak
+
+**It has no policy until it searches.** Every other agent here answers "what
+would you do in that cell" by reading a row. This one answers by running a
+search, and a search of fifty simulations from a cold state is a noisy answer.
+That is the `policy` column: 0.4633 is a sixteen step route and 0.5133 is the
+shortest one at fourteen, so the search behaves as well as the planners and
+describes itself two steps worse. The picture `rel train` draws of it is that
+description rather than a table.
+
+**The standard repair is not here.** What fixes a rollout that reaches no
+ending is a value at the leaf instead of a rollout, learned or given. Adding
+one would make this the shape that plays board games, and it is not built.
+
+---
+
 ## An action that lasts several steps
 
 ```console
@@ -1577,6 +1696,7 @@ it off.
 | Prediction against a known answer | `python scripts/measure_prediction.py` |
 | Replay and a target network | `python scripts/measure_value_network.py --env cartpole --runs 10 --set step_size=0.02` |
 | Four ways of exploring | `python scripts/measure_exploration.py --runs 10 --each-seed` |
+| Decision time against background planning | `python scripts/measure_search.py --episodes 40 --runs 3` |
 | One rule at several dials | `python scripts/measure_exploration.py --rules softmax:0.02,softmax:0.001` |
 | Any one or two settings | `rel sweep <agent> --env <env> --over name=a,b,c` |
 | Specification gaming | `rel gaming` |
