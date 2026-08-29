@@ -259,12 +259,35 @@ class TestAttributingATableToACommand:
     def test_the_best_of_several_partial_matches_is_taken(
         self, script: ModuleType
     ) -> None:
-        claim = self.claim(script, "| a | 1 | 2 | 3 |")
+        claim = self.claim(script, "| a | 1 | 2 | 3 | 4 |")
         command, absent = script.attribute(
-            claim, {"one": ["1"], "two": ["1", "2"], "none": []}
+            claim,
+            {"two": ["1", "2"], "three": ["1", "2", "3"], "none": []},
         )
-        assert command == "two"
-        assert absent == ["3"]
+        assert command == "three"
+        assert absent == ["4"]
+
+    def test_a_command_that_accounts_for_too_little_is_a_coincidence(
+        self, script: ModuleType
+    ) -> None:
+        """The second thing the first version got wrong.
+
+        It named whichever of forty eight commands matched most, and one
+        number of seventy is enough to win that when every other command
+        matches none. Small integers turn up in every output, so a table with
+        no command on the page is otherwise attributed to a coincidence.
+        """
+        claim = self.claim(script, "| a | 1 | 2 | 3 | 4 |", nearest="above it")
+        assert script.attribute(claim, {"above it": ["1"]}) == (
+            "",
+            ["1", "2", "3", "4"],
+        )
+
+    def test_exactly_half_is_enough(self, script: ModuleType) -> None:
+        # The boundary, written down because `ENOUGH` is a judgement and the
+        # comparison around it is the kind that is easy to get wrong by one.
+        claim = self.claim(script, "| a | 1 | 2 | 3 | 4 |")
+        assert script.attribute(claim, {"half": ["1", "2"]})[0] == "half"
 
     def test_a_command_that_accounts_for_nothing_is_not_named(
         self, script: ModuleType
@@ -303,8 +326,21 @@ class TestRunningTheCommand:
 
     def test_a_command_that_never_finishes_is_cut_off(self, script: ModuleType) -> None:
         _, taken, trouble = script.run('python -c "import time; time.sleep(30)"', 0.5)
-        assert "took longer than" in trouble
+        assert trouble.startswith(script.TIMED_OUT)
         assert taken < 5.0
+
+    def test_giving_up_reads_differently_from_failing(self, script: ModuleType) -> None:
+        """The first version reported both as a command that would not run.
+
+        Three of the page's commands take longer than fifteen minutes, and it
+        called all three broken and returned one. A budget this script chose
+        is not a defect in the documentation, and putting the two together
+        made the real failures unfindable.
+        """
+        _, _, slow = script.run('python -c "import time; time.sleep(30)"', 0.5)
+        _, _, failed = script.run("rel train no-such-agent --env cliff", 120.0)
+        assert slow.startswith(script.TIMED_OUT)
+        assert not failed.startswith(script.TIMED_OUT)
 
 
 class TestAgainstTheRealPage:

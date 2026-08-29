@@ -40,6 +40,7 @@ number that swapped places with another number in the same table is not.
 from __future__ import annotations
 
 import argparse
+import math
 import re
 import shlex
 import subprocess
@@ -65,6 +66,22 @@ NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
 #: to a measurement, and checking them would ask whether `--runs 10` is still
 #: printed.
 NOT_RESULTS = frozenset({"table | command"})
+
+#: How a run says it gave up rather than failed. A command that takes longer
+#: than the budget is a fact about the budget, and reporting it beside a
+#: command that will not run would make the second one unfindable.
+TIMED_OUT = "gave up after"
+
+#: How much of a table one command has to account for before it is called the
+#: command that table came from. Below this it is a coincidence: three numbers
+#: of seventy is what any output shares with any table, because 0.5 and 10 and
+#: 2 turn up everywhere.
+#:
+#: Half is a judgement and not a measurement. It is high enough that no pair on
+#: this page reaches it by accident and low enough that a table which has drifted
+#: in a few cells is still attributed and reported as drifted rather than as
+#: unaccounted for.
+ENOUGH = 0.5
 
 
 def heading_of(row: str) -> str:
@@ -199,7 +216,7 @@ def run(command: str, seconds: float) -> tuple[str, float, str]:
             check=False,
         )
     except subprocess.TimeoutExpired:
-        return "", time.perf_counter() - started, f"took longer than {seconds:.0f}s"
+        return "", time.perf_counter() - started, f"{TIMED_OUT} {seconds:.0f}s"
     except FileNotFoundError as missing_program:
         return "", time.perf_counter() - started, f"could not run it: {missing_program}"
 
@@ -236,13 +253,14 @@ def attribute(claim: Claim, printed: dict[str, list[str]]) -> tuple[str, list[st
     """
     wanted = claim.numbers
     best: tuple[str, list[str]] = ("", wanted)
+    needed = math.ceil(len(wanted) * ENOUGH)
     for command, available in printed.items():
         absent = missing(wanted, available)
-        if len(absent) == len(wanted):
-            # It accounts for nothing, so it is not where the table came
-            # from. Without this a command that prints none of a table's
-            # numbers would be named as its source whenever no command
-            # printed any of them, which reads as an attribution.
+        if len(wanted) - len(absent) < needed:
+            # It accounts for too little of the table to be where the table
+            # came from. Without this the best of forty eight coincidences is
+            # named as a source, and a small integer that every output happens
+            # to print is enough to make one.
             continue
         if len(absent) < len(best[1]) or (
             len(absent) == len(best[1]) and command == claim.nearest
@@ -291,10 +309,15 @@ def main() -> int:
     started = time.perf_counter()
     printed: dict[str, list[str]] = {}
     broken: list[str] = []
+    slow: list[str] = []
 
     for number, command in enumerate(commands, start=1):
         print(f"[{number}/{len(commands)}] {command}", flush=True)
         output, spent, trouble = run(command, args.timeout)
+        if trouble.startswith(TIMED_OUT):
+            print(f"    {trouble}, so nothing below is checked against it", flush=True)
+            slow.append(command)
+            continue
         if trouble:
             print(f"    could not run it. {trouble}", flush=True)
             broken.append(command)
@@ -339,9 +362,20 @@ def main() -> int:
         f"on the page,\nand {orphans} by no command at all, "
         f"in {time.perf_counter() - started:.0f}s."
     )
+    if slow:
+        print(
+            f"\n{len(slow)} commands took longer than the {args.timeout:.0f}s budget."
+            f"\nA table of theirs reads as unaccounted for above, because nothing\n"
+            f"ran to account for it. Raise --timeout to check them:"
+        )
+        for command in slow:
+            print(f"  {command}")
+
     if broken:
         # A documented command that will not run is a defect whatever the
-        # numbers say, so this is the one thing here worth an exit code.
+        # numbers say, so this is the one thing here worth an exit code. A
+        # command that ran out of time is not: that is this script's budget
+        # rather than anything about the page.
         print(f"\n{len(broken)} commands would not run at all:")
         for command in broken:
             print(f"  {command}")
