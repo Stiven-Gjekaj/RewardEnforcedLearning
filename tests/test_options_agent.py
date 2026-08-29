@@ -13,7 +13,7 @@ import pytest
 
 from rel.agents.base import Transition
 from rel.agents.dp import evaluate_policy, value_iteration
-from rel.agents.options import OptionsQ
+from rel.agents.options import IntraOptionQ, OptionsQ
 from rel.agents.td import QLearning
 from rel.envs.classic import four_rooms
 from rel.options import Option, hallway_options, primitives
@@ -344,3 +344,220 @@ class TestCountingTheUpdates:
             agent.act(state)
             agent.observe(go(state, 1, 0.0, state + 1))
         assert agent.updates == 3
+
+
+def an_intra_agent(*extra: Option, **settings: float) -> IntraOptionQ:
+    options = [*primitives(FOUR, STATES), *extra]
+    return IntraOptionQ(
+        Rng(1),
+        FOUR,
+        options,
+        step_size=settings.get("step_size", 1.0),
+        discount=settings.get("discount", 0.5),
+        epsilon=settings.get("epsilon", 0.0),
+    )
+
+
+class TestEveryOptionThatAgreesIsTaught:
+    """One real step is evidence about every option that would have taken it.
+
+    That is the whole difference from `OptionsQ`, which waits for the option
+    that ran to stop and credits only the state it started in.
+    """
+
+    def test_an_option_that_keeps_going_uses_its_own_value(self) -> None:
+        # The corridor does not stop at state 2, so what it is worth there is
+        # its own entry and not the best entry.
+        #
+        #   2 + 0.5 * 8 = 6
+        agent = an_intra_agent(CORRIDOR)
+        agent.values(2)[4] = 8.0
+        agent.values(2)[0] = 20.0
+
+        agent.values(1)[4] = 1.0
+        agent.act(1)
+        agent.observe(go(1, 1, 2.0, 2))
+
+        assert agent.q[1][4] == pytest.approx(6.0)
+
+    def test_a_primitive_option_on_the_same_step_uses_the_best_value(self) -> None:
+        # It stops after every step, so what happens next is somebody else's
+        # choice and the best entry is the right one.
+        #
+        #   2 + 0.5 * 20 = 12
+        agent = an_intra_agent(CORRIDOR)
+        agent.values(2)[4] = 8.0
+        agent.values(2)[0] = 20.0
+
+        agent.values(1)[4] = 1.0
+        agent.act(1)
+        agent.observe(go(1, 1, 2.0, 2))
+
+        assert agent.q[1][1] == pytest.approx(12.0)
+
+    def test_an_option_that_stops_hands_the_choice_back(self) -> None:
+        #   4 + 0.5 * 10 = 9
+        agent = an_intra_agent(CORRIDOR)
+        agent.values(3)[0] = 10.0
+
+        agent.values(2)[4] = 1.0
+        agent.act(2)
+        agent.observe(go(2, 1, 4.0, 3))
+
+        assert agent.q[2][4] == pytest.approx(9.0)
+
+    def test_an_option_that_disagrees_learns_nothing(self) -> None:
+        agent = an_intra_agent(CORRIDOR)
+        agent.values(1)[4] = 7.0
+        agent.values(1)[0] = 7.0
+        agent.act(1)
+        agent.observe(go(1, 0, 2.0, 2))
+
+        assert agent.q[1][4] == pytest.approx(7.0)
+        assert agent.q[1][0] != pytest.approx(7.0)
+
+    def test_a_terminated_episode_bootstraps_from_nothing(self) -> None:
+        agent = an_intra_agent(CORRIDOR)
+        agent.values(3)[0] = 10.0
+        agent.values(2)[4] = 1.0
+        agent.act(2)
+        agent.observe(go(2, 1, 4.0, 3, terminated=True))
+        assert agent.q[2][4] == pytest.approx(4.0)
+
+    def test_a_step_limit_does_not_stop_an_option(self) -> None:
+        # The step limit stops the run. It is not the option's own rule, so
+        # the target is the one that rule gives: the corridor keeps going
+        # through state 2 and is worth its own entry there.
+        agent = an_intra_agent(CORRIDOR)
+        agent.values(2)[4] = 8.0
+        agent.values(2)[0] = 20.0
+        agent.values(1)[4] = 1.0
+        agent.act(1)
+        agent.observe(go(1, 1, 2.0, 2, truncated=True))
+        assert agent.q[1][4] == pytest.approx(6.0)
+
+
+class TestTheStatesAnOptionPassesThrough:
+    def test_they_are_credited_here_and_not_by_the_plain_agent(self) -> None:
+        # The fault this agent exists to fix. Both walk the corridor. The
+        # plain one credits where the option started and nothing else.
+        walk = ((0, 1), (1, 2), (2, 3))
+
+        plain = an_agent(CORRIDOR, discount=0.5)
+        intra = an_intra_agent(CORRIDOR)
+        for agent in (plain, intra):
+            agent.values(0)[4] = 1.0
+            for state, landed in walk:
+                agent.act(state)
+                agent.observe(go(state, 1, 1.0, landed))
+
+        assert set(plain.q) == {0}
+        assert set(intra.q) == {0, 1, 2}
+
+    def test_it_makes_more_updates_for_the_same_experience(self) -> None:
+        walk = ((0, 1), (1, 2), (2, 3))
+
+        plain = an_agent(CORRIDOR, discount=0.5)
+        intra = an_intra_agent(CORRIDOR)
+        for agent in (plain, intra):
+            agent.values(0)[4] = 1.0
+            for state, landed in walk:
+                agent.act(state)
+                agent.observe(go(state, 1, 1.0, landed))
+
+        # One for the option that ran, against two for every step: the
+        # primitive that agrees and the corridor.
+        assert plain.updates == 1
+        assert intra.updates == 6
+
+    def test_the_option_that_ran_is_not_credited_twice(self) -> None:
+        # It is one of the options that agreed with each of its steps. Adding
+        # the multi step update on top would credit its start twice for the
+        # same experience.
+        agent = an_intra_agent(CORRIDOR)
+        agent.values(0)[4] = 1.0
+        agent.act(0)
+        agent.observe(go(0, 1, 1.0, 1))
+        after_one_step = agent.q[0][4]
+
+        agent.act(1)
+        agent.observe(go(1, 1, 1.0, 2))
+        agent.act(2)
+        agent.observe(go(2, 1, 1.0, 3))
+
+        # The option stopped, and its starting cell did not move again.
+        assert agent.running is None
+        assert agent.q[0][4] == pytest.approx(after_one_step)
+
+
+class TestTheCollapseToQLearning:
+    def test_primitive_options_alone_are_q_learning(self) -> None:
+        # A primitive option stops after every step, so its target is always
+        # the best value and the rule is Q-learning exactly.
+        walk = (
+            Transition(0, 1, -1.0, 1, terminated=False, truncated=False),
+            Transition(1, 2, -1.0, 2, terminated=False, truncated=False),
+            Transition(2, 0, 10.0, 3, terminated=True, truncated=False),
+        )
+
+        intra = IntraOptionQ(
+            Rng(1), FOUR, primitives(FOUR, STATES), step_size=0.5, discount=0.9
+        )
+        plain: QLearning[int] = QLearning(Rng(1), FOUR, step_size=0.5, discount=0.9)
+        for agent in (intra, plain):
+            agent.values(1)[2] = 10.0
+            agent.values(2)[3] = 4.0
+
+        for step in walk:
+            intra.act(step.observation)
+            intra.observe(step)
+            plain.observe(step)
+
+        assert intra.q == plain.q
+
+
+class TestIntraOptionLearns:
+    def test_it_reaches_the_best_four_rooms_policy(self) -> None:
+        rng = Rng(1)
+        env = four_rooms(rng.stream("env"))
+        options = [
+            *primitives(env.action_space, range(env.observation_space.n)),
+            *hallway_options(env, env.gaps()),
+        ]
+        agent = IntraOptionQ(
+            rng.stream("agent"),
+            env.action_space,
+            options,
+            step_size=0.5,
+            discount=0.95,
+            epsilon=0.1,
+        )
+        train(env, agent, 400, discount=0.95)
+
+        policy = [agent.greedy(state) for state in range(env.observation_space.n)]
+        report = evaluate_policy(env, policy, discount=0.95)
+        best = value_iteration(env, discount=0.95).start_value
+        assert report.reaches_end
+        assert report.start_value == pytest.approx(best)
+
+    def test_it_keeps_no_row_for_a_cell_it_never_stands_in(self) -> None:
+        rng = Rng(1)
+        env = four_rooms(rng.stream("env"))
+        options = [
+            *primitives(env.action_space, range(env.observation_space.n)),
+            *hallway_options(env, env.gaps()),
+        ]
+        agent = IntraOptionQ(
+            rng.stream("agent"), env.action_space, options, step_size=0.5
+        )
+
+        stood_in: set[int] = set()
+        watched = agent.observe
+
+        def observe(transition: Transition[int]) -> None:
+            stood_in.add(transition.observation)
+            watched(transition)
+
+        agent.observe = observe  # type: ignore[method-assign]
+        train(env, agent, 30, discount=0.95)
+        assert set(agent.q) - stood_in == set()

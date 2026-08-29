@@ -249,4 +249,90 @@ class OptionsQ(TabularAgent[int]):
         )
 
 
-__all__ = ["OptionsQ"]
+class IntraOptionQ(OptionsQ):
+    """Q-learning over options that teaches every option agreeing with a step.
+
+    `options-q` waits for an option to stop and credits the state it started
+    in. Three steps inside one option move one cell, and the two states it
+    passed through learn nothing about it. On four rooms that costs 2.57 return
+    while learning, and `docs/algorithms.md` measures it.
+
+    This is the standard answer. One real step is evidence about every option
+    that would have taken that action there, whether or not that option was the
+    one running, so every one of them is updated:
+
+        Q(s, o) += step * (r + discount * U(s') - Q(s, o))
+
+    where `U(s')` is what the option is worth from where it landed. That is the
+    option's own value if it keeps going and the best value there if it stops,
+    because an option that stops hands control back and what happens next is
+    somebody else's choice.
+
+    ## The collapse
+
+    A primitive option stops after every step, so `U(s')` is always the best
+    value and the rule is Q-learning exactly. An agent holding only primitive
+    options is therefore Q-learning here as well, and is the same agent
+    `options-q` is.
+
+    ## What it costs
+
+    More updates. `options-q` makes about one update for every step it takes
+    and this makes one for every option that agrees with the step, which on
+    four rooms is between one and three. Whether the extra updates pay for
+    themselves is a measurement rather than an argument, and
+    `scripts/measure_intra_option.py` is it.
+
+    ## Why the option that ran is not treated differently
+
+    It is not special. It is one of the options that agreed with the step, and
+    it gets the same update they do. Adding the multi step update on top would
+    credit its starting state twice for the same experience.
+    """
+
+    def _learn(self, transition: Transition[int]) -> None:
+        """Nothing but the counters.
+
+        The multi step update is replaced rather than added to. The option
+        that ran is one of the options that agreed with each of its steps, and
+        it has already been credited for every one of them.
+        """
+        self.finished += 1
+        self.steps_in_options += self.length
+
+    def _learn_from_step(self, transition: Transition[int]) -> None:
+        step_size = self.current_step_size()
+
+        for index, option in enumerate(self.options):
+            if not option.would_take(transition.observation, transition.action):
+                continue
+
+            row = self.values(transition.observation)
+            row[index] += step_size * (
+                self._target(option, index, transition) - row[index]
+            )
+            self._bump()
+
+    def _target(self, option: Option, index: int, transition: Transition[int]) -> float:
+        """What this step says the option is worth, from where it landed.
+
+        A terminated episode has no future at all. Otherwise it is the option's
+        own value if the option keeps going, and the best value available if it
+        stops, because an option that stops hands the choice back.
+
+        A step limit is not a stopping rule. It stops the run and it does not
+        stop the option, so the target here is the one the option's own rule
+        gives and not the one a forced stop would give.
+        """
+        landed = transition.next_observation
+        if transition.terminated:
+            return transition.reward
+
+        if option.stops_at(landed):
+            ahead = self.best_value(landed)
+        else:
+            ahead = self.peek(landed)[index]
+        return transition.reward + self.discount * ahead
+
+
+__all__ = ["IntraOptionQ", "OptionsQ"]
