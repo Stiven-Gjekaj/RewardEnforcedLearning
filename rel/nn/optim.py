@@ -128,31 +128,46 @@ class Adam(Optimiser):
         ]
 
     def step(self) -> None:
+        # Everything the inner loop reads is pulled into a local first. That
+        # loop runs once for every number in every parameter on every step,
+        # which on the cliff walk value network is eight hundred and fifty two
+        # times a step, and each of `self.decay` and its four neighbours was an
+        # attribute lookup inside it. The two `1 - decay` terms were being
+        # subtracted again for every number as well.
+        #
+        # None of it changes the arithmetic. The same products are formed and
+        # added in the same order, which is what lets the digest say so.
         self.steps += 1
         shrink = self._shrink()
 
-        first_left = 1.0 - self.decay**self.steps
-        second_left = 1.0 - self.square_decay**self.steps
+        decay = self.decay
+        square_decay = self.square_decay
+        keep = 1.0 - decay
+        square_keep = 1.0 - square_decay
+        step_size = self.step_size
+        epsilon = self.epsilon
+        root = math.sqrt
+
+        first_left = 1.0 - decay**self.steps
+        second_left = 1.0 - square_decay**self.steps
 
         for index, tensor in enumerate(self.parameters):
             average = self.average[index]
             square = self.square[index]
+            data = tensor.data
 
             for position, raw in enumerate(tensor.grad):
                 gradient = raw * shrink
-                average[position] = (
-                    self.decay * average[position] + (1.0 - self.decay) * gradient
+                moved = decay * average[position] + keep * gradient
+                squared = (
+                    square_decay * square[position] + square_keep * gradient * gradient
                 )
-                square[position] = (
-                    self.square_decay * square[position]
-                    + (1.0 - self.square_decay) * gradient * gradient
-                )
+                average[position] = moved
+                square[position] = squared
 
-                corrected = average[position] / first_left
-                spread = math.sqrt(square[position] / second_left)
-                tensor.data[position] -= (
-                    self.step_size * corrected / (spread + self.epsilon)
-                )
+                corrected = moved / first_left
+                spread = root(squared / second_left)
+                data[position] -= step_size * corrected / (spread + epsilon)
 
 
 __all__ = ["SGD", "Adam", "Optimiser", "gradient_length"]

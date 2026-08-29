@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from rel.agents import AGENTS
 from rel.envs import ENVIRONMENTS
 from rel.nn.autograd import Tensor, linear
+from rel.nn.optim import Adam
 from rel.rng import Rng
 from rel.training import digest_of, train
 from rel.ui.table import table
@@ -98,6 +99,43 @@ def one_layer(
     return min(forwards), min(backwards)
 
 
+def one_optimiser(
+    inputs: int, hidden: int, outputs: int, steps: int, repeats: int = 3
+) -> tuple[float, int]:
+    """The seconds Adam takes over a network's worth of parameters.
+
+    Its own line because the whole run cannot see it. The optimiser is about
+    a tenth of a `deep-q` run, so a change that makes it a fifth faster moves
+    the run by two percent, and two percent is smaller than the run to run
+    spread of the timing above it.
+    """
+    rng = Rng(1).stream("weights")
+    parameters = [
+        Tensor(
+            [rng.normal(0.0, 0.1) for _ in range(hidden * inputs)], (hidden, inputs)
+        ),
+        Tensor([0.0] * hidden, (hidden,)),
+        Tensor(
+            [rng.normal(0.0, 0.1) for _ in range(outputs * hidden)], (outputs, hidden)
+        ),
+        Tensor([0.0] * outputs, (outputs,)),
+    ]
+    for tensor in parameters:
+        tensor.grad = [rng.normal(0.0, 0.01) for _ in tensor.data]
+
+    adam = Adam(parameters, step_size=0.01)
+    numbers = sum(len(tensor.data) for tensor in parameters)
+
+    taken: list[float] = []
+    for _ in range(repeats):
+        started = time.perf_counter()
+        for _ in range(steps):
+            adam.step()
+        taken.append(time.perf_counter() - started)
+
+    return min(taken), numbers
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env", default="cartpole")
@@ -124,6 +162,7 @@ def main() -> int:
 
     forward, backward = one_layer(4, 16, args.passes)
     wide_forward, wide_backward = one_layer(48, 16, args.passes)
+    stepping, numbers = one_optimiser(48, 16, 4, args.passes)
 
     print(
         f"{args.agent} on {args.env}, {args.episodes} episodes, best of {args.repeats}."
@@ -137,6 +176,7 @@ def main() -> int:
         (f"4 to 16 backward, {args.passes:,} passes", f"{backward:.3f}s"),
         (f"48 to 16 forward, {args.passes:,} passes", f"{wide_forward:.3f}s"),
         (f"48 to 16 backward, {args.passes:,} passes", f"{wide_backward:.3f}s"),
+        (f"Adam over {numbers} numbers, {args.passes:,} steps", f"{stepping:.3f}s"),
     ]
     for line in table(["", "time"], rows, align=["left", "right"]):
         print(f"  {line}")
