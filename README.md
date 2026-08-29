@@ -36,7 +36,7 @@ environments where the reward is not the point_
 **A reinforcement learning laboratory that runs in a terminal and needs
 nothing installed.**
 
-Thirteen environments, thirty agents, a gradient engine, a dynamic
+Fourteen environments, thirty agents, a gradient engine, a dynamic
 programming solver that says what the best possible policy is worth, and a
 command line that draws a learning curve out of braille dots.
 
@@ -196,6 +196,10 @@ the path digest rather than trusting it.
 - **Bandits.** The ten armed testbed, and a version where every lever wanders.
 - **Grids.** The cliff walk, the windy grid, four rooms, the Dyna maze and the
   frozen lake, all written as pictures of themselves.
+- **A corridor.** One folded path forty seven steps long where nothing pays
+  until the end, so an agent that has learned nothing does not arrive. It is
+  here because every other grid can be solved by wandering, which makes them
+  useless for comparing ways of exploring.
 - **A random walk.** The one environment here whose values are arithmetic
   rather than another computation, which is what makes a prediction checkable
   against the answer.
@@ -229,6 +233,9 @@ package: see [docs/grids.md](docs/grids.md).
   options read off the layout rather than written down, with and without
   credit for the states an option passed through.
 - **Approximation.** Semi-gradient SARSA and Q-learning over a tile coder.
+- **Exploring.** Every tabular agent takes a rule: epsilon-greedy, softmax, or
+  a count-based bonus. Optimistic initialisation sits beside them as a starting
+  value rather than a rule.
 - **Networks.** Q-learning over a network, with a replay buffer and a target
   network that can each be switched off, and REINFORCE with a baseline and an
   actor critic. All of them run on a reverse mode gradient engine written out
@@ -311,11 +318,12 @@ an agent when it is fifty times too large.
 ```
 rel/core.py         the contract: what an environment is, what a step is
 rel/rng.py          PCG written out, with named independent streams
-rel/envs/           thirteen environments. Never import an agent.
+rel/envs/           fourteen environments. Never import an agent.
 rel/agents/         thirty agents. Never import an environment.
   dp.py             value iteration, policy iteration, exact policy values
   td.py             SARSA, Q-learning, Expected SARSA, Double Q, n-step
   tiles.py          tile coding, worked out exactly rather than hashed
+  explore.py        how an agent picks an action from what it knows
   policy.py         REINFORCE and an actor critic
   value_network.py  Q-learning over a network, with replay and a target
 rel/options.py      an action that lasts several steps, built from a model
@@ -332,15 +340,15 @@ scripts/            the scripts that produce the numbers in the documentation
 | Area | Files | Lines |
 | --- | ---: | ---: |
 | Core | 5 | 910 |
-| Environments | 7 | 2222 |
-| Agents | 20 | 5581 |
+| Environments | 7 | 2270 |
+| Agents | 21 | 6077 |
 | Network | 4 | 720 |
 | Running | 5 | 1026 |
 | Interface | 6 | 1022 |
 | Command line | 3 | 1595 |
-| **Total** | **50** | **13076** |
+| **Total** | **51** | **13620** |
 
-Not counting 10784 lines of tests and 1985 of measurement scripts. Run
+Not counting 11588 lines of tests and 2240 of measurement scripts. Run
 `python scripts/lines.py` for the current numbers.
 
 Three rules about who may import whom are enforced by a test that reads the
@@ -410,7 +418,7 @@ what it was for.
 
 ## Status
 
-Alpha, and complete enough to be useful. Thirteen environments and thirty
+Alpha, and complete enough to be useful. Fourteen environments and thirty
 agents, all of them covered by a suite that runs in about eight minutes with no
 browser, no display and no network.
 
