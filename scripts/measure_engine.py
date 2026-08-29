@@ -51,13 +51,22 @@ def one_run(
     return seconds, record.digest.hexdigest(), "-" if learned is None else learned
 
 
-def one_layer(inputs: int, outputs: int, passes: int) -> tuple[float, float]:
-    """The seconds a bare layer takes, forward and backward.
+def one_layer(
+    inputs: int, outputs: int, passes: int, repeats: int = 3
+) -> tuple[float, float]:
+    """The seconds a bare layer takes, forward and backward, best of a few.
 
     A whole agent measures the engine mixed with everything around it. This is
     the engine on its own, at the shape the agents really use, so a change that
     helps one layer and hurts the loop around it shows up as two numbers rather
     than as one that did not move.
+
+    **The best of several rather than one timing.** The first version timed
+    each shape once, and its answer for unchanged code moved from 1.06 to 1.22
+    seconds depending on what had run before it in the same process. Five
+    timings in a row settle inside four percent of each other, and the first of
+    them is the slow one every time. Taking the best throws away whatever the
+    machine was doing rather than averaging it in.
 
     The backward pass is driven by calling the node's own closure rather than
     by `Tensor.backward`, which would walk the graph as well and is timed by
@@ -71,18 +80,22 @@ def one_layer(inputs: int, outputs: int, passes: int) -> tuple[float, float]:
     bias = Tensor([0.0] * outputs, (outputs,))
     x = Tensor([rng.normal() for _ in range(inputs)])
 
-    started = time.perf_counter()
-    made = [linear(x, weight, bias) for _ in range(passes)]
-    forward = time.perf_counter() - started
+    forwards: list[float] = []
+    backwards: list[float] = []
 
-    started = time.perf_counter()
-    for result in made:
-        result.grad = [1.0] * len(result)
-        assert result._backward is not None
-        result._backward()
-    backward = time.perf_counter() - started
+    for _ in range(repeats):
+        started = time.perf_counter()
+        made = [linear(x, weight, bias) for _ in range(passes)]
+        forwards.append(time.perf_counter() - started)
 
-    return forward, backward
+        started = time.perf_counter()
+        for result in made:
+            result.grad = [1.0] * len(result)
+            assert result._backward is not None
+            result._backward()
+        backwards.append(time.perf_counter() - started)
+
+    return min(forwards), min(backwards)
 
 
 def main() -> int:
@@ -120,10 +133,10 @@ def main() -> int:
     rows = [
         ("a whole run, best", f"{min(times):.3f}s"),
         ("a whole run, median", f"{statistics.median(times):.3f}s"),
-        (f"4 to 16 forward, {args.passes:,} passes", f"{forward:.2f}s"),
-        (f"4 to 16 backward, {args.passes:,} passes", f"{backward:.2f}s"),
-        (f"48 to 16 forward, {args.passes:,} passes", f"{wide_forward:.2f}s"),
-        (f"48 to 16 backward, {args.passes:,} passes", f"{wide_backward:.2f}s"),
+        (f"4 to 16 forward, {args.passes:,} passes", f"{forward:.3f}s"),
+        (f"4 to 16 backward, {args.passes:,} passes", f"{backward:.3f}s"),
+        (f"48 to 16 forward, {args.passes:,} passes", f"{wide_forward:.3f}s"),
+        (f"48 to 16 backward, {args.passes:,} passes", f"{wide_backward:.3f}s"),
     ]
     for line in table(["", "time"], rows, align=["left", "right"]):
         print(f"  {line}")
