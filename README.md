@@ -240,7 +240,8 @@ package: see [docs/grids.md](docs/grids.md).
 - **Options.** Q-learning whose choices can last several steps, over hallway
   options read off the layout rather than written down, with and without
   credit for the states an option passed through.
-- **Approximation.** Semi-gradient SARSA and Q-learning over a tile coder.
+- **Approximation.** Semi-gradient SARSA and Q-learning, over a tile coder or
+  over radial basis features. The same agent runs on either.
 - **Exploring.** Every tabular agent takes a rule: epsilon-greedy, softmax, or
   a count-based bonus. Optimistic initialisation sits beside them as a starting
   value rather than a rule.
@@ -336,10 +337,11 @@ an agent when it is fifty times too large.
 rel/core.py         the contract: what an environment is, what a step is
 rel/rng.py          PCG written out, with named independent streams
 rel/envs/           fifteen environments. Never import an agent.
-rel/agents/         thirty two agents. Never import an environment.
+rel/agents/         thirty four agents. Never import an environment.
   dp.py             value iteration, policy iteration, exact policy values
   td.py             SARSA, Q-learning, Expected SARSA, Double Q, n-step
   tiles.py          tile coding, worked out exactly rather than hashed
+  basis.py          radial basis features, which have no boundaries
   explore.py        how an agent picks an action from what it knows
   policy.py         REINFORCE and an actor critic
   average.py        learning with no discount, by subtracting the rate
@@ -361,14 +363,14 @@ scripts/            the scripts that produce the numbers in the documentation
 | --- | ---: | ---: |
 | Core | 5 | 910 |
 | Environments | 8 | 2489 |
-| Agents | 23 | 6654 |
+| Agents | 24 | 7046 |
 | Network | 4 | 782 |
 | Running | 6 | 1252 |
 | Interface | 6 | 1022 |
 | Command line | 3 | 1658 |
-| **Total** | **55** | **14767** |
+| **Total** | **56** | **15159** |
 
-Not counting 12981 lines of tests and 2936 of measurement scripts. Run
+Not counting 13804 lines of tests and 3235 of measurement scripts. Run
 `python scripts/lines.py` for the current numbers.
 
 Three rules about who may import whom are enforced by a test that reads the

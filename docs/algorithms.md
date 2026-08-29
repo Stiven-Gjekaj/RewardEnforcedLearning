@@ -1316,6 +1316,135 @@ usually said.
 
 ---
 
+## A second way to make features, and the one number that decides it
+
+A tile coder answers "which cells is this point in", and every answer is a
+switch: on or off. Radial basis features answer "how close is this point to
+each of these places", and every answer is a number between zero and one.
+
+The difference is a step against a slope. Two points on opposite sides of a
+tile boundary share nothing along that dimension however close together they
+are. A radial basis has no boundaries: a point a hair away has a value a hair
+different, everywhere.
+
+`rbf-sarsa` and `rbf-q` are the same agents as `tile-sarsa` and `tile-q`, over
+the other encoder. Nothing about `LinearAgent` knows which it is talking to.
+
+```console
+$ python scripts/measure_approximation.py --runs 10
+```
+
+### The count of features says the opposite of the cost
+
+| environment | agent | features | us/step |
+| --- | --- | ---: | ---: |
+| mountain car | tile-sarsa | 648 | **52** |
+| mountain car | rbf-sarsa | 36 | 120 |
+| mountain car | rbf-sarsa kept=8 | 36 | 106 |
+| cart pole | tile-sarsa | 52,488 | **70** |
+| cart pole | rbf-sarsa | 1,296 | 3511 |
+| cart pole | rbf-sarsa kept=8 | 1,296 | 3073 |
+
+On the cart pole the tile coder has forty times more features and costs a
+fiftieth as much per step. Reading the feature counts alone gives the opposite
+answer to reading the clock, which is why both columns are here.
+
+The reason is not that a tile coder is a better shape. It is that **a tile
+coder never asks a feature that is off.** It works out which eight switches are
+on directly, by arithmetic on the coordinates, and never touches the other
+52,480. A radial basis has no such route: every centre answers every point.
+
+| a step of a four dimensional radial basis, 1296 centres | us |
+| --- | ---: |
+| the distance to all 1296 centres | 755 |
+| and the exponential of each | 861 |
+| and normalising them | 1042 |
+| finding the largest 8 by sorting | 132 |
+| finding the largest 8 by a heap | 84 |
+
+### Dropping the far centres cannot fix it
+
+`kept` drops all but the largest few values, and it was going to be the
+default, and it was going to buy back exactly the sparse shape the tile coder
+has. It buys eleven percent.
+
+The table above says why. Three quarters of the step is the distances, and they
+are paid before anything can be dropped, because **there is no way to know
+which centres are far away without measuring the distance to all of them.** The
+sort that then finds the largest eight costs about what dropping the other 1288
+saves. A heap is faster than the sort and not by enough to matter.
+
+It also costs the thing the encoder exists for. Between two centres there is a
+point where the smallest kept value and the largest dropped one cross, and
+either side of it the agent reads a different weight for a feature of the same
+size. The jump there is exactly the size of the smallest kept value: 0.036 at
+the default settings, where the largest feature of that same point is 0.214.
+That is smaller than a tile coder's boundary, which swaps a whole switch of
+eight, and it is the same kind of thing.
+
+So `kept` is off by default. `TestKeepingBringsTheBoundaryBack` in
+`tests/test_basis.py` is the measurement, and it found the boundary by sweeping
+a line across the box and looking for a step, which is the only way it would
+have been found: every other test of the encoder passed.
+
+### On the mountain car it learns better, at twice the cost
+
+| agent | mean | every seed |
+| --- | ---: | --- |
+| tile-sarsa | -164.6 | -170 -157 -166 -136 -158 -172 -178 -163 -173 -173 |
+| rbf-sarsa | **-143.3** | -131 -152 -137 -141 -153 -138 -153 -136 -160 -134 |
+
+Tile coding minus radial basis: -21.3, 95 percent interval [-30.4, -11.5],
+p 0.008. Both halves of the answer agree, over ten seeds.
+
+Read it as an early learning result and not as a verdict. Sixty episodes is
+what these runs get, and a radial basis spreads one reward much further than a
+tile does. A tile here is an eighth of the box wide and a point outside it gets
+nothing. A centre is still worth 0.61 at a seventh of the box away and 0.14 at
+a third, so the first time a run reaches the flag, far more of the space hears
+about it. The table further up this page runs `tile-sarsa` for 300 episodes and
+it reaches -114.2, which is better than either row here.
+
+### The width is the whole of the setting
+
+The width is a multiple of the spacing between the centres.
+
+| width | mean | every seed |
+| ---: | ---: | --- |
+| 0.5 | -150.8 | -161 -159 -138 -143 -142 -139 -145 -165 -167 -150 |
+| 0.75 | **-143.3** | -131 -152 -137 -141 -153 -138 -153 -136 -160 -134 |
+| 1 | -150.0 | -148 -148 -145 -160 -157 -138 -152 -147 -160 -144 |
+| 1.5 | -207.6 | -169 -142 -371 -197 -149 -175 -214 -314 -172 -174 |
+| 2 | -842.2 | -1000 -1000 -1000 -173 -1000 -1000 -1000 -1000 -871 -379 |
+| 3 | -509.5 | -1000 -318 -456 -337 -476 -461 -1000 -279 -308 -459 |
+
+At two spacings, eight of ten seeds never reach the flag. Every centre answers
+about the same at that width, so the features say almost nothing about where
+the point is, and the agent is learning one number for the whole box.
+
+One whole spacing is the value that looks right and it is not the best one. It
+loses to three quarters on the mountain car by 11.2 over twelve seeds, interval
+[+4.1, +19.6], p 0.010, and on the cart pole by 183.7 over eight seeds,
+interval [+147, +223], p 0.008. Half a spacing beats one on both and does not
+beat three quarters on either. So the default is three quarters, and
+`TestTheDefaultWidth` in `tests/test_basis.py` holds it there with the reason
+written next to it.
+
+### Where it is weak
+
+- **One environment for the learning comparison.** The cart pole would take an
+  hour at the exact settings, so it was compared at `bins=4` for the width
+  sweep only.
+- **Sixty episodes.** The comparison is of early learning. Which encoder is
+  ahead after three hundred episodes is not measured here.
+- **The width was swept on a grid of six values.** The best of six is not the
+  best there is, and the sweep is coarse near the top: 0.5, 0.75 and 1 sit
+  within 8 points of each other while 1.5 and above fall off a cliff.
+- **The timing is one machine, one Python.** The ratio between the two
+  encoders is the part worth reading, not the microseconds.
+
+---
+
 ## The two control problems
 
 Neither has a table of states and neither has a model, so there is no exact
@@ -2028,6 +2157,7 @@ is not here.
 | One setting swept | `python scripts/measure_control.py --env cartpole --set entropy=0.05` |
 | Every seed behind a mean | `python scripts/measure_agents.py --env cliff --each-seed` |
 | The tile coder offsets | `python scripts/measure_tiling_offsets.py` |
+| Tile coding against a radial basis | `python scripts/measure_approximation.py --runs 10` |
 | What importance sampling costs | `python scripts/measure_importance.py` |
 | Ordered replay against uniform | `python scripts/measure_sweeping.py --episodes 400` |
 | The seed that gets lost | `python scripts/measure_lost_seed.py --ladder-all` |
