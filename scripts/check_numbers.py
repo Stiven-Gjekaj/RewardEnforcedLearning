@@ -12,23 +12,29 @@ says which. This is the thing that says which.
 
 ## How it decides
 
-For each command in a ```console block, it takes every table that follows the
-block, runs the command, and asks of each number in each table: does this
-number appear anywhere in what the command printed?
+Every command in a ```console block is run once. Then each table on the page is
+put against every one of those outputs, and the one that accounts for most of
+the table's numbers is the command that table came from.
 
-That is a weaker question than "is this the right number in the right cell",
-and it is the one that can be asked without the document declaring which table
-came from which column of which run. A number that has moved disappears from
-the output, so it is caught. A number that has swapped places with another
-number in the same table is not.
+Matching rather than position, and the first version did it by position. It
+took the tables that followed a block and asked whether that block's commands
+printed their numbers. Two thirds of what it reported was a table sitting under
+a command it did not come from, because `## The same table, four more
+environments` writes one command and then four tables, and the other three
+commands are not on the page at all.
 
-## What a low score means
+Matching finds those. A table whose numbers appear in the output of a command
+written further up the page is attributed to it and reported as clean. A table
+that no documented command accounts for is reported as exactly that, which is
+the state the page is really in for a table whose command it never names.
 
-A table where nothing matches is more likely to be a table this attached to
-the wrong command than a table that is wholly wrong. The rule is that a table
-belongs to the nearest command above it, and a page that discusses one command
-under several headings breaks that rule. Both look the same from here, so
-both are reported and neither is called stale.
+## What it can and cannot see
+
+It asks whether each number appears anywhere in an output. That is weaker than
+asking whether it is the right number in the right cell, and it is the question
+that can be asked of a page which nowhere says which column of which run a cell
+came from. A number that moved disappears from every output, so it is caught. A
+number that swapped places with another number in the same table is not.
 """
 
 from __future__ import annotations
@@ -72,6 +78,9 @@ class Claim:
 
     #: The line the table starts on, for a report a reader can navigate by.
     line: int
+    #: The command written closest above it. A hint and not an answer: the
+    #: report says when the command that accounts for a table is not this one.
+    nearest: str = ""
     rows: list[str] = field(default_factory=list)
 
     @property
@@ -83,29 +92,6 @@ class Claim:
                 continue
             found.extend(NUMBER.findall(row.replace(",", "").replace("*", "")))
         return found
-
-
-@dataclass
-class Block:
-    """One console block in the documentation, and the tables that follow it.
-
-    All of the commands rather than one of them. A block that shows two
-    commands and then one table is showing a table built from both, so a
-    number is looked for in what any of them printed.
-    """
-
-    commands: list[str]
-    line: int
-    claims: list[Claim] = field(default_factory=list)
-
-    @property
-    def numbers(self) -> int:
-        return sum(len(claim.numbers) for claim in self.claims)
-
-    @property
-    def label(self) -> str:
-        rest = len(self.commands) - 1
-        return self.commands[0] if not rest else f"{self.commands[0]}  (+{rest})"
 
 
 def commands_in(fence: list[str]) -> list[str]:
@@ -132,15 +118,15 @@ def commands_in(fence: list[str]) -> list[str]:
     return found
 
 
-def read(path: Path) -> list[Block]:
-    """Every command in a markdown file, with the tables that follow it.
+def read(path: Path) -> tuple[list[str], list[Claim]]:
+    """Every command in a markdown file, and every table, kept apart.
 
-    A table belongs to the nearest command above it. Headings do not break
-    that, because this page states a command once and then discusses what it
-    printed under several headings.
+    Which table came from which command is not decided here. It is decided by
+    running the commands and seeing which output accounts for which table.
     """
     lines = path.read_text().splitlines()
-    blocks: list[Block] = []
+    commands: list[str] = []
+    claims: list[Claim] = []
     claim: Claim | None = None
     # Whether the line before this one was part of a table. A table whose
     # heading says it holds commands is skipped whole, and without this the
@@ -152,36 +138,38 @@ def read(path: Path) -> list[Block]:
         text = lines[index].strip()
 
         if text.startswith("```"):
-            fence: list[str] = []
             language = text.strip("`")
+            fence: list[str] = []
             index += 1
             while index < len(lines) and not lines[index].strip().startswith("```"):
                 fence.append(lines[index])
                 index += 1
             index += 1
-            claim = None
-            inside = False
+            claim, inside = None, False
             if language == "console":
-                found = commands_in(fence)
-                if found:
-                    blocks.append(Block(found, index))
+                for command in commands_in(fence):
+                    if command not in commands:
+                        commands.append(command)
             continue
 
-        if text.startswith("|") and blocks:
+        if text.startswith("|"):
             if not inside:
                 inside = True
-                claim = None if heading_of(text) in NOT_RESULTS else Claim(index + 1)
+                claim = (
+                    None
+                    if heading_of(text) in NOT_RESULTS
+                    else Claim(index + 1, commands[-1] if commands else "")
+                )
                 if claim is not None:
-                    blocks[-1].claims.append(claim)
+                    claims.append(claim)
             if claim is not None:
                 claim.rows.append(text)
         else:
-            inside = False
-            claim = None
+            claim, inside = None, False
 
         index += 1
 
-    return blocks
+    return commands, [claim for claim in claims if claim.numbers]
 
 
 def run(command: str, seconds: float) -> tuple[str, float, str]:
@@ -212,8 +200,8 @@ def run(command: str, seconds: float) -> tuple[str, float, str]:
         )
     except subprocess.TimeoutExpired:
         return "", time.perf_counter() - started, f"took longer than {seconds:.0f}s"
-    except FileNotFoundError as missing:
-        return "", time.perf_counter() - started, f"could not run it: {missing}"
+    except FileNotFoundError as missing_program:
+        return "", time.perf_counter() - started, f"could not run it: {missing_program}"
 
     taken = time.perf_counter() - started
     if done.returncode != 0:
@@ -222,55 +210,45 @@ def run(command: str, seconds: float) -> tuple[str, float, str]:
     return done.stdout, taken, ""
 
 
-def missing(claim: Claim, printed: str) -> list[str]:
-    """The numbers a table states that the output does not contain.
+def missing(wanted: list[str], available: list[str]) -> list[str]:
+    """The numbers a table states that an output does not contain.
 
     Counted with multiplicity. A table that states -13.00 four times and an
     output that prints it twice is two numbers short, and reporting it as
     nothing short would hide exactly the kind of change this is for.
     """
-    available = list(NUMBER.findall(printed.replace(",", "")))
+    left = list(available)
     absent: list[str] = []
-    for number in claim.numbers:
-        if number in available:
-            available.remove(number)
+    for number in wanted:
+        if number in left:
+            left.remove(number)
         else:
             absent.append(number)
     return absent
 
 
-@dataclass
-class Result:
-    """What running one block's commands said about the numbers under it."""
+def attribute(claim: Claim, printed: dict[str, list[str]]) -> tuple[str, list[str]]:
+    """The command that accounts for most of a table, and what it still misses.
 
-    found: int
-    claimed: int
-    absent: list[str]
-    trouble: str
-    seconds: float
-
-
-def check(block: Block, seconds: float) -> Result:
-    """How many of a block's claimed numbers its commands still print."""
-    printed = ""
-    taken = 0.0
-    for command in block.commands:
-        output, spent, trouble = run(command, seconds)
-        taken += spent
-        if trouble:
-            return Result(0, block.numbers, [], f"{command}: {trouble}", taken)
-        printed += output
-
-    absent: list[str] = []
-    gone_total = 0
-    for claim in block.claims:
-        gone = missing(claim, printed)
-        gone_total += len(gone)
-        if gone:
-            shown = " ".join(gone[:12])
-            more = "" if len(gone) <= 12 else f" and {len(gone) - 12} more"
-            absent.append(f"line {claim.line}: {shown}{more}")
-    return Result(block.numbers - gone_total, block.numbers, absent, "", taken)
+    Ties go to the command written nearest above the table, so a page that
+    does say where a table came from is taken at its word whenever the numbers
+    do not disagree with it.
+    """
+    wanted = claim.numbers
+    best: tuple[str, list[str]] = ("", wanted)
+    for command, available in printed.items():
+        absent = missing(wanted, available)
+        if len(absent) == len(wanted):
+            # It accounts for nothing, so it is not where the table came
+            # from. Without this a command that prints none of a table's
+            # numbers would be named as its source whenever no command
+            # printed any of them, which reads as an attribution.
+            continue
+        if len(absent) < len(best[1]) or (
+            len(absent) == len(best[1]) and command == claim.nearest
+        ):
+            best = (command, absent)
+    return best
 
 
 def main() -> int:
@@ -286,28 +264,24 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, default=900.0)
     args = parser.parse_args()
 
-    blocks = [block for block in read(ROOT / args.doc) if block.numbers]
+    commands, claims = read(ROOT / args.doc)
     if args.only:
-        blocks = [
-            block
-            for block in blocks
-            if any(args.only in command for command in block.commands)
-        ]
+        commands = [command for command in commands if args.only in command]
+        claims = [claim for claim in claims if args.only in claim.nearest]
 
     if args.list or not (args.only or args.all):
-        total = sum(block.numbers for block in blocks)
+        stated = sum(len(claim.numbers) for claim in claims)
         print(
-            f"{len(blocks)} console blocks in {args.doc} have tables under\n"
-            f"them, stating {total} numbers between them.\n"
+            f"{len(commands)} commands and {len(claims)} tables in {args.doc},\n"
+            f"stating {stated} numbers between them.\n"
         )
-        rows = [
-            [f"{block.line}", f"{len(block.claims)}", f"{block.numbers}", block.label]
-            for block in blocks
-        ]
         for line in table(
-            ["line", "tables", "numbers", "command"],
-            rows,
-            align=["right", "right", "right", "left"],
+            ["line", "numbers", "nearest command above it"],
+            [
+                [f"{claim.line}", f"{len(claim.numbers)}", claim.nearest]
+                for claim in claims
+            ],
+            align=["right", "right", "left"],
         ):
             print(f"  {line}")
         if not args.list:
@@ -315,45 +289,62 @@ def main() -> int:
         return 0
 
     started = time.perf_counter()
-    stale = 0
-    broken = 0
-    for number, block in enumerate(blocks, start=1):
-        # Said before the command runs rather than after. Some of these take
-        # minutes, and a run that prints nothing for an hour looks the same
-        # as a run that has hung.
-        print(f"\n[{number}/{len(blocks)}] {block.label}", flush=True)
+    printed: dict[str, list[str]] = {}
+    broken: list[str] = []
 
-        result = check(block, args.timeout)
-        if result.trouble:
-            print(f"  could not check it. {result.trouble}", flush=True)
-            broken += 1
+    for number, command in enumerate(commands, start=1):
+        print(f"[{number}/{len(commands)}] {command}", flush=True)
+        output, spent, trouble = run(command, args.timeout)
+        if trouble:
+            print(f"    could not run it. {trouble}", flush=True)
+            broken.append(command)
             continue
-        print(
-            f"  {result.found} of {result.claimed} numbers still printed, "
-            f"in {result.seconds:.0f}s",
-            flush=True,
-        )
-        for line in result.absent:
-            print(f"  {line}", flush=True)
-        stale += bool(result.absent)
+        print(f"    {spent:.0f}s", flush=True)
+        printed[command] = NUMBER.findall(output.replace(",", ""))
 
-    checked = len(blocks) - broken
-    print(
-        f"\n{checked - stale} of {checked} blocks print every number the page "
-        f"states for them, in {time.perf_counter() - started:.0f}s."
-    )
-    if stale:
+    clean = 0
+    orphans = 0
+    print("\n")
+    for claim in claims:
+        command, absent = attribute(claim, printed)
+        stated = len(claim.numbers)
+        if not absent:
+            clean += 1
+            if command != claim.nearest:
+                print(
+                    f"line {claim.line}: all {stated} numbers, but from\n"
+                    f"  {command}\n"
+                    f"  rather than the command above it, which is\n"
+                    f"  {claim.nearest}"
+                )
+            continue
+
+        if len(absent) == stated:
+            orphans += 1
+            print(
+                f"line {claim.line}: no command on this page prints any of its "
+                f"{stated} numbers."
+            )
+            continue
+
+        shown = " ".join(absent[:12])
+        more = "" if len(absent) <= 12 else f" and {len(absent) - 12} more"
         print(
-            "A block that prints none of its numbers is more likely a table\n"
-            "attached to the wrong command than a table that is wholly wrong.\n"
-            "This cannot tell those apart, so it reports both and calls\n"
-            "neither of them stale."
+            f"line {claim.line}: {stated - len(absent)} of {stated} numbers, best "
+            f"from\n  {command}\n  missing {shown}{more}"
         )
+
+    print(
+        f"\n{clean} of {len(claims)} tables are wholly accounted for by a command "
+        f"on the page,\nand {orphans} by no command at all, "
+        f"in {time.perf_counter() - started:.0f}s."
+    )
     if broken:
         # A documented command that will not run is a defect whatever the
-        # numbers under it say, so this is the one thing here worth an exit
-        # code. Numbers that moved need a person to read them.
-        print(f"{broken} of {len(blocks)} would not run at all.")
+        # numbers say, so this is the one thing here worth an exit code.
+        print(f"\n{len(broken)} commands would not run at all:")
+        for command in broken:
+            print(f"  {command}")
     return 1 if broken else 0
 
 

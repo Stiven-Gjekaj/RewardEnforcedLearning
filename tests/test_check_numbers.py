@@ -1,9 +1,13 @@
 """The parsing in `scripts/check_numbers.py`, which is where it can go wrong.
 
 The script asks whether a number the documentation states still comes out of
-the command above it. Everything hard about that is in deciding which command
-a table belongs to and which characters in a cell are a number, and both of
-those are decided here rather than by running anything.
+some command on the page. Everything hard about that is in deciding which
+characters in a cell are a number and which command accounts for a table, and
+both are decided here rather than by running anything.
+
+Which command a table came from is worked out by matching its numbers against
+every command's output, not by position. `TestAttributingATableToACommand` is
+that decision, and the reason for it is in the script.
 
 The script is loaded by its path, because `scripts/` is not a package and
 importing it as one would be a different arrangement than the one that runs.
@@ -74,7 +78,7 @@ class TestReadingACommand:
         assert script.commands_in(["$ a \\"]) == ["a"]
 
 
-class TestWhichTableBelongsToWhichCommand:
+class TestFindingTheCommandsAndTheTables:
     PAGE = """# A page
 
 ```console
@@ -101,40 +105,57 @@ $ python third.py
 | something | 4.5 |
 """
 
-    def test_every_block_is_found(self, script: ModuleType, tmp_path: Path) -> None:
-        blocks = script.read(write(tmp_path, self.PAGE))
-        assert [block.commands for block in blocks] == [
-            ["python first.py"],
-            ["python second.py", "python third.py"],
+    def test_every_command_is_found(self, script: ModuleType, tmp_path: Path) -> None:
+        commands, _ = script.read(write(tmp_path, self.PAGE))
+        assert commands == ["python first.py", "python second.py", "python third.py"]
+
+    def test_a_command_written_twice_is_run_once(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        # The page shows `rel compare sarsa q-learning --env cliff --runs 10`
+        # in two places. Running it twice would double the slowest part of
+        # this for nothing.
+        page = "```console\n$ python a.py\n```\n\n```console\n$ python a.py\n```\n"
+        commands, _ = script.read(write(tmp_path, page))
+        assert commands == ["python a.py"]
+
+    def test_every_table_is_found(self, script: ModuleType, tmp_path: Path) -> None:
+        _, claims = script.read(write(tmp_path, self.PAGE))
+        assert len(claims) == 3
+        assert [claim.numbers for claim in claims] == [["-27.70"], ["-50.71"], ["4.5"]]
+
+    def test_a_heading_does_not_join_two_tables_into_one(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        _, claims = script.read(write(tmp_path, self.PAGE))
+        assert [claim.line for claim in claims] == [7, 13, 22]
+
+    def test_each_table_remembers_the_command_nearest_above_it(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        """A hint rather than an answer. It settles a tie when two commands
+        account for a table equally well, and the report names it when the
+        command that accounts for a table is a different one."""
+        _, claims = script.read(write(tmp_path, self.PAGE))
+        assert [claim.nearest for claim in claims] == [
+            "python first.py",
+            "python first.py",
+            "python third.py",
         ]
 
-    def test_a_heading_does_not_end_the_tables(
+    def test_a_table_before_any_command_is_still_a_table(
         self, script: ModuleType, tmp_path: Path
     ) -> None:
-        """The page states a command once and then discusses what it printed
-        under several headings. Stopping at the first heading would drop most
-        of the numbers on the page and call the rest of them checked."""
-        blocks = script.read(write(tmp_path, self.PAGE))
-        assert len(blocks[0].claims) == 2
-        assert blocks[0].numbers == 2
-
-    def test_the_next_command_does_end_them(
-        self, script: ModuleType, tmp_path: Path
-    ) -> None:
-        blocks = script.read(write(tmp_path, self.PAGE))
-        assert len(blocks[1].claims) == 1
-
-    def test_a_table_before_any_command_belongs_to_nothing(
-        self, script: ModuleType, tmp_path: Path
-    ) -> None:
-        blocks = script.read(write(tmp_path, "| a | 1 |\n\n```console\n$ x\n```\n"))
-        assert blocks[0].numbers == 0
+        _, claims = script.read(write(tmp_path, "| a | 1 |\n\n```console\n$ x\n```\n"))
+        assert [claim.nearest for claim in claims] == [""]
 
     def test_a_block_that_is_not_console_is_not_a_command(
         self, script: ModuleType, tmp_path: Path
     ) -> None:
         page = "```python\nx = 1\n```\n\n| a | 1 |\n"
-        assert script.read(write(tmp_path, page)) == []
+        commands, claims = script.read(write(tmp_path, page))
+        assert commands == []
+        assert len(claims) == 1
 
     def test_the_table_of_commands_at_the_end_is_not_a_result(
         self, script: ModuleType, tmp_path: Path
@@ -147,7 +168,7 @@ $ python third.py
             "| Table | Command |\n| --- | --- |\n"
             "| Every agent | `python scripts/measure_agents.py --runs 10` |\n"
         )
-        assert script.read(write(tmp_path, page))[0].numbers == 0
+        assert script.read(write(tmp_path, page))[1] == []
 
 
 class TestWhichCharactersAreANumber:
@@ -179,26 +200,80 @@ class TestWhichCharactersAreANumber:
 
 
 class TestWhatIsMissing:
-    def claim(self, script: ModuleType, row: str) -> object:
-        made = script.Claim(1)
-        made.rows = [row]
-        return made
-
-    def test_a_number_anywhere_in_the_output_counts(self, script: ModuleType) -> None:
-        claim = self.claim(script, "| a | -27.70 |")
-        assert script.missing(claim, "sarsa   -27.70 +/- 1.64") == []
+    def test_a_number_the_output_holds_is_not_missing(self, script: ModuleType) -> None:
+        assert script.missing(["-27.70"], ["-27.70", "1.64"]) == []
 
     def test_a_number_that_moved_is_reported(self, script: ModuleType) -> None:
-        claim = self.claim(script, "| a | -27.70 |")
-        assert script.missing(claim, "sarsa   -28.10") == ["-27.70"]
+        assert script.missing(["-27.70"], ["-28.10"]) == ["-27.70"]
 
     def test_the_same_number_twice_needs_it_twice(self, script: ModuleType) -> None:
         """Counted with multiplicity on purpose. A table that states -13.00
         four times against an output that prints it twice has changed, and
         matching on membership alone would call it unchanged."""
-        claim = self.claim(script, "| a | -13.00 | -13.00 |")
-        assert script.missing(claim, "one -13.00 line") == ["-13.00"]
-        assert script.missing(claim, "-13.00 and -13.00") == []
+        assert script.missing(["-13.00", "-13.00"], ["-13.00"]) == ["-13.00"]
+        assert script.missing(["-13.00", "-13.00"], ["-13.00", "-13.00"]) == []
+
+
+class TestAttributingATableToACommand:
+    """Which command a table came from, decided by its numbers.
+
+    The first version decided by position and was wrong about two thirds of
+    the page, because `## The same table, four more environments` writes one
+    command and then four tables, and the other three commands are nowhere on
+    the page at all.
+    """
+
+    def claim(self, script: ModuleType, row: str, nearest: str = "") -> object:
+        made = script.Claim(1, nearest)
+        made.rows = [row]
+        return made
+
+    def test_the_command_that_accounts_for_it_wins(self, script: ModuleType) -> None:
+        claim = self.claim(script, "| a | -20.20 | -22.73 |", nearest="wrong one")
+        command, absent = script.attribute(
+            claim,
+            {"wrong one": ["-15.00", "-16.17"], "right one": ["-20.20", "-22.73"]},
+        )
+        assert command == "right one"
+        assert absent == []
+
+    def test_a_tie_goes_to_the_command_above_it(self, script: ModuleType) -> None:
+        """A page that does say where a table came from is taken at its word
+        whenever the numbers do not disagree with it. Two commands printing
+        the same numbers is the ordinary case for a sweep."""
+        claim = self.claim(script, "| a | 1.5 |", nearest="the one above")
+        both = {"the one above": ["1.5"], "another": ["1.5"]}
+        assert script.attribute(claim, both)[0] == "the one above"
+
+    def test_a_table_no_command_accounts_for_comes_back_empty(
+        self, script: ModuleType
+    ) -> None:
+        # Which is the state the page is in for a table whose command it never
+        # names. Reporting it as stale would be wrong and reporting it as
+        # clean would be worse.
+        claim = self.claim(script, "| a | 9.99 |", nearest="something")
+        command, absent = script.attribute(claim, {"something": ["1.0"]})
+        assert command == ""
+        assert absent == ["9.99"]
+
+    def test_the_best_of_several_partial_matches_is_taken(
+        self, script: ModuleType
+    ) -> None:
+        claim = self.claim(script, "| a | 1 | 2 | 3 |")
+        command, absent = script.attribute(
+            claim, {"one": ["1"], "two": ["1", "2"], "none": []}
+        )
+        assert command == "two"
+        assert absent == ["3"]
+
+    def test_a_command_that_accounts_for_nothing_is_not_named(
+        self, script: ModuleType
+    ) -> None:
+        # Even when it is the command written above the table, and even when
+        # no other command does better. Naming it would read as an
+        # attribution, and the truth is that nothing on the page explains it.
+        claim = self.claim(script, "| a | 9.99 |", nearest="above it")
+        assert script.attribute(claim, {"above it": ["1.0"]}) == ("", ["9.99"])
 
 
 class TestRunningTheCommand:
@@ -233,25 +308,36 @@ class TestRunningTheCommand:
 
 
 class TestAgainstTheRealPage:
-    def test_every_block_has_a_command(self, script: ModuleType) -> None:
-        for block in script.read(script.ROOT / "docs" / "algorithms.md"):
-            assert block.commands
-            assert all(command for command in block.commands)
+    def test_every_command_is_a_command(self, script: ModuleType) -> None:
+        commands, _ = script.read(script.ROOT / "docs" / "algorithms.md")
+        assert commands
+        assert all(command.startswith(("python ", "rel ")) for command in commands)
 
     def test_the_page_states_a_great_many_numbers(self, script: ModuleType) -> None:
         # The point of the exercise. If this drops to nothing, the parsing
         # broke and the script would report a clean page either way.
-        blocks = script.read(script.ROOT / "docs" / "algorithms.md")
-        assert sum(block.numbers for block in blocks) > 800
+        _, claims = script.read(script.ROOT / "docs" / "algorithms.md")
+        assert sum(len(claim.numbers) for claim in claims) > 800
 
     def test_no_claim_holds_a_command_line(self, script: ModuleType) -> None:
         # The closing table of the page is a list of commands. Every number in
         # it is a setting rather than a result, so none of its rows may reach
         # a claim.
-        for block in script.read(script.ROOT / "docs" / "algorithms.md"):
-            for claim in block.claims:
-                for row in claim.rows:
-                    assert "scripts/measure" not in row, row
+        _, claims = script.read(script.ROOT / "docs" / "algorithms.md")
+        for claim in claims:
+            for row in claim.rows:
+                assert "scripts/measure" not in row, row
+
+    def test_more_tables_than_commands_that_could_own_them(
+        self, script: ModuleType
+    ) -> None:
+        """Not an accident of counting. Several sections write one command and
+        then a table for each of four environments, so the page has tables it
+        never names a command for, and matching is the only thing that can
+        say which those are."""
+        commands, claims = script.read(script.ROOT / "docs" / "algorithms.md")
+        nearest = {claim.nearest for claim in claims}
+        assert len(nearest) < len(commands)
 
 
 class TestWhatTheExitCodeMeans:
@@ -317,8 +403,7 @@ class TestWhatTheExitCodeMeans:
         self.go(script, monkeypatch, page)
         printed = capsys.readouterr().out
         assert "line 5" in printed
-        assert "9.5" in printed
-        assert "0 of 1 numbers still printed" in printed
+        assert "no command on this page prints any of its 1 numbers" in printed
 
     def test_the_listing_runs_nothing(
         self,
