@@ -61,6 +61,7 @@ from rel.agents.prediction import (
     TDLambda,
     TemporalDifference,
 )
+from rel.agents.search import TreeSearch
 from rel.agents.sweeping import PrioritisedSweeping
 from rel.agents.td import DoubleQ, ExpectedSarsa, NStepSarsa, QLearning, Sarsa
 from rel.agents.tiles import TileCoder
@@ -503,6 +504,36 @@ def _mc_prediction(
     )
 
 
+def _tree_search(
+    rng: Rng,
+    env: Env[Any],
+    simulations: int = 50,
+    depth: int = 60,
+    confidence: float = 1.0,
+    discount: float = 0.95,
+    reuse: bool = True,
+) -> Agent[Any]:
+    #: `reuse=False` is the ablation, and it is the one that says what the
+    #: tree is doing. Off, the agent plans from nothing at every decision and
+    #: carries away nothing at all. On, the work done for one state is there
+    #: when it comes back. Both are the same code with one flag changed.
+    if not isinstance(env, TabularEnv):
+        raise TypeError(
+            f"{env.spec.name} keeps no model, so there is nothing to search. "
+            f"This agent needs an environment tagged 'tabular'."
+        )
+    return TreeSearch(
+        rng,
+        env.action_space,
+        env,
+        simulations=simulations,
+        depth=depth,
+        confidence=confidence,
+        discount=discount,
+        reuse=reuse,
+    )
+
+
 def _deep_q(
     rng: Rng,
     env: Env[Any],
@@ -731,6 +762,12 @@ AGENTS: Registry[Agent[Any]] = Registry(
             "Dyna that replays the step that matters rather than a random one.",
             _sweeping,
             tags=("tabular", "planning", "off-policy"),
+        ),
+        Entry(
+            "mcts",
+            "Runs simulations from where it stands, then acts on what they said.",
+            _tree_search,
+            tags=("planning", "needs-model"),
         ),
         Entry(
             "options-q",
