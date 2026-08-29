@@ -28,6 +28,7 @@ KNOWN_TAGS = frozenset(
         "network",
         "off-policy",
         "on-policy",
+        "prediction",
         "planning",
         "reference",
         "tabular",

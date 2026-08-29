@@ -54,6 +54,12 @@ from rel.agents.monte_carlo import MonteCarloControl
 from rel.agents.off_policy import Estimator, OffPolicyMonteCarlo
 from rel.agents.options import IntraOptionQ, OptionsQ
 from rel.agents.policy import ActorCritic, Reinforce
+from rel.agents.prediction import (
+    MonteCarloPrediction,
+    NStepTD,
+    TDLambda,
+    TemporalDifference,
+)
 from rel.agents.sweeping import PrioritisedSweeping
 from rel.agents.td import DoubleQ, ExpectedSarsa, NStepSarsa, QLearning, Sarsa
 from rel.agents.tiles import TileCoder
@@ -375,6 +381,108 @@ def _built_options(
     )
 
 
+def _followed(env: Env[Any], policy: str, discount: float) -> dict[int, int] | None:
+    """The fixed policy a predictor is handed.
+
+    `uniform` is `None` rather than a mapping. A policy that draws cannot be
+    written as one action per state, and it is the classic setting for the
+    random walk, so the two are different kinds of thing rather than one kind
+    with a special case.
+    """
+    if policy == "uniform":
+        return None
+    if policy != "optimal":
+        raise ValueError(f"policy is 'uniform' or 'optimal'. {policy!r} is not.")
+
+    if not isinstance(env, TabularEnv):
+        raise TypeError(
+            f"{env.spec.name} keeps no model, so the best policy cannot be "
+            f"worked out. Use policy=uniform, or an environment tagged "
+            f"'tabular'."
+        )
+    return dict(enumerate(value_iteration(env, discount=discount).policy))
+
+
+def _td(
+    rng: Rng,
+    env: Env[Any],
+    policy: str = "uniform",
+    step_size: float | Schedule = 0.1,
+    discount: float = 1.0,
+    start_value: float = 0.0,
+) -> Agent[Any]:
+    return TemporalDifference(
+        rng,
+        env.action_space,
+        _followed(env, policy, discount),
+        step_size=step_size,
+        discount=discount,
+        start_value=start_value,
+    )
+
+
+def _n_step_td(
+    rng: Rng,
+    env: Env[Any],
+    policy: str = "uniform",
+    n: int = 3,
+    step_size: float | Schedule = 0.1,
+    discount: float = 1.0,
+    start_value: float = 0.0,
+) -> Agent[Any]:
+    return NStepTD(
+        rng,
+        env.action_space,
+        _followed(env, policy, discount),
+        n=n,
+        step_size=step_size,
+        discount=discount,
+        start_value=start_value,
+    )
+
+
+def _td_lambda(
+    rng: Rng,
+    env: Env[Any],
+    policy: str = "uniform",
+    trace_decay: float = 0.8,
+    traces: Kind = "replacing",
+    step_size: float | Schedule = 0.1,
+    discount: float = 1.0,
+    start_value: float = 0.0,
+) -> Agent[Any]:
+    return TDLambda(
+        rng,
+        env.action_space,
+        _followed(env, policy, discount),
+        trace_decay=trace_decay,
+        traces=traces,
+        step_size=step_size,
+        discount=discount,
+        start_value=start_value,
+    )
+
+
+def _mc_prediction(
+    rng: Rng,
+    env: Env[Any],
+    policy: str = "uniform",
+    first_visit: bool = True,
+    step_size: float | Schedule = 0.1,
+    discount: float = 1.0,
+    start_value: float = 0.0,
+) -> Agent[Any]:
+    return MonteCarloPrediction(
+        rng,
+        env.action_space,
+        _followed(env, policy, discount),
+        first_visit=first_visit,
+        step_size=step_size,
+        discount=discount,
+        start_value=start_value,
+    )
+
+
 def _policy_gradient(cls: type[Reinforce[Any]]) -> AgentBuilder:
     #: The entropy bonus here is 0.05 and the classes default to less. The
     #: registry is where a default is chosen by measurement rather than by the
@@ -583,6 +691,30 @@ AGENTS: Registry[Agent[Any]] = Registry(
             "Options, with every state an option passed through credited too.",
             _options(IntraOptionQ),
             tags=("tabular", "planning", "off-policy"),
+        ),
+        Entry(
+            "td",
+            "Estimates what a fixed policy is worth, one step at a time.",
+            _td,
+            tags=("tabular", "prediction", "on-policy"),
+        ),
+        Entry(
+            "n-step-td",
+            "Prediction that waits n steps before falling back on an estimate.",
+            _n_step_td,
+            tags=("tabular", "prediction", "on-policy"),
+        ),
+        Entry(
+            "td-lambda",
+            "Prediction with a trace on every state, which fades rather than stops.",
+            _td_lambda,
+            tags=("tabular", "prediction", "on-policy"),
+        ),
+        Entry(
+            "mc-prediction",
+            "Prediction that waits for the episode and uses the return itself.",
+            _mc_prediction,
+            tags=("tabular", "prediction", "on-policy"),
         ),
         Entry(
             "tile-sarsa",
