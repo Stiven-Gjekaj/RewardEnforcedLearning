@@ -19,6 +19,23 @@ questions. Everything here that has a number behind it says what was measured.
 
 ## Built since that table was written
 
+**A faster gradient engine that computes the same numbers.** Three changes,
+none of them clever: the lists an inner loop reads are pulled into locals in
+`linear` and in `Adam`, and an internal constructor skips the copy and the
+shape check that the public one owes a caller. A whole `reinforce` run goes
+from 0.142s to 0.131s, a 48 to 16 backward pass from 2.062s to 1.868s, and Adam
+from 5.359s to 4.289s. **Both digests are byte for byte the same before and
+after**, which is the only reason any of it is worth having: an optimisation
+that reassociates a sum is faster and gives different answers, and on a
+learning agent different answers look exactly like another seed.
+
+Three things about the measuring came out wrong first and are written down.
+A single timing of unchanged code moved by a tenth of a second depending on
+what had run before it. `cProfile` made the optimiser look like the place to
+work, and an eighteen percent saving there moved a whole run by nothing the
+whole-run timing could see, so the benchmark grew a line for it. And a slice
+that makes a wide layer faster makes a narrow one slower.
+
 **A comparison rather than two descriptions**, in `rel compare`. It printed two
 means and two standard errors, which describe two sets of numbers, and a reader
 takes a comparison from them anyway. It prints the paired difference, a 95%
