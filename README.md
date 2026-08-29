@@ -36,7 +36,7 @@ environments where the reward is not the point_
 **A reinforcement learning laboratory that runs in a terminal and needs
 nothing installed.**
 
-Fourteen environments, thirty agents, a gradient engine, a dynamic
+Fourteen environments, thirty one agents, a gradient engine, a dynamic
 programming solver that says what the best possible policy is worth, and a
 command line that draws a learning curve out of braille dots.
 
@@ -228,7 +228,9 @@ package: see [docs/grids.md](docs/grids.md).
 - **Off-policy.** Monte Carlo with ordinary and weighted importance sampling,
   and n-step tree backup, which asks the same question and never divides.
 - **Planning.** Dyna-Q, Dyna-Q+, and prioritised sweeping, which replays the
-  step that matters rather than a random one.
+  step that matters rather than a random one. Beside them a tree search that
+  plans at the moment of choosing instead, by running simulations from the
+  state it is standing in.
 - **Options.** Q-learning whose choices can last several steps, over hallway
   options read off the layout rather than written down, with and without
   credit for the states an option passed through.
@@ -319,12 +321,13 @@ an agent when it is fifty times too large.
 rel/core.py         the contract: what an environment is, what a step is
 rel/rng.py          PCG written out, with named independent streams
 rel/envs/           fourteen environments. Never import an agent.
-rel/agents/         thirty agents. Never import an environment.
+rel/agents/         thirty one agents. Never import an environment.
   dp.py             value iteration, policy iteration, exact policy values
   td.py             SARSA, Q-learning, Expected SARSA, Double Q, n-step
   tiles.py          tile coding, worked out exactly rather than hashed
   explore.py        how an agent picks an action from what it knows
   policy.py         REINFORCE and an actor critic
+  search.py         a tree search that plans at the moment of choosing
   value_network.py  Q-learning over a network, with replay and a target
 rel/options.py      an action that lasts several steps, built from a model
 rel/pressure.py     following a fixed policy with a dial on how hard it tries
@@ -418,7 +421,7 @@ what it was for.
 
 ## Status
 
-Alpha, and complete enough to be useful. Fourteen environments and thirty
+Alpha, and complete enough to be useful. Fourteen environments and thirty one
 agents, all of them covered by a suite that runs in about eight minutes with no
 browser, no display and no network.
 

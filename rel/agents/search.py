@@ -22,6 +22,19 @@ root. The most visits rather than the best mean: a mean over three samples is
 high by luck often enough to matter, and the count is what the descent has
 already agreed with.
 
+## A simulation that runs out of depth is worth what it collected
+
+There is no estimate of the rest. That is the honest thing to do with no value
+function to ask, and it is also the whole weakness of this agent. On a grid
+where every step pays -1 and the discount is one, a simulation that stops at
+the depth limit is worth exactly minus the depth wherever it went, so the only
+thing that can separate two branches is reaching an ending. A random rollout of
+thirty steps reaches an ending on none of two hundred tries on the cliff walk
+and none on the Dyna maze, which `tests/test_search.py` measures.
+
+What makes the search work on the maze anyway is the tree, not the rollout: it
+keeps what the real steps found, and `reuse` turns that off.
+
 ## The tree is keyed by state, so it is a graph
 
 Textbook tree search gives each path its own node. Here a state reached two
