@@ -94,6 +94,54 @@ class PolicyNetwork:
         )
 
 
+class QNetwork:
+    """Observation in, one number for each action out.
+
+    The same shape as `PolicyNetwork` without the softmax on the end. A policy
+    needs numbers that add up to one and a value does not: an action is worth
+    what it is worth, and squashing the four of them onto a simplex would throw
+    that away.
+
+    `copy_from` is here for the target network. Learning towards a target that
+    moves with every step is the instability a value network is known for, and
+    the standard answer is a second copy of the weights that is refreshed now
+    and then rather than continuously.
+    """
+
+    __slots__ = ("first", "hidden", "second")
+
+    def __init__(self, rng: Rng, inputs: int, actions: int, hidden: int = 16) -> None:
+        self.hidden = hidden
+        self.first = Linear(rng, inputs, hidden)
+        # A small last layer, so every action starts worth about the same and
+        # the agent has no opinion to be talked out of.
+        self.second = Linear(rng, hidden, actions, gain=0.1)
+
+    def __call__(self, observation: Sequence[float]) -> Tensor:
+        x = Tensor(observation)
+        return self.second(relu(self.first(x)))
+
+    def values(self, observation: Sequence[float]) -> list[float]:
+        return list(self(observation).data)
+
+    def parameters(self) -> list[Tensor]:
+        return self.first.parameters() + self.second.parameters()
+
+    def copy_from(self, other: QNetwork) -> None:
+        """Take every weight from another network of the same shape."""
+        for mine, theirs in zip(self.parameters(), other.parameters(), strict=True):
+            if mine.shape != theirs.shape:
+                raise ValueError(
+                    f"A network of {mine.shape} cannot copy one of {theirs.shape}."
+                )
+            mine.data[:] = theirs.data
+
+    def __repr__(self) -> str:
+        return (
+            f"QNetwork({self.first.inputs} -> {self.hidden} -> {self.second.outputs})"
+        )
+
+
 class ValueNetwork:
     """Observation in, one number out. The baseline of a policy gradient."""
 
@@ -115,4 +163,4 @@ class ValueNetwork:
         return f"ValueNetwork({self.first.inputs} -> {self.hidden} -> 1)"
 
 
-__all__ = ["Linear", "PolicyNetwork", "ValueNetwork"]
+__all__ = ["Linear", "PolicyNetwork", "QNetwork", "ValueNetwork"]

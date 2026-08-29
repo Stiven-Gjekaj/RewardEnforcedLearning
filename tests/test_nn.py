@@ -6,8 +6,8 @@ import math
 
 import pytest
 
-from rel.nn.autograd import Tensor
-from rel.nn.layers import Linear, PolicyNetwork, ValueNetwork
+from rel.nn.autograd import Tensor, select
+from rel.nn.layers import Linear, PolicyNetwork, QNetwork, ValueNetwork
 from rel.nn.optim import SGD, Adam, gradient_length
 from rel.rng import Rng
 
@@ -215,3 +215,52 @@ def test_a_network_learns_a_function() -> None:
             right += 1
 
     assert right > 180, f"{right} of 200"
+
+
+class TestQNetwork:
+    def test_it_gives_one_number_for_each_action(self) -> None:
+        net = QNetwork(Rng(1), 4, 3)
+        assert len(net.values([0.1, 0.2, 0.3, 0.4])) == 3
+
+    def test_the_numbers_do_not_add_up_to_one(self) -> None:
+        # A policy needs numbers on a simplex and a value does not. An action
+        # is worth what it is worth, and squashing them would throw that away.
+        net = QNetwork(Rng(1), 4, 3)
+        net.second.bias.data[:] = [1.0, 2.0, 3.0]
+        assert sum(net.values([0.0, 0.0, 0.0, 0.0])) == pytest.approx(6.0)
+
+    def test_every_action_starts_worth_about_the_same(self) -> None:
+        # A network that starts with an opinion explores nothing and takes a
+        # long time to be talked out of it.
+        net = QNetwork(Rng(1), 4, 4)
+        spread = max(net.values([0.5, -0.5, 0.5, -0.5])) - min(
+            net.values([0.5, -0.5, 0.5, -0.5])
+        )
+        assert spread < 0.1
+
+    def test_copying_takes_every_weight(self) -> None:
+        one = QNetwork(Rng(1), 3, 2)
+        other = QNetwork(Rng(2), 3, 2)
+        assert other.values([1.0, 0.0, 0.0]) != one.values([1.0, 0.0, 0.0])
+
+        other.copy_from(one)
+        assert other.values([1.0, 0.0, 0.0]) == one.values([1.0, 0.0, 0.0])
+
+    def test_the_copy_does_not_share_its_weights(self) -> None:
+        # A target network that moved with the live one would be the live one,
+        # and there would be nothing to refresh.
+        one = QNetwork(Rng(1), 3, 2)
+        other = QNetwork(Rng(2), 3, 2)
+        other.copy_from(one)
+
+        one.second.bias.data[0] += 5.0
+        assert other.values([1.0, 0.0, 0.0]) != one.values([1.0, 0.0, 0.0])
+
+    def test_copying_a_network_of_another_shape_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="cannot copy"):
+            QNetwork(Rng(1), 3, 2).copy_from(QNetwork(Rng(1), 4, 2))
+
+    def test_a_gradient_reaches_every_weight(self) -> None:
+        net = QNetwork(Rng(1), 3, 2)
+        select(net([1.0, -1.0, 0.5]), 1).backward()
+        assert any(any(value != 0.0 for value in p.grad) for p in net.parameters())
