@@ -15,11 +15,23 @@ questions. Everything here that has a number behind it says what was measured.
 | --- | --- | --- |
 | Replay and a target network | The two pieces that make a value network stable | Needs a network over Q rather than over a policy, and the honest version needs more compute than pure Python has |
 | Continuous actions | Half of control, and everything about robotics | The whole action interface here is `Discrete`. This is a large change and it should be a large change |
-| Intra-option learning | Credit for every state an option passed through, not only the one it started in | The measurement that would justify it is in [algorithms.md](algorithms.md#an-action-that-lasts-several-steps): plain options cost 2.57 return on four rooms, and this is the standard answer to why |
 
 ---
 
 ## Built since that table was written
+
+**Intra-option learning**, as `intra-option-q`. One real step is evidence about
+every option that would have taken that action there, so the states an option
+passes through are credited for it rather than only the state it started in.
+
+It was built to test a reading rather than to improve a number. The algorithms
+page reads the cost of having options as the price of exploring, on the
+evidence of an exploration ladder, and that reading predicts that fixing the
+credit assignment moves the early episodes and leaves the late ones alone. It
+does: 15% shorter episodes in the first hundred, 24% in the second, within
+noise by the fourth, and 0.54 recovered of the 2.02 that having the options
+costs at all. Two independent measurements now say the cost is the commitment
+and not the credit.
 
 **Prioritised sweeping**, as `prioritised-sweeping`. It needs a median of 880
 updates to solve the Dyna maze where `dyna-q` needs 8520, and its worst seed

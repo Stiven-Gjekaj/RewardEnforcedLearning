@@ -649,6 +649,60 @@ commitment is worth what it saves minus what it costs to be wrong about. Here
 there is nothing to save: the value of a cell is already carried back one cell
 per step by every reward, and the doorways are not where the agent wants to be.
 
+### Crediting the states an option passed through
+
+```console
+$ rel train intra-option-q --env rooms
+$ python scripts/measure_intra_option.py --episodes 800 --block 100
+```
+
+`options-q` waits for an option to stop and credits the state it started in.
+Three steps inside one option move one cell, and the two states it passed
+through learn nothing about it. That is the usual complaint about the method,
+and intra-option learning is the usual answer: one real step is evidence about
+every option that would have taken that action there, so every one of them is
+updated whether or not it was the one running.
+
+The section above reads the cost of having options as the price of exploring,
+and it reads it off a ladder rather than off a mechanism. That reading makes a
+prediction. If the cost is the exploring, then fixing the credit assignment
+will move the early episodes and leave the late ones roughly alone.
+
+| agent | 1-100 | 101-200 | 201-300 | 301-400 | 701-800 | updates/step | last 100 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| options-q | 123.9 | 41.2 | 30.5 | 26.0 | 24.5 | 0.78 | -24.50 |
+| intra-option-q | **105.3** | **31.2** | **25.8** | 25.1 | **24.0** | 1.64 | **-23.96** |
+| options-q, no options | 95.4 | 28.6 | 22.9 | 22.7 | 22.5 | 1.00 | -22.48 |
+| intra-option-q, no options | 95.4 | 28.6 | 22.9 | 22.7 | 22.5 | 1.00 | -22.48 |
+
+*Four rooms, ten seeds, 800 episodes. The numbered columns are the mean
+episode length over that block. `updates/step` is how many times the learning
+rule was applied to a cell for each step taken.*
+
+**The prediction holds.** Intra-option learning is 15% shorter in the first
+hundred episodes and 24% shorter in the second, and by the fourth block the two
+are within noise of each other. It recovers 0.54 of the 2.02 that having the
+options costs at all, and it does that work early.
+
+So two independent measurements now say the same thing. The ladder says the
+cost scales with epsilon, and fixing the credit assignment leaves most of it
+standing. **The cost of an option here is the cost of committing to it while
+exploring, and not the cost of learning about it slowly.**
+
+What it buys is not free: 1.64 applications of the learning rule for every step
+taken, against 0.78. Slightly over twice the work for a quarter of the gap.
+
+### The last two rows are the collapse
+
+A primitive option stops after every step, so what it is worth from where it
+landed is the best value there, and the rule is Q-learning exactly. Both agents
+holding only those are the same agent, and the table says so in every column
+of every block: 95.4, 28.6, 22.9, 22.7, 22.5, and -22.48 on the last hundred.
+
+That is a stronger check than the unit test beside it. The test feeds three
+transitions and compares two tables. This runs eight thousand episodes on ten
+seeds and gets the same number to two decimal places.
+
 ### The picture is not the policy
 
 There is a second thing here, and it is about measurement rather than about
@@ -1148,6 +1202,7 @@ it off.
 | Ordered replay against uniform | `python scripts/measure_sweeping.py --episodes 400` |
 | The seed that gets lost | `python scripts/measure_lost_seed.py --ladder-all` |
 | What an option costs | `python scripts/measure_options.py --runs 20` |
+| What crediting the middle buys | `python scripts/measure_intra_option.py --episodes 800 --block 100` |
 | Any one or two settings | `rel sweep <agent> --env <env> --over name=a,b,c` |
 | Specification gaming | `rel gaming` |
 | One run in detail | `rel train q-learning --env cliff --seed 7` |
