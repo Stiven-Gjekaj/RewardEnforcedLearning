@@ -19,6 +19,27 @@ questions. Everything here that has a number behind it says what was measured.
 
 ## Built since that table was written
 
+**Exploring by something other than chance.** `explore` is a setting on every
+tabular agent, and three rules answer it: epsilon-greedy, softmax, and a
+count-based bonus. Optimistic initialisation is the fourth way and it is a
+starting value rather than a rule.
+
+The finding is one sentence. **The dial of a rule cannot help find a first
+reward, and only what the rule ranks by can.** Before anything pays, every
+value in the table is the starting number, so a rule that ranks by value ranks
+a row of equal numbers. The digest says it exactly rather than approximately:
+on the corridor, epsilon 0.1, 0.5 and 0.9 walk one path, softmax at two
+temperatures a hundredfold apart walks another, and the count bonus at three
+confidences walks a third.
+
+Measuring it needed a grid to measure it on. Every grid this project had can be
+solved by an agent that wanders, so all four ways read the same on all of them.
+The corridor is one folded path forty seven steps long where nothing pays until
+the end, and there the median run first reaches the goal on episode 18, 21, 6
+and 1. All four end with the optimal policy, and what differs is the seventeen
+thousand five hundred steps epsilon-greedy spent before there was anything to
+learn from.
+
 **A value network**, as `deep-q`, with a replay buffer and a target network as
 two settings of one agent rather than two agents. The ablation is the point,
 and it reads differently on two environments. On the cart pole neither piece
