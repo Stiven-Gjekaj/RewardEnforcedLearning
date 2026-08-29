@@ -86,6 +86,8 @@ class OptionsQ(TabularAgent[int]):
         #: the long options or only the primitive ones.
         self.finished = 0
         self.steps_in_options = 0
+        #: How many times the learning rule has been applied to a cell.
+        self.updates = 0
         #: How many of those choices were an option that lasts. A measurement
         #: that wants to know what the abstraction cost needs this and cannot
         #: get it from the mean length alone, because a run that never chose a
@@ -192,11 +194,23 @@ class OptionsQ(TabularAgent[int]):
         self.collected += self.discount**self.length * transition.reward
         self.length += 1
 
+        self._learn_from_step(transition)
+
         if transition.done or option.stops_at(transition.next_observation):
             self._learn(transition)
             self.running = None
 
+    def _learn_from_step(self, transition: Transition[int]) -> None:
+        """Learn from the step just taken, before knowing where it leads.
+
+        Nothing here. This agent waits for the option to stop and credits the
+        state it started in, which is one update for however many steps the
+        option ran. `IntraOptionQ` fills this in, and that is the whole
+        difference between the two.
+        """
+
     def _learn(self, transition: Transition[int]) -> None:
+        """Learn from the option that has just stopped."""
         assert self.running is not None
 
         # A cut off episode is not a finished one. The state the option was
@@ -209,9 +223,19 @@ class OptionsQ(TabularAgent[int]):
 
         row = self.values(self.began_at)
         row[self.running] += self.current_step_size() * (target - row[self.running])
+        self._bump()
 
         self.finished += 1
         self.steps_in_options += self.length
+
+    def _bump(self) -> None:
+        """One more application of the learning rule to one cell.
+
+        Counted rather than worked out from the episodes, because the two
+        agents here make a different number of them per step and that
+        difference is what the comparison between them is about.
+        """
+        self.updates += 1
 
     def end_episode(self) -> None:
         super().end_episode()

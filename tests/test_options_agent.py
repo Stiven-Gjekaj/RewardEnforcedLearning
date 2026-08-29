@@ -325,3 +325,22 @@ class TestSayingWhatTheChoiceIs:
     def test_an_agent_that_only_takes_actions_never_says_so(self) -> None:
         agent = an_agent()
         assert not any(agent.choice_lasts(state) for state in STATES)
+
+
+class TestCountingTheUpdates:
+    def test_an_option_that_ran_three_steps_is_one_update(self) -> None:
+        # This is the cost the whole track is about. Three steps of experience
+        # move one cell, and the two states passed through get nothing.
+        agent = an_agent(CORRIDOR, discount=0.5)
+        agent.values(0)[4] = 1.0
+        for state, landed in ((0, 1), (1, 2), (2, 3)):
+            agent.act(state)
+            agent.observe(go(state, 1, 1.0, landed))
+        assert agent.updates == 1
+
+    def test_a_primitive_option_is_one_update_a_step(self) -> None:
+        agent = an_agent()
+        for state in (0, 1, 2):
+            agent.act(state)
+            agent.observe(go(state, 1, 0.0, state + 1))
+        assert agent.updates == 3
