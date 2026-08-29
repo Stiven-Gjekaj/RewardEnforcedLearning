@@ -844,9 +844,31 @@ about fourteen steps away and a random walk does not go in a straight line.
 So the tail of a simulation is nearly always the same number, and on the cliff
 walk it is exactly the same number: every step there pays -1 and the discount
 is one, so a rollout that stops at the depth limit is worth minus the depth
-wherever it went. Nothing separates two branches, the agent wanders, and the
-episode runs to the step limit. That is why the test suite runs this agent on
-the maze rather than on the cliff walk.
+wherever it went. Nothing separates two branches.
+
+```console
+$ python scripts/measure_search.py --env cliff --episodes 10 --runs 3 \
+    --only "mcts 50,dyna-q 5,prioritised-sweeping"
+```
+
+| agent | settled | policy found | stuck | model steps | time |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `mcts`, 50 simulations | **500** | - | 3 of 3 | **15,000,000** | 324s |
+| `dyna-q`, 5 planning steps | 56 | - | 3 of 3 | 2,815 | 0s |
+| `prioritised-sweeping` | 44 | **-13.00** | | 2,201 | 0s |
+
+*The cliff walk, three seeds, ten episodes. The shortest route is 13 steps and
+the step limit is 500.*
+
+**Every episode of every seed runs to the step limit.** The search never
+reaches the goal at all, and it spends fifteen million model steps not reaching
+it. Ten episodes is too few for `dyna-q` to have finished either, which is why
+its policy column is empty as well, but it is walking 56 steps where the search
+is walking 500.
+
+That is why the test suite runs this agent on the maze rather than on the cliff
+walk: not to be kind to it, but because there is nothing to test in a run that
+cannot start.
 
 ### Where it is weak
 
