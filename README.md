@@ -196,7 +196,7 @@ the path digest rather than trusting it.
 - **Bandits.** The ten armed testbed, and a version where every lever wanders.
 - **Grids.** The cliff walk, the windy grid, four rooms, the Dyna maze and the
   frozen lake, all written as pictures of themselves.
-- **A corridor.** One folded path forty seven steps long where nothing pays
+- **A corridor.** One folded path forty eight steps long where nothing pays
   until the end, so an agent that has learned nothing does not arrive. It is
   here because every other grid can be solved by wandering, which makes them
   useless for comparing ways of exploring.

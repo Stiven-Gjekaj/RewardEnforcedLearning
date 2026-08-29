@@ -407,14 +407,14 @@ how much exploring each is still doing at the end: epsilon-greedy is still
 taking a random action one step in ten and the other three have stopped.
 
 That is not a result about exploring. It is a result about these grids. The
-goal of the cliff walk is thirteen steps from the start and so is the goal of
-the Dyna maze, so an agent that has learned nothing arrives anyway and there is
-nothing for a better rule to be better at.
+goal of the cliff walk is thirteen steps from the start and the goal of the
+Dyna maze is fourteen, so an agent that has learned nothing arrives anyway and
+there is nothing for a better rule to be better at.
 
 ### The corridor was built to have something to be better at
 
 One folded path, nine by nine, no branch anywhere in it. The route is forty
-seven steps and nothing pays until the end of it. A random policy covers a line
+eight steps and nothing pays until the end of it. A random policy covers a line
 of length n in about n squared steps, so an agent that has learned nothing
 spends a whole episode not finding out that there is anything to find.
 
@@ -426,7 +426,9 @@ spends a whole episode not finding out that there is anything to find.
 | optimism 1 | **1** | **0** | 48 | 0.0897 | 2s |
 
 *Ten seeds, three hundred episodes, discount 0.95. The best possible return
-from the start is 0.0897, which is 0.95 raised to the forty seven.*
+from the start is 0.0897, which is 0.95 raised to the forty seventh: the reward
+arrives on the forty eighth step and is discounted once for every step before
+it.*
 
 The episode each seed first reached the goal on:
 
@@ -490,7 +492,7 @@ ways.
 
 The dials do their work afterwards, once the values are real, and what they
 decide is how much exploring carries on. That is the settled column: 48, 49 and
-77 steps at a confidence of 0.1, 0.5 and 2, against a route that is 47.
+77 steps at a confidence of 0.1, 0.5 and 2, against a route that is 48.
 
 ### What the alternatives cost
 

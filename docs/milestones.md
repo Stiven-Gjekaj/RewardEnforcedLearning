@@ -34,7 +34,7 @@ confidences walks a third.
 
 Measuring it needed a grid to measure it on. Every grid this project had can be
 solved by an agent that wanders, so all four ways read the same on all of them.
-The corridor is one folded path forty seven steps long where nothing pays until
+The corridor is one folded path forty eight steps long where nothing pays until
 the end, and there the median run first reaches the goal on episode 18, 21, 6
 and 1. All four end with the optimal policy, and what differs is the seventeen
 thousand five hundred steps epsilon-greedy spent before there was anything to

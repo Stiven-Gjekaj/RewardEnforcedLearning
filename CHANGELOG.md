@@ -33,7 +33,7 @@ Everything below is new.
 
 **Environments**
 
-- **A corridor**, one folded path forty seven steps long with no branch
+- **A corridor**, one folded path forty eight steps long with no branch
   anywhere in it and nothing paid until the goal. It exists because every other
   grid here can be solved by an agent that wanders, so all four ways of
   exploring read the same on all of them. A random policy covers a line of
