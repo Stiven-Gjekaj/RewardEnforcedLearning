@@ -47,6 +47,7 @@ from rel.agents.bandit import (
     UpperConfidenceBandit,
 )
 from rel.agents.base import Agent, RandomAgent, TabularAgent, Transition
+from rel.agents.basis import RadialBasis
 from rel.agents.dp import FixedPolicyAgent, value_iteration
 from rel.agents.dyna import DynaQ, DynaQPlus
 from rel.agents.explore import as_rule
@@ -660,6 +661,38 @@ def _linear(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder:
     return build
 
 
+def _radial(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder:
+    def build(
+        rng: Rng,
+        env: Env[Any],
+        bins: int = 6,
+        width: float = 1.0,
+        kept: int | None = None,
+        step_size: float | Schedule = 0.5,
+        discount: float = 1.0,
+        epsilon: float | Schedule = 0.05,
+        optimism: float = 0.0,
+    ) -> Agent[Any]:
+        box = getattr(env, "tiling_space", env.observation_space)
+        if not isinstance(box, Box):
+            raise TypeError(
+                f"{env.spec.name} has a {type(box).__name__} observation, and "
+                f"a radial basis divides a Box. This agent needs an "
+                f"environment tagged 'continuous'."
+            )
+        return cls(
+            rng,
+            env.action_space,
+            RadialBasis(box, bins=bins, width=width, kept=kept),
+            step_size=step_size,
+            discount=discount,
+            epsilon=epsilon,
+            optimism=optimism,
+        )
+
+    return build
+
+
 def _epsilon_greedy_bandit(
     rng: Rng,
     env: Env[Any],
@@ -845,6 +878,18 @@ AGENTS: Registry[Agent[Any]] = Registry(
             "tile-q",
             "Q-learning over a tile coder.",
             _linear(SemiGradientQ),
+            tags=("linear", "off-policy"),
+        ),
+        Entry(
+            "rbf-sarsa",
+            "SARSA over radial basis features, which have no boundaries.",
+            _radial(SemiGradientSarsa),
+            tags=("linear", "on-policy"),
+        ),
+        Entry(
+            "rbf-q",
+            "Q-learning over radial basis features.",
+            _radial(SemiGradientQ),
             tags=("linear", "off-policy"),
         ),
         Entry(

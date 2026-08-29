@@ -188,6 +188,11 @@ class TestWhenAnAgentDoesNotFit:
         with pytest.raises(TypeError, match="tile coder divides a Box"):
             AGENTS.make("tile-sarsa", Rng(1).stream("agent"), env)
 
+    def test_a_radial_basis_says_so_on_a_table_of_states(self) -> None:
+        env = ENVIRONMENTS.make("cliff", Rng(1).stream("env"))
+        with pytest.raises(TypeError, match="radial basis divides a Box"):
+            AGENTS.make("rbf-sarsa", Rng(1).stream("agent"), env)
+
     def test_a_setting_that_does_not_exist_is_named(self) -> None:
         env = ENVIRONMENTS.make("cliff", Rng(1).stream("env"))
         with pytest.raises(TypeError, match="no setting named 'wobble'"):

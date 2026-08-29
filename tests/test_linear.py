@@ -292,3 +292,54 @@ class TestTheCoderIsInterchangeable:
         agent.observe(ends(0.3, 0, 4.0, 0.9))
         after = agent.action_values((0.3,))[0]
         assert after - before == pytest.approx(0.25 * (4.0 - before))
+
+
+class TestTheRegistryEntries:
+    """`rbf-sarsa` and `rbf-q`, beside `tile-sarsa` and `tile-q`.
+
+    Added rather than swapped in. Renaming the tile entries would break every
+    documented command in this project, and the point of the exercise is to
+    have both to compare.
+    """
+
+    def test_both_are_registered_and_tagged_like_their_neighbours(self) -> None:
+        for name, expected in (("rbf-sarsa", "on-policy"), ("rbf-q", "off-policy")):
+            entry = AGENTS[name]
+            assert set(entry.tags) == {"linear", expected}
+
+    def test_they_build_a_radial_basis_over_the_tiling_space(self) -> None:
+        # The mountain car reports a velocity that can leave its own bounds by
+        # a hair, so it offers a wider box for an encoder to divide. Reading
+        # the observation space instead would clip those points together.
+        env = ENVIRONMENTS.make("mountaincar", Rng(1).stream("env"))
+        agent = AGENTS.make("rbf-sarsa", Rng(1).stream("agent"), env)
+        assert isinstance(agent.coder, RadialBasis)
+        assert agent.coder.box is env.tiling_space
+
+    def test_the_default_keeps_every_centre(self) -> None:
+        # The encoder's default, carried through rather than overridden. An
+        # agent that dropped features by default would have the boundary the
+        # encoder exists to avoid, and would not say so anywhere.
+        env = ENVIRONMENTS.make("mountaincar", Rng(1).stream("env"))
+        agent = AGENTS.make("rbf-sarsa", Rng(1).stream("agent"), env)
+        assert agent.coder.kept is None
+
+    def test_the_settings_can_be_reached_from_the_command_line(self) -> None:
+        env = ENVIRONMENTS.make("mountaincar", Rng(1).stream("env"))
+        agent = AGENTS.make(
+            "rbf-q", Rng(1).stream("agent"), env, bins=4, width=2.0, kept=3
+        )
+        assert (agent.coder.bins, agent.coder.width, agent.coder.kept) == (4, 2.0, 3)
+
+    def test_the_mountain_car_gets_out_over_a_radial_basis(self) -> None:
+        # The same bar `tile-sarsa` clears in `TestItReallyLearns`, on the
+        # environment both are documented against.
+        root = Rng(4)
+        env = ENVIRONMENTS.make("mountaincar", root.stream("env"))
+        agent = AGENTS.make("rbf-sarsa", root.stream("agent"), env)
+        train(env, agent, 60, discount=env.spec.suggested_discount)
+
+        watched = evaluate(
+            ENVIRONMENTS.make("mountaincar", Rng(12).stream("env")), agent, 10
+        )
+        assert watched.final() > -400.0
