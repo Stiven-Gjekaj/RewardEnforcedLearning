@@ -39,6 +39,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from rel.agents.average import DifferentialQ
 from rel.agents.bandit import (
     EpsilonGreedyBandit,
     GradientBandit,
@@ -504,6 +505,29 @@ def _mc_prediction(
     )
 
 
+def _differential_q(
+    rng: Rng,
+    env: Env[Any],
+    step_size: float | Schedule = 0.1,
+    average_step: float = 0.1,
+    epsilon: float | Schedule = 0.1,
+    optimism: float = 0.0,
+    explore: str = "epsilon-greedy",
+) -> Agent[Any]:
+    #: No discount setting, and that is the whole point of the agent. It
+    #: subtracts the rate it is collecting instead, so there is no number here
+    #: to get wrong.
+    return DifferentialQ(
+        rng,
+        env.action_space,
+        step_size=step_size,
+        average_step=average_step,
+        epsilon=epsilon,
+        optimism=optimism,
+        explore=as_rule(explore, epsilon),
+    )
+
+
 def _tree_search(
     rng: Rng,
     env: Env[Any],
@@ -762,6 +786,12 @@ AGENTS: Registry[Agent[Any]] = Registry(
             "Dyna that replays the step that matters rather than a random one.",
             _sweeping,
             tags=("tabular", "planning", "off-policy"),
+        ),
+        Entry(
+            "differential-q",
+            "Q-learning with no discount, which subtracts the rate it collects.",
+            _differential_q,
+            tags=("tabular", "off-policy", "average-reward"),
         ),
         Entry(
             "mcts",

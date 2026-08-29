@@ -21,6 +21,7 @@ from rel.training import evaluate, train
 NAMES = AGENTS.names()
 KNOWN_TAGS = frozenset(
     {
+        "average-reward",
         "bandit",
         "baseline",
         "linear",
