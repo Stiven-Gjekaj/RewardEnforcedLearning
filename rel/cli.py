@@ -244,6 +244,22 @@ def report_lines(
             )
         )
 
+    error = prediction_error(env, agent)
+    if error is not None:
+        lines.append("")
+        lines.extend(
+            pairs(
+                [
+                    (
+                        "error against the true values",
+                        f"{error:.4f}   (root mean square, over the states it "
+                        f"can be in)",
+                    )
+                ],
+                palette,
+            )
+        )
+
     # Two digests, because they answer two questions. The path says whether
     # two runs did the same thing, and it is what every number in the
     # documentation was compared against. What it learned says whether two
@@ -257,6 +273,26 @@ def report_lines(
     lines.append("")
     lines.extend(pairs(digests, palette))
     return lines
+
+
+def prediction_error(env: Env[Any], agent: Agent[Any]) -> float | None:
+    """How far this agent's values are from the real ones, if both exist.
+
+    Almost nothing can answer this. It needs an environment that knows what
+    its states are really worth, which here is the random walk alone, and an
+    agent that keeps a number for a state, which is the predictors.
+
+    Asked of the environment rather than checked against its type, for the
+    reason `_doorways` in `rel/agents/__init__.py` gives: this file may read an
+    environment and it may not know which ones exist.
+    """
+    describe = getattr(env, "values_to_score", None)
+    score = getattr(agent, "error_against", None)
+    if not callable(describe) or not callable(score):
+        return None
+
+    error: float = score(describe())
+    return error
 
 
 def grid_pictures(

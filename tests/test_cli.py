@@ -1033,3 +1033,65 @@ class TestBothDigests:
             ]
         )
         assert capsys.readouterr().out.strip() == "0de6831e401c7ddd"
+
+
+class TestTheErrorAgainstTheTrueValues:
+    def test_a_predictor_on_the_walk_reports_it(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert (
+            main(
+                [
+                    "train",
+                    "td",
+                    "--env",
+                    "walk",
+                    "--episodes",
+                    "200",
+                    "--set",
+                    "start_value=0.5",
+                    "--quiet",
+                    "--no-colour",
+                ]
+            )
+            == 0
+        )
+        assert "error against the true values" in capsys.readouterr().out
+
+    def test_an_agent_that_controls_does_not(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # It keeps a number for an action rather than for a state, so there
+        # is nothing to compare.
+        main(
+            [
+                "train",
+                "q-learning",
+                "--env",
+                "walk",
+                "--episodes",
+                "50",
+                "--quiet",
+                "--no-colour",
+            ]
+        )
+        assert "error against the true values" not in capsys.readouterr().out
+
+    def test_an_environment_that_cannot_say_does_not(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        main(
+            [
+                "train",
+                "td",
+                "--env",
+                "cliff",
+                "--episodes",
+                "20",
+                "--set",
+                "policy=optimal",
+                "--quiet",
+                "--no-colour",
+            ]
+        )
+        assert "error against the true values" not in capsys.readouterr().out
