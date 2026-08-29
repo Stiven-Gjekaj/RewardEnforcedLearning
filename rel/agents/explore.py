@@ -32,6 +32,7 @@ same policy.
 
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
@@ -174,10 +175,81 @@ class EpsilonGreedy(Rule):
         return f"EpsilonGreedy(epsilon={self.epsilon(0):g})"
 
 
+class Softmax(Rule):
+    """Every action, with a probability that rises with what it is worth.
+
+    Epsilon-greedy explores by ignoring what the agent knows, so the second
+    best action and the worst one are equally likely to be the one it tries.
+    This ranks them instead. An action worth a little less than the best comes
+    up often and one worth far less comes up rarely.
+
+    The dial is the temperature. A high one flattens the ordering towards
+    uniform and a low one sharpens it towards greedy. It can be a schedule, and
+    cooling is the usual way to use it.
+
+    ## The temperature is in the units of the value
+
+    This is the weakness of the rule and it is not a small one. Epsilon means
+    the same thing on every problem: it is a probability. A temperature does
+    not. It divides a difference between two values, so what counts as hot
+    depends on how far apart the values of that environment are.
+
+    On the cliff walk the values run to about -100 and neighbouring actions
+    differ by ones, so a temperature of one already follows the ordering
+    closely and a temperature of 0.1 is greedy in all but name. On a grid where
+    every reward is 0 or 1 the same two numbers are almost uniform. A setting
+    carried from one environment to another is not the same setting.
+    """
+
+    __slots__ = ("temperature",)
+
+    def __init__(self, temperature: float | Schedule = 1.0) -> None:
+        self.temperature = as_schedule(temperature)
+
+    def choose(
+        self,
+        rng: Rng,
+        scores: Sequence[float],
+        counts: Counts,
+        episodes: int,
+        steps: int,
+    ) -> int:
+        shares = self.probabilities(scores, counts, episodes, steps)
+        return rng.weighted_index(shares)
+
+    def probabilities(
+        self,
+        scores: Sequence[float],
+        counts: Counts,
+        episodes: int,
+        steps: int,
+    ) -> list[float]:
+        temperature = self.temperature(episodes)
+        if temperature < 0.0:
+            raise ValueError("A temperature is zero or above.")
+        if temperature == 0.0:
+            # The limit rather than a division by zero. A schedule that cools
+            # to nothing should end greedy, not raise on its last episode.
+            return greedy_probabilities(scores)
+
+        # Every exponent is zero or below, so nothing here can overflow. The
+        # far ends underflow to zero instead, which is the right answer: an
+        # action worth forty less at a temperature of one is not going to be
+        # taken.
+        best = max(scores)
+        weights = [math.exp((score - best) / temperature) for score in scores]
+        total = sum(weights)
+        return [weight / total for weight in weights]
+
+    def __repr__(self) -> str:
+        return f"Softmax(temperature={self.temperature(0):g})"
+
+
 __all__ = [
     "Counts",
     "EpsilonGreedy",
     "Rule",
+    "Softmax",
     "argmax",
     "greedy_probabilities",
 ]

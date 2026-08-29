@@ -22,6 +22,7 @@ from rel.agents.explore import (
     Counts,
     EpsilonGreedy,
     Rule,
+    Softmax,
     argmax,
     greedy_probabilities,
 )
@@ -136,6 +137,75 @@ class TestEpsilonGreedy:
 
     def test_it_says_what_it_is(self) -> None:
         assert "0.1" in repr(EpsilonGreedy(0.1))
+
+
+class TestSoftmax:
+    def test_it_adds_up_to_one(self) -> None:
+        rule = Softmax(1.0)
+        assert sum(rule.probabilities([1.0, 2.0, 3.0], None, 0, 0)) == pytest.approx(
+            1.0
+        )
+
+    def test_a_better_action_is_more_likely(self) -> None:
+        shares = Softmax(1.0).probabilities([0.0, 1.0, 2.0], None, 0, 0)
+        assert shares[0] < shares[1] < shares[2]
+
+    def test_equal_actions_are_equally_likely(self) -> None:
+        shares = Softmax(1.0).probabilities([4.0, 4.0], None, 0, 0)
+        assert shares == pytest.approx([0.5, 0.5])
+
+    def test_a_hot_temperature_is_near_uniform(self) -> None:
+        shares = Softmax(1000.0).probabilities([0.0, 1.0, 2.0], None, 0, 0)
+        assert shares == pytest.approx([1 / 3, 1 / 3, 1 / 3], abs=0.01)
+
+    def test_a_cold_temperature_is_near_greedy(self) -> None:
+        shares = Softmax(0.01).probabilities([0.0, 1.0, 2.0], None, 0, 0)
+        assert shares == pytest.approx([0.0, 0.0, 1.0], abs=1e-6)
+
+    def test_zero_is_greedy_rather_than_a_division_by_zero(self) -> None:
+        """A schedule that cools to nothing has to survive its last episode."""
+        shares = Softmax(0.0).probabilities([0.0, 1.0, 2.0], None, 0, 0)
+        assert shares == [0.0, 0.0, 1.0]
+
+    def test_below_zero_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="zero or above"):
+            Softmax(-1.0).probabilities([0.0, 1.0], None, 0, 0)
+
+    def test_far_apart_values_do_not_overflow(self) -> None:
+        """The exponents are all zero or below, so nothing can run away."""
+        shares = Softmax(0.5).probabilities([-1000.0, 1000.0], None, 0, 0)
+        assert shares == pytest.approx([0.0, 1.0])
+
+    def test_the_schedule_is_read_at_the_episode(self) -> None:
+        rule = Softmax(linear(100.0, 0.01, 10))
+        hot = rule.probabilities([0.0, 1.0], None, 0, 0)
+        cold = rule.probabilities([0.0, 1.0], None, 10, 0)
+        assert hot[1] < cold[1]
+
+    def test_choosing_matches_the_probabilities(self) -> None:
+        rule = Softmax(1.0)
+        rng = Rng(11)
+        scores = [0.0, 1.0, 2.0]
+
+        picks = [rule.choose(rng, scores, None, 0, 0) for _ in range(20000)]
+        for index, share in enumerate(rule.probabilities(scores, None, 0, 0)):
+            assert picks.count(index) / 20000 == pytest.approx(share, abs=0.02)
+
+    def test_it_ranks_where_epsilon_greedy_does_not(self) -> None:
+        """The whole point, as a comparison.
+
+        Epsilon-greedy gives the second best action and the worst one the same
+        share. This gives the second best more.
+        """
+        scores = [0.0, 1.0, 5.0]
+        flat = EpsilonGreedy(0.3).probabilities(scores, None, 0, 0)
+        ranked = Softmax(1.0).probabilities(scores, None, 0, 0)
+
+        assert flat[0] == pytest.approx(flat[1])
+        assert ranked[1] > ranked[0]
+
+    def test_it_says_what_it_is(self) -> None:
+        assert "2" in repr(Softmax(2.0))
 
 
 class Counted(Rule):
