@@ -159,7 +159,21 @@ def main() -> int:
         action="store_true",
         help="print the episode every seed first arrived on, under the table",
     )
+    parser.add_argument(
+        "--rules",
+        help=(
+            "rules to run instead of the four, comma separated, as they are "
+            "written for --set explore, for example softmax:0.01,softmax:0.001"
+        ),
+    )
     args = parser.parse_args()
+
+    arms = ARMS
+    if args.rules:
+        # A ladder of one rule at several dials. The four arms answer "which
+        # way of exploring", and this answers "was that rule's dial wrong",
+        # which is the question a row that does badly always raises.
+        arms = tuple((one, one, 0.0) for one in args.rules.split(","))
 
     from rel.cli import parse_settings
 
@@ -185,7 +199,7 @@ def main() -> int:
 
     rows = []
     every: list[tuple[str, list[int | None]]] = []
-    for label, explore, optimism in ARMS:
+    for label, explore, optimism in arms:
         arrivals, costs, settled, exact, seconds = measure(
             args.env,
             args.agent,
@@ -219,11 +233,12 @@ def main() -> int:
 
     if args.each_seed:
         print()
+        widest = max(len(label) for label, _ in every)
         for label, arrivals in every:
             numbers = " ".join(
                 "  -" if one is None else f"{one:3d}" for one in arrivals
             )
-            print(f"  {label:15s} {numbers}")
+            print(f"  {label:{widest}s} {numbers}")
 
     print(
         "\n'first end' is the episode that first reached an ending and 'steps\n"
