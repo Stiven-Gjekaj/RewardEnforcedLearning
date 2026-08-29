@@ -8,6 +8,8 @@ numbers it gave before. Those tests say why it does and check that it does.
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 from rel.agents import AGENTS
@@ -250,24 +252,38 @@ class TestTheCoderIsInterchangeable:
         assert coder.squared_length(values) == 8.0
         assert agent.current_step_size(values) == 0.3 / 8
 
-    def test_a_whole_run_over_a_tile_coder_is_unchanged(self) -> None:
+    def run(self, name: str) -> tuple[str, str | None]:
+        root = Rng(1)
+        env = ENVIRONMENTS.make(name, root.stream("env"))
+        agent = AGENTS.make("tile-sarsa", root.stream("agent"), env)
+        record = train(env, agent, 20, discount=env.spec.suggested_discount)
+        return record.digest.hexdigest(), digest_of(agent)
+
+    def test_the_path_of_a_whole_run_is_unchanged(self) -> None:
         """The digests from before the agent took a `Coder` at all.
 
         Written down rather than compared against a second run, because a
         second run of the same code agrees with itself whatever either of
-        them does. These four numbers were produced by the version that named
-        `TileCoder` in its signature.
+        them does. These were produced by the version that named `TileCoder`
+        in its signature, and they are the same on every Python this project
+        is tested on.
         """
-        for name, path, learned in [
-            ("mountaincar", "22bdc32f14a68951", "c721fa20534a5f44"),
-            ("cartpole", "979877443e6c00a3", "54f776207a734d90"),
-        ]:
-            root = Rng(1)
-            env = ENVIRONMENTS.make(name, root.stream("env"))
-            agent = AGENTS.make("tile-sarsa", root.stream("agent"), env)
-            record = train(env, agent, 20, discount=env.spec.suggested_discount)
-            assert record.digest.hexdigest() == path, name
-            assert digest_of(agent) == learned, name
+        assert self.run("mountaincar")[0] == "22bdc32f14a68951"
+        assert self.run("cartpole")[0] == "979877443e6c00a3"
+
+    def test_what_it_learned_is_unchanged_too(self) -> None:
+        """The same claim about the weights, and the cart pole has two answers.
+
+        Not two because of this change. Both were produced by the version
+        before it as well, on the same interpreters, and which one comes out
+        depends on the Python running it rather than on anything in this
+        repository. `TestTheDigestIsNotStableAcrossPythons` has the cause.
+        """
+        assert self.run("mountaincar")[1] == "c721fa20534a5f44"
+        assert self.run("cartpole")[1] in {
+            "54f776207a734d90",  # Python 3.11 and below
+            "5c5e9c0f6fd6d467",  # Python 3.12 and above
+        }
 
     def test_a_radial_basis_runs_under_the_same_agent(self) -> None:
         basis = RadialBasis(UNIT, bins=4)
@@ -343,3 +359,55 @@ class TestTheRegistryEntries:
             ENVIRONMENTS.make("mountaincar", Rng(12).stream("env")), agent, 10
         )
         assert watched.final() > -400.0
+
+
+class TestTheDigestIsNotStableAcrossPythons:
+    """Why `tile-sarsa` on the cart pole learns two different tables.
+
+    CPython 3.12 gave `sum()` compensated summation over floats. It is more
+    accurate than adding the numbers up one at a time, and it is therefore a
+    different answer. `LinearAgent.value` is a `sum`, so every value it
+    computes differs in its last bits between 3.11 and 3.12, and twenty
+    episodes of the cart pole is enough for that to reach the twelve
+    significant figures the learned digest hashes.
+
+    This is worth a class of its own because the digest is the tool this
+    project uses to say "the same run" rather than "a similar one", and a
+    tool that answers differently on two interpreters has to be known about
+    before it is trusted.
+    """
+
+    def test_the_interpreter_decides_whether_sum_compensates(self) -> None:
+        # The demonstration rather than the claim. Adding these four numbers
+        # left to right loses the two ones; compensating keeps them.
+        pieces = [1.0, 1e100, 1.0, -1e100]
+        naive = 0.0
+        for piece in pieces:
+            naive += piece
+
+        assert naive == 0.0
+        compensates = sys.version_info >= (3, 12)
+        assert (sum(pieces) != naive) == compensates
+
+    def test_the_path_digest_does_not_move(self) -> None:
+        """Which is why the two are kept apart.
+
+        A path digest hashes the transitions, and a transition is an
+        observation, an action and a reward written to a fixed number of
+        figures. Those survive a difference in the last bits of a value,
+        because a policy is a comparison between values rather than a value.
+        """
+        env = ENVIRONMENTS.make("cartpole", Rng(1).stream("env"))
+        agent = AGENTS.make("tile-sarsa", Rng(1).stream("agent"), env)
+        record = train(env, agent, 20, discount=env.spec.suggested_discount)
+        assert record.digest.hexdigest() == "979877443e6c00a3"
+
+    def test_the_mountain_car_is_not_far_enough_to_show_it(self) -> None:
+        # Twenty episodes of a two dimensional box does not accumulate enough
+        # for the difference to reach the digest. That the same code shows it
+        # on one environment and not the other is the reason to state the
+        # fact rather than to pick an environment that hides it.
+        env = ENVIRONMENTS.make("mountaincar", Rng(1).stream("env"))
+        agent = AGENTS.make("tile-sarsa", Rng(1).stream("agent"), env)
+        train(env, agent, 20, discount=env.spec.suggested_discount)
+        assert digest_of(agent) == "c721fa20534a5f44"
