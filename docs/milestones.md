@@ -19,6 +19,31 @@ questions. Everything here that has a number behind it says what was measured.
 
 ## Built since that table was written
 
+**A second way of making features, and the reason tile coding wins.** Radial
+basis features answer how close a point is to each of some centres, rather than
+which cells it is in. `LinearAgent` now takes either, through a `Coder`
+protocol that neither encoder imports, and every run over a tile coder gives
+the numbers it gave before to the last bit.
+
+What the measurement said is not what the exercise was for. On the cart pole a
+tile coder has 52488 features and takes 70 microseconds a step; a radial basis
+has 1296 and takes 3511. A tile coder is not cheap because it has few features.
+It is cheap because it works out which eight switches are on by arithmetic and
+**never asks the other 52480 anything**, and a radial basis has no such route.
+
+The plan was to give it one, by keeping only the largest few values. That
+cannot work and the reason is worth the whole track: there is no way to know
+which centres are far away without measuring the distance to all of them, which
+is three quarters of the step. It buys eleven percent, and it pays for that by
+putting the boundary back that the encoder exists to remove. It is off by
+default, and a test named after it sweeps a line across the box to find the
+step it makes.
+
+On the mountain car at sixty episodes the radial basis learns better, by 21.3
+points of return over ten seeds. The default width is three quarters of the
+spacing between centres, which was measured on two environments rather than
+reasoned: one whole spacing looks right and loses on both.
+
 **A faster gradient engine that computes the same numbers.** Three changes,
 none of them clever: the lists an inner loop reads are pulled into locals in
 `linear` and in `Adam`, and an internal constructor skips the copy and the
