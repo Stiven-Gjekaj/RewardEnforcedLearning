@@ -158,6 +158,20 @@ class TestReadingThePolicyLeavesNoTrace:
         after = {state: node.visits for state, node in agent.tree.items()}
         assert after == before
 
+    def test_it_does_not_count_the_work_as_the_agent_s(self) -> None:
+        """`simulated` is what a measurement reads as the work this agent
+        spent, and work spent answering a question about the agent is not work
+        the agent did. Without this, a table of cost would depend on how often
+        somebody read the policy."""
+        model = dyna_maze(Rng(1))
+        agent = searcher(Rng(3), model, discount=0.95)
+        agent.act(model.reset())
+
+        before = agent.simulated
+        for state in range(model.observation_space.n):
+            agent.greedy(state)
+        assert agent.simulated == before
+
     def test_it_does_not_spend_the_generator(self) -> None:
         model = dyna_maze(Rng(1))
         agent = searcher(Rng(3), model, discount=0.95)

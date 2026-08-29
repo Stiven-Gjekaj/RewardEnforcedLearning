@@ -168,12 +168,21 @@ class TreeSearch(Agent[int]):
         chance would move the run it is being asked about, which is a fault
         this project has already had once and measured.
 
-        So this searches on a copy of the tree with a copy of the generator.
+        There are three traces to leave and this leaves none of them. It
+        searches on a copy of the tree, with a copy of the generator, and it
+        puts the count of simulated steps back afterwards. The count matters
+        for the same reason as the other two: it is what the measurement reads
+        as the work this agent spent, and work spent answering a question about
+        the agent is not work the agent did.
         """
         tree = {state: node.copy() for state, node in self.tree.items()}
         probe = Rng.restore(*self.rng.snapshot())
-        self._search(tree, probe, observation)
-        return self.actions.start + self._best(tree, probe, observation)
+        spent = self.simulated
+        try:
+            self._search(tree, probe, observation)
+            return self.actions.start + self._best(tree, probe, observation)
+        finally:
+            self.simulated = spent
 
     def _best(self, tree: dict[int, Node], rng: Rng, state: int) -> int:
         node = tree.get(state)
