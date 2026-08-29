@@ -116,7 +116,23 @@ def main() -> int:
     parser.add_argument("--env", default="maze")
     parser.add_argument("--episodes", type=int, default=30)
     parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument(
+        "--only",
+        help=(
+            "run only these rows, comma separated, by the label in the first "
+            "column, for example 'mcts 50,dyna-q 5'"
+        ),
+    )
     args = parser.parse_args()
+
+    arms = ARMS
+    if args.only:
+        wanted = [one.strip() for one in args.only.split(",")]
+        unknown = [one for one in wanted if one not in {label for label, _, _ in ARMS}]
+        if unknown:
+            offered = ", ".join(repr(label) for label, _, _ in ARMS)
+            raise SystemExit(f"There is no row {unknown[0]!r}. There is: {offered}.")
+        arms = tuple(arm for arm in ARMS if arm[0] in wanted)
 
     probe = ENVIRONMENTS.make(args.env, Rng(1).stream("env"))
     discount = probe.spec.suggested_discount
@@ -137,7 +153,7 @@ def main() -> int:
     )
 
     rows = []
-    for label, name, settings in ARMS:
+    for label, name, settings in arms:
         lengths, asked, values, seconds = measure(
             args.env, name, settings, args.episodes, args.runs
         )
