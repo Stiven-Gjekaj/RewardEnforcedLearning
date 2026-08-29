@@ -1941,6 +1941,84 @@ than a default.
 
 ---
 
+## Making the engine faster without changing what it computes
+
+```console
+$ python scripts/measure_engine.py
+$ python scripts/measure_engine.py --agent deep-q --env cliff --episodes 3
+```
+
+The gradient engine is pure Python, so it is slow, and the agents built on it
+are the slowest things here. Speeding it up is easy. Speeding it up **without
+changing a single number** is the part worth doing carefully, because an
+optimisation that reassociates a sum is faster and gives different answers, and
+on a learning agent different answers look exactly like the same agent on
+another seed.
+
+So every change below was checked against the two digests, and every one of
+them left both untouched.
+
+| 20,000 passes each | before | after |
+| --- | ---: | ---: |
+| a whole `reinforce` run | 0.142s | **0.131s** |
+| 4 to 16 forward | 0.262s | 0.246s |
+| 4 to 16 backward | 0.221s | 0.208s |
+| 48 to 16 forward | 1.155s | 1.137s |
+| 48 to 16 backward | 2.062s | **1.868s** |
+| Adam over 852 numbers | 5.359s | **4.289s** |
+
+*Digests before and after: `26caed70127e02dc` and `65988fc88c846945`, both.*
+
+Three changes, and none of them is clever. Every list an inner loop reads is
+pulled into a local first, in `linear` and again in `Adam`, because
+`weight.data` inside a loop that runs once per weight is an attribute lookup
+per weight. An internal constructor skips the copy and the shape check that the
+public one owes a caller, because every operation in the engine builds a fresh
+list of floats and knows the shape it made it to.
+
+**The same numbers are added in the same order.** That is the whole discipline,
+and the digest is what turns it from an intention into a check.
+
+### Three things the measuring got wrong first
+
+**A single timing is worth about as much as a single seed.** The first version
+of the benchmark timed each shape once. Unchanged code answered anywhere from
+1.06 to 1.22 seconds for the same twenty thousand passes, depending on what had
+run in the process before it, and the first timing was the slow one every time.
+The first optimisation was measured against that and its commit message claims
+a gain twice the size of the real one. Best of three now.
+
+**A profile is not a measurement of the run.** `cProfile` put the optimiser at
+15% of a `deep-q` run, which is roughly right, and made it look like the place
+to work. Adam did turn out to be 18% faster after the change. The run moved by
+0.3%, because the whole-run timing cannot resolve the 2% that an 18% saving on
+a tenth of the work buys. A component a whole run cannot see needs its own line
+in the table, which is why there is now one for the optimiser.
+
+**A faster inner loop can be slower.** The first version of the `linear` change
+zipped over a slice of the weight row instead of indexing into it. That is
+faster on a wide layer and slower on a narrow one: 48 to 16 forward went from
+1.22 to 1.10, and 4 to 16 forward went from 0.29 to 0.38, because slicing four
+elements sixteen times a pass costs more than the indexing it removes. This
+project runs both shapes, so the slice is out.
+
+### Where it is weak
+
+**Nothing here changes the shape of the work.** The engine still allocates a
+tensor for every intermediate value and walks the graph on every backward pass,
+and those are what a real engine avoids. What is left after these changes is
+what pure Python costs to do the arithmetic at all.
+
+**The backward pass still computes a gradient nobody reads.** `linear` fills in
+the gradient with respect to its input, and for the first layer of a network
+that input is the observation, which nothing differentiates with respect to. On
+a 48 to 16 layer that is half the inner loop of the most expensive backward
+here. Skipping it needs the engine to be told which tensors want gradients, and
+that is a change to what `backward` means rather than to how fast it is, so it
+is not here.
+
+---
+
 ## Where the numbers on this page can be checked
 
 | Table | Command |
@@ -1960,6 +2038,7 @@ than a default.
 | Four ways of exploring | `python scripts/measure_exploration.py --runs 10 --each-seed` |
 | Which loop a discount chooses | `python scripts/measure_average_reward.py` |
 | How large a difference is noise | `python scripts/measure_noise.py --trials 200` |
+| The engine, faster and unchanged | `python scripts/measure_engine.py` |
 | Decision time against background planning | `python scripts/measure_search.py --episodes 40 --runs 3` |
 | One rule at several dials | `python scripts/measure_exploration.py --rules softmax:0.02,softmax:0.001` |
 | Any one or two settings | `rel sweep <agent> --env <env> --over name=a,b,c` |
