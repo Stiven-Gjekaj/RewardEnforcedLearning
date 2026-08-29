@@ -50,6 +50,18 @@ Everything below is new.
 
 **Agents**
 
+- **A value network**, as `deep-q`: Q-learning with a network in place of the
+  table, and the two pieces that make one work as settings that can each be
+  switched off. A replay buffer breaks up the correlation between steps that
+  arrive one after another, and a target network stops the estimate and the
+  thing it is fitted to from moving together. On the cart pole neither piece
+  alone does anything: a median of 66.3 steps with both, and 9.0, 9.4 and 8.8
+  with either one missing, where a pole nobody balances falls in about nine.
+  On the cliff walk all four medians are the same number and only the tail
+  moves, because a one-hot grid gives each state close to its own parameters
+  and the shared weight problem barely arises. The same ablation on two
+  environments gives opposite looking tables, and the difference is the
+  representation rather than the algorithm.
 - **Prioritised sweeping**, Dyna that replays the step that matters rather than
   one drawn at random. Work follows the change backwards through the model: it
   takes the largest change off a queue and then asks which steps lead into the
