@@ -241,7 +241,12 @@ either: it finds the optimal policy on the cliff walk, and REINFORCE shares
 this file, this encoder and this optimiser and reaches five hundred on all five
 seeds. The difference is the one thing the two do not share, which is a target
 bootstrapped from a value network that is still wrong. A target network or
-n-step returns are what would test that, and neither is here.
+n-step returns are what would test that.
+
+A target network is now in the project, on `deep-q` rather than on this critic,
+and what it does there is evidence for the reading rather than against it: on
+the cart pole it buys nothing on its own and a great deal beside a replay
+buffer. Putting one on this critic is the test that is still not run.
 
 ---
 
