@@ -1095,3 +1095,69 @@ class TestTheErrorAgainstTheTrueValues:
             ]
         )
         assert "error against the true values" not in capsys.readouterr().out
+
+
+class TestCompareSaysWhetherTheDifferenceIsReal:
+    """The table on its own is a description of two sets of numbers.
+
+    A reader takes a comparison from it anyway, so the comparison is printed
+    rather than left to be made by eye out of two means and two errors.
+    """
+
+    @staticmethod
+    def _ran(agents: list[str], runs: int, capsys: pytest.CaptureFixture[str]) -> str:
+        assert (
+            main(
+                [
+                    "compare",
+                    *agents,
+                    "--env",
+                    "cliff",
+                    "--episodes",
+                    "40",
+                    "--runs",
+                    str(runs),
+                    "--no-colour",
+                    "--no-band",
+                ]
+            )
+            == 0
+        )
+        return capsys.readouterr().out
+
+    def test_two_agents_get_a_difference_and_an_interval(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        out = self._ran(["sarsa", "q-learning"], 5, capsys)
+        assert "sarsa against q-learning, paired by seed" in out
+        assert "difference" in out
+        assert "95% interval" in out
+        assert "p value" in out
+
+    def test_three_agents_get_none_of_it(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """With three the reader wants three pairs, or one against each of the
+        others, and which of those was meant is a question rather than a
+        default."""
+        out = self._ran(["sarsa", "q-learning", "expected-sarsa"], 3, capsys)
+        assert "paired by seed" not in out
+
+    def test_five_seeds_are_told_they_cannot_reach_five_percent(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The floor of a paired test over five seeds is 0.0625, whatever the
+        difference is. A reader who does not know that reads a p of 0.06 as a
+        result that nearly happened."""
+        out = self._ran(["sarsa", "q-learning"], 5, capsys)
+        assert "5 seeds cannot give a p below 0.0625" in out
+
+    def test_the_same_agent_twice_says_so_rather_than_nothing(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Both runs met the same seeds with the same settings, so they are
+        the same run. Printing a comparison of a thing with itself would be
+        worse, and printing nothing would leave a reader wondering."""
+        out = self._ran(["q-learning", "q-learning"], 5, capsys)
+        assert "The same agent twice" in out
+        assert "paired by seed" not in out

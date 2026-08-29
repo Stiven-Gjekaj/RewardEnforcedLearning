@@ -43,6 +43,7 @@ from rel import __version__
 from rel.agents import AGENTS
 from rel.agents.base import Agent
 from rel.agents.dp import DidNotSettleError, evaluate_policy, value_iteration
+from rel.compare import compare
 from rel.core import Env, TabularEnv
 from rel.envs import ENVIRONMENTS
 from rel.envs.gridfile import read as read_grid
@@ -759,6 +760,10 @@ def command_compare(args: argparse.Namespace) -> int:
     spread: dict[str, tuple[list[float], list[float]]] = {}
     rows = []
     marks: dict[str, float] = {}
+    #: What each agent got on each seed, in seed order. A paired comparison
+    #: needs the order, because subtracting within a seed is the whole of what
+    #: makes it paired.
+    by_seed: dict[str, list[float]] = {}
 
     for name in args.agents:
         totals: list[list[float]] = []
@@ -807,6 +812,7 @@ def command_compare(args: argparse.Namespace) -> int:
                 ],
             )
 
+        by_seed[name] = list(finals)
         learned = summarise(finals)
         exact_text = "-"
         if exact_values:
@@ -859,7 +865,64 @@ def command_compare(args: argparse.Namespace) -> int:
         f"'last 100' is the return while learning, which includes the cost of "
         f"exploring."
     )
+
+    for line in _difference_lines(args, by_seed, palette):
+        print(line)
     return 0
+
+
+def _difference_lines(
+    args: argparse.Namespace,
+    by_seed: dict[str, list[float]],
+    palette: Palette,
+) -> list[str]:
+    """What the table above does not say: whether the difference is real.
+
+    Only for two agents. With three the reader wants three pairs, or one of
+    them against each of the others, and which of those was meant is a question
+    rather than a default. Two is the case where there is nothing to ask.
+    """
+    if len(args.agents) == 2 and len(by_seed) == 1:
+        # The same name twice. Both runs took the same seeds and the same
+        # settings, so they are the same run and the difference is zero by
+        # construction. Saying so beats printing a comparison of a thing with
+        # itself, and beats printing nothing.
+        return [
+            "",
+            palette.paint("The same agent twice", "bold"),
+            "  Both runs met the same seeds with the same settings, so the",
+            "  difference between them is zero and nothing was compared.",
+        ]
+
+    if len(by_seed) != 2:
+        return []
+
+    (first, ours), (second, theirs) = by_seed.items()
+    answer = compare(ours, theirs, Rng(args.seed).stream("compare"))
+
+    floor = 2.0 / 2.0**answer.seeds
+    lines = [
+        "",
+        palette.paint(f"{first} against {second}, paired by seed", "bold"),
+        f"  difference    {answer.difference:+.2f}",
+        f"  95% interval  {answer.low:+.2f} to {answer.high:+.2f}",
+        f"  p value       {answer.p_value:.4f}"
+        + ("" if answer.exact else "  (sampled)"),
+    ]
+
+    if not answer.certain:
+        lines.append(
+            "\nThe interval crosses zero, so these seeds do not say which "
+            "agent is better."
+        )
+    if answer.p_value > 0.05 and floor > 0.05:
+        lines.append(
+            f"\n{answer.seeds} seeds cannot give a p below {floor:.4f} however "
+            f"large the difference is, because a paired test over {answer.seeds}"
+            f" seeds has only {2**answer.seeds} sign patterns in it. Six seeds "
+            f"is the fewest that can reach 0.05."
+        )
+    return lines
 
 
 def command_demo(args: argparse.Namespace) -> int:
