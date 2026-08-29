@@ -1,5 +1,5 @@
 # One path, folded. There is no branch anywhere in it, so the route from
-# the start to the goal is the only route and it is forty seven steps
+# the start to the goal is the only route and it is forty eight steps
 # long. Nothing pays until the goal, which pays 1.
 #
 # This grid exists to make exploring the problem rather than learning.

@@ -83,16 +83,16 @@ DYNA_MAZE = (
 )
 
 # One path, folded. Nine by nine with no branch anywhere in it, so there is
-# exactly one route from the start to the goal and it is forty seven steps
+# exactly one route from the start to the goal and it is forty eight steps
 # long. Nothing pays until the goal, which pays 1.
 #
 # This grid is here to make exploring the problem. Every other grid in this
 # project can be solved by an agent that wanders: the goal of the cliff walk is
-# thirteen steps from the start and so is the goal of the Dyna maze. A policy
-# that moves at random covers a line of length n in about n squared steps, so
-# forty seven is about two thousand two hundred, and an agent that has learned
-# nothing spends a whole episode not finding out that there is anything to
-# find.
+# thirteen steps from the start and the goal of the Dyna maze is fourteen. A
+# policy that moves at random covers a line of length n in about n squared
+# steps, so forty eight is about two thousand three hundred, and an agent that
+# has learned nothing spends a whole episode not finding out that there is
+# anything to find.
 #
 # Nothing here is deep. It is long, and long is enough.
 CORRIDOR = (
@@ -191,7 +191,7 @@ def dyna_maze(rng: Rng) -> GridWorld:
 
 
 def corridor(rng: Rng) -> GridWorld:
-    """One folded path, forty seven steps long. Only the goal pays."""
+    """One folded path, forty eight steps long. Only the goal pays."""
     return GridWorld(
         rng,
         CORRIDOR,

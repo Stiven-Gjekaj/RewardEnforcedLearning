@@ -249,20 +249,38 @@ class TestTheCorridor:
         assert isinstance(env, GridWorld)
         return env
 
-    def test_the_only_route_is_forty_seven_steps(self) -> None:
-        env = self._made()
-        best = value_iteration(env, discount=0.95)
-        # A discounted 1 at the goal and nothing on the way, so the value of
-        # the start is the discount raised to the length of the route.
-        length = math.log(best.start_value) / math.log(0.95)
-        assert round(length) == 47
+    @staticmethod
+    def _route(env: GridWorld, discount: float) -> int:
+        """How many steps the best policy takes, by walking it.
+
+        Counted rather than read off the value. The value of the start is the
+        discount raised to the number of steps **before** the reward, which is
+        one less than the length of the route, and reading a length off it
+        directly is how this test first said forty seven.
+        """
+        solved = value_iteration(env, discount=discount)
+        state = env.start_states()[0][1]
+        for step in range(1, 1000):
+            branch = env.transitions(state, solved.policy[state])[0]
+            if branch.terminated:
+                return step
+            state = branch.observation
+        raise AssertionError("the best policy did not reach an ending")
+
+    def test_the_only_route_is_forty_eight_steps(self) -> None:
+        assert self._route(self._made(), 0.95) == 48
+
+    def test_the_value_of_the_start_agrees_with_that(self) -> None:
+        best = value_iteration(self._made(), discount=0.95)
+        # Forty eight steps means the reward is discounted forty seven times.
+        assert best.start_value == pytest.approx(0.95**47)
 
     def test_it_is_further_than_every_other_grid(self) -> None:
         """The claim the grid exists to make."""
-        maze = ENVIRONMENTS.make("maze", Rng(1).stream("env"))
-        assert isinstance(maze, GridWorld)
-        theirs = value_iteration(maze, discount=0.95)
-        assert math.log(theirs.start_value) / math.log(0.95) < 47
+        for name, discount in (("maze", 0.95), ("cliff", 1.0), ("rooms", 1.0)):
+            other = ENVIRONMENTS.make(name, Rng(1).stream("env"))
+            assert isinstance(other, GridWorld)
+            assert self._route(other, discount) < 48
 
     def test_nothing_pays_until_the_goal(self) -> None:
         env = self._made()
