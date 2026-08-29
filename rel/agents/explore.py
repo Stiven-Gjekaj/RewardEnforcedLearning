@@ -245,7 +245,92 @@ class Softmax(Rule):
         return f"Softmax(temperature={self.temperature(0):g})"
 
 
+class CountBonus(Rule):
+    """The best action, where best counts how little the action has been tried.
+
+    Each action gets its value plus a term that grows with how long it has been
+    since it was taken here and shrinks as it is taken more. An action never
+    taken in this state scores infinity, so the first few visits to a state try
+    everything once before ranking anything.
+
+    Nothing here is random except a tie. That is the point: epsilon-greedy and
+    softmax explore by putting chance into the choice, and this explores by
+    putting the reason to explore into the score.
+
+    ## This is the bandit rule, once per state
+
+    `UpperConfidenceBandit` does this over the levers of one bandit, where the
+    guarantee it is famous for holds. Treating each state as its own bandit
+    does not carry the guarantee across, and the reason is worth being plain
+    about: a bandit's arms pay out on their own, and a grid's actions pay out
+    through the states they lead to.
+
+    So this drives the agent to try every action of the states it stands in,
+    and nothing in it drives the agent towards a state it has never reached.
+    Once every action of a state has been taken a few times the bonus there is
+    small and the agent is greedy again, whatever is still unexplored two rooms
+    away. Optimistic initialisation is the rule in this file that does the
+    other thing, and `docs/algorithms.md` measures the two side by side.
+
+    ## What it costs
+
+    A second dictionary the size of the table, written on every step. Nothing
+    else here keeps one, which is why `needs_counts` exists.
+    """
+
+    __slots__ = ("confidence",)
+
+    needs_counts = True
+
+    def __init__(self, confidence: float = 2.0) -> None:
+        if confidence < 0.0:
+            raise ValueError("A confidence is zero or above.")
+        self.confidence = confidence
+
+    def bonused(self, scores: Sequence[float], counts: Counts) -> list[float]:
+        """The scores with the exploration bonus added to each."""
+        if counts is None:
+            raise ValueError(
+                "This rule explores by counting and was given no counts. "
+                "The agent reads `needs_counts` to decide whether to keep them."
+            )
+
+        # The count of visits to this state, which is what each action's own
+        # count is being compared against. The plus one is so that the first
+        # visit takes the log of one rather than of zero.
+        span = math.log(sum(counts) + 1)
+        return [
+            math.inf
+            if count == 0
+            else score + self.confidence * math.sqrt(span / count)
+            for score, count in zip(scores, counts, strict=True)
+        ]
+
+    def choose(
+        self,
+        rng: Rng,
+        scores: Sequence[float],
+        counts: Counts,
+        episodes: int,
+        steps: int,
+    ) -> int:
+        return argmax(rng, self.bonused(scores, counts))
+
+    def probabilities(
+        self,
+        scores: Sequence[float],
+        counts: Counts,
+        episodes: int,
+        steps: int,
+    ) -> list[float]:
+        return greedy_probabilities(self.bonused(scores, counts))
+
+    def __repr__(self) -> str:
+        return f"CountBonus(confidence={self.confidence:g})"
+
+
 __all__ = [
+    "CountBonus",
     "Counts",
     "EpsilonGreedy",
     "Rule",

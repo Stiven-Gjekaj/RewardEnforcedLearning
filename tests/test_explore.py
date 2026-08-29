@@ -19,6 +19,7 @@ import pytest
 from rel.agents.base import TabularAgent
 from rel.agents.dyna import DynaQ
 from rel.agents.explore import (
+    CountBonus,
     Counts,
     EpsilonGreedy,
     Rule,
@@ -206,6 +207,107 @@ class TestSoftmax:
 
     def test_it_says_what_it_is(self) -> None:
         assert "2" in repr(Softmax(2.0))
+
+
+class TestCountBonus:
+    def test_an_untried_action_comes_first(self) -> None:
+        rule = CountBonus(2.0)
+        assert rule.choose(Rng(1), [0.0, -100.0], [4, 0], 0, 0) == 1
+
+    def test_every_action_is_untried_on_the_first_visit(self) -> None:
+        """All infinite, so the first choice in a state is a fair draw.
+
+        The values are ignored there, and they should be: an untouched row is
+        the starting number in every cell, and ranking by it would rank by
+        nothing.
+        """
+        rule = CountBonus(2.0)
+        assert rule.probabilities([5.0, 0.0, 0.0], [0, 0, 0], 0, 0) == pytest.approx(
+            [1 / 3, 1 / 3, 1 / 3]
+        )
+
+        rng = Rng(2)
+        picks = [rule.choose(rng, [5.0, 0.0, 0.0], [0, 0, 0], 0, 0) for _ in range(300)]
+        assert set(picks) == {0, 1, 2}
+
+    def test_the_rarer_action_gets_the_larger_bonus(self) -> None:
+        rule = CountBonus(1.0)
+        scores = rule.bonused([0.0, 0.0], [1, 50])
+        assert scores[0] > scores[1]
+
+    def test_a_confidence_of_zero_is_greedy_once_everything_is_tried(self) -> None:
+        rule = CountBonus(0.0)
+        assert rule.bonused([1.0, 2.0], [3, 90]) == [1.0, 2.0]
+
+    def test_a_large_enough_bonus_beats_a_better_value(self) -> None:
+        rule = CountBonus(10.0)
+        assert rule.choose(Rng(1), [5.0, 4.0], [400, 1], 0, 0) == 1
+
+    def test_the_bonus_shrinks_as_an_action_is_taken(self) -> None:
+        rule = CountBonus(2.0)
+        early = rule.bonused([0.0, 0.0], [1, 1])[0]
+        later = rule.bonused([0.0, 0.0], [200, 200])[0]
+        assert later < early
+
+    def test_it_asks_for_the_counts(self) -> None:
+        assert CountBonus.needs_counts is True
+
+    def test_without_them_it_says_so(self) -> None:
+        with pytest.raises(ValueError, match="no counts"):
+            CountBonus(2.0).choose(Rng(1), [0.0, 1.0], None, 0, 0)
+
+    def test_a_confidence_below_zero_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="zero or above"):
+            CountBonus(-1.0)
+
+    def test_choosing_matches_the_probabilities(self) -> None:
+        rule = CountBonus(1.0)
+        rng = Rng(5)
+        scores = [0.0, 1.0, 0.5]
+        counts = [10, 10, 3]
+
+        picks = [rule.choose(rng, scores, counts, 0, 0) for _ in range(2000)]
+        for index, share in enumerate(rule.probabilities(scores, counts, 0, 0)):
+            assert picks.count(index) / 2000 == pytest.approx(share, abs=0.02)
+
+    def test_nothing_is_random_except_a_tie(self) -> None:
+        """The whole difference from the two rules above.
+
+        They put chance into the choice. This puts the reason to explore into
+        the score, so a state whose actions are all well tried costs no draw
+        at all.
+        """
+        rule = CountBonus(2.0)
+        rng = Rng(1)
+        before = rng.snapshot()
+        rule.choose(rng, [0.0, 1.0], [8, 9], 0, 0)
+        assert rng.snapshot() == before
+
+    def test_it_says_what_it_is(self) -> None:
+        assert "2" in repr(CountBonus(2.0))
+
+
+class TestCountBonusInAnAgent:
+    def test_the_agent_keeps_the_counts_for_it(self) -> None:
+        agent = QLearning(Rng(1), Discrete(4), explore=CountBonus(2.0))
+        assert agent.counts == {}
+
+    def test_it_tries_every_action_of_a_state_before_repeating_one(self) -> None:
+        agent = QLearning(Rng(1), Discrete(4), explore=CountBonus(2.0))
+        taken = [agent.act(0) for _ in range(4)]
+        assert sorted(taken) == [0, 1, 2, 3]
+
+    def test_a_run_finishes(self) -> None:
+        root = Rng(3)
+        env = cliff_walk(root.stream("env"))
+        agent = QLearning(
+            root.stream("agent"),
+            env.action_space,
+            step_size=0.5,
+            explore=CountBonus(1.0),
+        )
+        record = train(env, agent, 30)
+        assert len(record.returns) == 30
 
 
 class Counted(Rule):
