@@ -13,6 +13,7 @@ importing it as one would be a different arrangement than the one that runs.
 from __future__ import annotations
 
 import importlib.util
+import re
 from pathlib import Path
 from types import ModuleType
 
@@ -21,6 +22,18 @@ import pytest
 from rel.rng import Rng
 
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "measure_approximation.py"
+
+
+def read_numbers(verdict: str) -> tuple[float, float, float]:
+    """The interval and the p value the verdict states, back out of its text.
+
+    The tests below are about whether the sentences match the numbers, so
+    they have to read the numbers the reader reads rather than a second copy
+    of them worked out another way.
+    """
+    found = re.search(r"\[([-+0-9.]+), ([-+0-9.]+)\], p ([0-9.]+)\.", verdict)
+    assert found is not None, verdict
+    return float(found[1]), float(found[2]), float(found[3])
 
 
 @pytest.fixture(scope="module")
@@ -162,9 +175,45 @@ class TestTheSections:
         _, verdict = script.learning_section(
             "mountaincar", 3, 4, Rng(1).stream("compare")
         )
-        inside = verdict.split("[")[1].split("]")[0]
-        low, high = (float(part) for part in inside.split(", "))
+        low, high, _ = read_numbers(verdict)
         assert ("not told apart" in verdict) == (low < 0.0 < high)
+
+    def test_too_few_seeds_to_reach_five_percent_says_so(
+        self, script: ModuleType
+    ) -> None:
+        # Three seeds have eight sign patterns, so the smallest p they allow
+        # is 0.25. A reader looking at a p of 0.25 has to be told that it is
+        # the floor rather than the answer.
+        _, verdict = script.learning_section(
+            "mountaincar", 3, 4, Rng(1).stream("compare")
+        )
+        assert "3 seeds cannot give a p below 0.2500" in verdict
+
+    def test_enough_seeds_to_reach_five_percent_says_nothing(
+        self, script: ModuleType
+    ) -> None:
+        _, verdict = script.learning_section(
+            "mountaincar", 6, 4, Rng(1).stream("compare")
+        )
+        assert "cannot give a p below" not in verdict
+
+    def test_an_interval_clear_of_zero_with_a_large_p_says_they_disagree(
+        self, script: ModuleType
+    ) -> None:
+        """The case the first version printed without comment.
+
+        Five seeds on the mountain car gave an interval of [-30.2, -0.8] and
+        a p of 0.250. A reader who stops at the interval reads that as a
+        verdict, and the interval is not the half of the answer that says
+        whether the sign could have gone the other way.
+        """
+        _, verdict = script.learning_section(
+            "mountaincar", 5, 60, Rng(7).stream("compare")
+        )
+        low, high, p_value = read_numbers(verdict)
+        assert not low < 0.0 < high
+        assert p_value > 0.05
+        assert "two\nhalves of the answer disagreeing" in verdict
 
     def test_the_width_table_has_a_row_for_each_width(self, script: ModuleType) -> None:
         rows = script.width_section("mountaincar", 2, 4)

@@ -169,14 +169,38 @@ def learning_section(
     ]
 
     answer = compare(scores[CODERS[0]], scores[CODERS[1]], rng)
+    floor = 2.0 / 2.0**answer.seeds
     verdict = (
         f"tile coding minus radial basis: {answer.difference:+.1f}, "
         f"95 percent interval [{answer.low:+.1f}, {answer.high:+.1f}], "
         f"p {answer.p_value:.3f}."
     )
+
     if not answer.certain:
         verdict += "\nThe interval crosses zero, so this says the two are not"
         verdict += " told apart by these seeds."
+    elif answer.p_value > 0.05:
+        # The two halves of the answer disagreeing is not a fault in either
+        # of them. The interval says how large the difference is and the test
+        # says how easily the sign could have come out the other way, and a
+        # handful of seeds can pin the size of something it cannot pin the
+        # sign of. Printing the interval alone would read as a verdict.
+        verdict += (
+            "\nThe interval is clear of zero and the p value is not, which is"
+            " the two\nhalves of the answer disagreeing. Take the p value:"
+            " the interval says how\nlarge the difference is, and it is the"
+            " test that says whether the sign of\nit could as easily have"
+            " gone the other way."
+        )
+
+    if answer.p_value > 0.05 and floor > 0.05:
+        verdict += (
+            f"\n{answer.seeds} seeds cannot give a p below {floor:.4f} however"
+            f" large the difference\nis, because a paired test over"
+            f" {answer.seeds} seeds has only {2**answer.seeds} sign patterns"
+            f" in it.\nSix seeds is the fewest that can reach 0.05. Run with"
+            f" --runs 10."
+        )
     return rows, verdict
 
 
