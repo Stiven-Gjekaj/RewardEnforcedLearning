@@ -82,6 +82,15 @@ class Option:
         """
         return state not in self.policy or state in self.stops
 
+    def would_take(self, state: int, action: int) -> bool:
+        """Whether this option would take that action there.
+
+        Intra-option learning needs this. One real step teaches every option
+        that agrees with it, whether or not that option was the one running,
+        and agreeing means having an answer here and having this one.
+        """
+        return self.policy.get(state) == action
+
     @property
     def is_primitive(self) -> bool:
         """Whether this option stops after every step, so it is an action.

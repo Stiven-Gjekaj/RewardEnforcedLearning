@@ -222,3 +222,39 @@ class TestAnOptionCanSayWhatShapeItIs:
         assert not any(
             option.is_primitive for option in hallway_options(env, env.gaps())
         )
+
+
+class TestWhetherAnOptionAgreesWithAStep:
+    """What intra-option learning asks of every option at every step."""
+
+    def test_it_agrees_when_the_action_is_its_own(self) -> None:
+        assert a_corridor().would_take(1, 1)
+
+    def test_it_does_not_agree_with_another_action(self) -> None:
+        assert not a_corridor().would_take(1, 0)
+
+    def test_it_does_not_agree_where_it_has_no_answer(self) -> None:
+        # A state outside the option is not a state it agrees about, and
+        # `None` is not an action, so this must not match action 0 either.
+        assert not a_corridor().would_take(9, 0)
+        assert not a_corridor().would_take(9, 1)
+
+    def test_a_primitive_option_agrees_with_its_own_action_everywhere(self) -> None:
+        option = primitive(2, range(5))
+        assert all(option.would_take(state, 2) for state in range(5))
+        assert not any(option.would_take(state, 1) for state in range(5))
+
+    def test_several_options_can_agree_with_one_step(self) -> None:
+        # The whole point. A step that a hallway option and a primitive one
+        # both agree with teaches both of them.
+        env = four_rooms(Rng(1))
+        options = [
+            *primitives(env.action_space, range(env.observation_space.n)),
+            *hallway_options(env, env.gaps()),
+        ]
+        start = env.reset()
+        action = next(
+            option.act(start) for option in options if option.can_start(start)
+        )
+        agreeing = [option for option in options if option.would_take(start, action)]
+        assert len(agreeing) >= 2
