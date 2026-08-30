@@ -2034,6 +2034,11 @@ episodes.** The measurement that called it lost runs for four hundred.
 
 Two hundred episodes of the cliff walk, seed 1:
 
+```console
+$ rel train q-learning --env cliff --episodes 200 --seed 1
+$ rel train reinforce --env cliff --episodes 200 --seed 1
+```
+
 <!-- not checked, column time: seconds belong to the machine, and the
 steps beside them are what the section compares -->
 | agent | time | steps |
