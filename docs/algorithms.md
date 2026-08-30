@@ -953,6 +953,7 @@ one would make this the shape that plays board games, and it is not built.
 ```console
 $ rel train options-q --env rooms
 $ rel train options-q --env rooms --set hallways=off
+$ python scripts/measure_options.py --runs 10
 $ python scripts/measure_options.py --runs 20
 ```
 
@@ -987,7 +988,8 @@ none of them has an interior wall.
 | options-q, `hallways=off` | -22.44 | -20.00 | |
 | options-q | -25.01 | -20.00 | 1 |
 
-*Four rooms, ten seeds, 500 episodes. The best possible return is -20.*
+*Four rooms, ten seeds, 500 episodes, the row at the default epsilon of 0.1.
+The best possible return is -20.*
 
 The first two rows are the collapse. An option that stops after every step is a
 primitive action, so an agent holding only those is Q-learning, and it is
@@ -1013,8 +1015,9 @@ learned would not.
 | 0.05 | -21.31 | -22.40 | 1.09 | 21.9 | 9% | 1.25 |
 | 0.02 | -20.54 | -21.00 | 0.46 | 23.2 | 9% | 1.24 |
 
-*Twenty seeds. `long` is the share of choices that were an option lasting more
-than a step, and `length` is the mean number of steps an option ran for.*
+*Twenty seeds, which is the second of the two commands above. `long` is the
+share of choices that were an option lasting more than a step, and `length` is
+the mean number of steps an option ran for.*
 
 Epsilon changes by a factor of ten and the fourth column sits between 22 and 31
 with no trend in it. The cost is the exploring.
@@ -1620,10 +1623,15 @@ $ python scripts/measure_control.py --env cartpole --episodes 600 \
     --agents tile-sarsa tile-q --set epsilon=0.0
 $ python scripts/measure_control.py --env cartpole --episodes 600 \
     --agents tile-sarsa --set epsilon=0.01
+$ python scripts/measure_control.py --env mountaincar --episodes 300
+$ python scripts/measure_control.py --env cartpole --episodes 600
 ```
 
-The rows at 0.05 are the registry default and come from the two commands in
-`The two control problems` above.
+The last two are the registry default of 0.05, and they are the same two
+commands as in `The two control problems` above. They are repeated here
+because the rows they produce are in this table, and a block that named four
+of the six commands behind a table would be a block that sent a reader to
+look for the other two.
 
 This block said `--env cartpole --agents tile-sarsa` for nineteen tracks. That
 command takes the default of 300 episodes, so it produced no row of the table
@@ -1631,6 +1639,8 @@ under it, and there were no commands at all for the other nine.
 
 Five seeds each, greedy return afterwards:
 
+<!-- not checked, column epsilon: the cells hold the setting each row was run
+at rather than anything a run produced -->
 | environment | agent | epsilon | mean | each seed |
 | --- | --- | ---: | ---: | --- |
 | mountain car | tile-sarsa | 0.00 | -115.8 | -118 -132 -103 -120 -106 |
@@ -2339,10 +2349,10 @@ its numbers came from rather than what they were.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **399 of this
+- **Any number written in a sentence.** It reads tables, and **400 of this
   page's numbers are in prose rather than in a cell**, against 1074 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 399 are settings, seed counts and episode caps rather than anything a
+  those 400 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -2352,7 +2362,7 @@ its numbers came from rather than what they were.
 
 - **Three hours.** One command alone is nearly forty minutes. The cache is what
   makes a second opinion cheap, and without it nobody would run this twice.
-- **796 of 1071 numbers are checked.** The rest are in a table or a column that
+- **786 of 1061 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
