@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-2035_passing-427819?style=for-the-badge" alt="2035 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-2083_passing-427819?style=for-the-badge" alt="2083 tests passing"/>
 </p>
 
 <p align="center">
@@ -371,7 +371,7 @@ scripts/            the scripts that produce the numbers in the documentation,
 | Command line | 3 | 1658 |
 | **Total** | **56** | **15159** |
 
-Not counting 14507 lines of tests and 3729 of measurement scripts. Run
+Not counting 15420 lines of tests and 3973 of measurement scripts. Run
 `python scripts/lines.py` for the current numbers.
 
 Three rules about who may import whom are enforced by a test that reads the
@@ -392,7 +392,7 @@ import statements of every module:
 $ pytest
 ```
 
-2035 tests. Some of what they cover, and why each one is there rather than the
+2083 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A

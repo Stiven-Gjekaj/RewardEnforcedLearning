@@ -19,6 +19,46 @@ questions. Everything here that has a number behind it says what was measured.
 
 ## Built since that table was written
 
+**A command that checks the numbers on the algorithms page.** It runs every
+command that page names, then puts each of its fifty one tables against every
+output and attributes it to the command that accounts for most of its numbers.
+`scripts/check_numbers.py --list` says what would be checked without running
+anything, and `--cache` keeps what each command printed so that checking a fix
+costs seconds rather than the three hours a whole run takes.
+
+Matching rather than position, and the first version did it by position. Two
+thirds of that first report was a table sitting under a command it did not come
+from, because `The same table, four more environments` writes one command and
+then four tables and the other three commands were nowhere on the page.
+
+What it found was not what the exercise expected. Almost nothing had drifted.
+What the page had was tables whose command it never named, or named wrongly:
+
+- Four tables under one of their four commands, for nineteen tracks.
+- Ten rows of an epsilon sweep under a command that takes the default episode
+  count where every cart pole row in it is 600, so that command printed no row
+  of the table under it.
+- The importance sampling table under `measure_importance.py` where the prose
+  beside it said 1200 episodes and the default is 1500. The current code at
+  `--episodes 1200` reproduces every number in it exactly.
+- Three grids of exploration rules with no console block above them at all.
+- A per seed row of updates that no option of any script could print, which
+  `measure_sweeping.py --each-seed` now prints.
+
+Every one of those was run before its command was written down.
+
+Seventeen tables carry a comment saying they are not checked and why, because
+some are differences between two runs, or arithmetic, or seconds on a machine.
+The reason is required and printed, because a table that exempts itself
+silently is how a number that moved would hide. A marker can name one column
+rather than the whole table, which keeps 28 numbers under check on a table
+whose only unfixable cell is a timing.
+
+Five faults in the tool were found by running it and are fixed: it called three
+slow commands broken, it named coincidences as sources, it deleted the cache
+when asked a narrow question, it trusted a cache made from different code, and
+it would have run itself for three hours recursively.
+
 **A second way of making features, and the reason tile coding wins.** Radial
 basis features answer how close a point is to each of some centres, rather than
 which cells it is in. `LinearAgent` now takes either, through a `Coder`
