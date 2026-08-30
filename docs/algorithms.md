@@ -1907,9 +1907,21 @@ on five seeds and six hundred episodes:
 
 ```console
 $ python scripts/measure_control.py --env cartpole --episodes 600 \
+    --agents actor-critic --set entropy=0.01
+$ python scripts/measure_control.py --env cartpole --episodes 600 \
     --agents actor-critic --set entropy=0.05
+$ python scripts/measure_control.py --env cartpole --episodes 600 \
+    --agents actor-critic --set entropy=0.1
+$ python scripts/measure_control.py --env cartpole --episodes 600 \
+    --agents actor-critic --set entropy=0.2
 ```
 
+One command a row. Each run is built with one entropy and prints one row, so
+naming only the 0.05 command left the other three rows with nothing behind
+them.
+
+<!-- not checked, column entropy: the cells hold the setting each row was run
+at rather than anything a run produced -->
 | entropy | mean | each seed |
 | --- | ---: | --- |
 | 0.01, the default | 8.4 | 8 8 8 8 9 |
@@ -1945,12 +1957,21 @@ one as for the tile coder above: a default is worth choosing by measurement.
 ```console
 $ python scripts/measure_control.py --env cartpole --episodes 600 \
     --agents reinforce --set entropy=0.05
+$ python scripts/measure_control.py --env cartpole --episodes 600 \
+    --agents reinforce --set entropy=0.01
 $ python scripts/measure_agents.py --env cliff --agents reinforce \
     --runs 12 --episodes 400 --each-seed --set entropy=0.05
+$ python scripts/measure_agents.py --env cliff --agents reinforce \
+    --runs 12 --episodes 400 --each-seed --set entropy=0.01
 ```
+
+One command a row again, and the default of this agent is 0.05, so the 0.01
+rows need to ask for it.
 
 **Cart pole**, five seeds, six hundred episodes:
 
+<!-- not checked, column entropy: the cells hold the setting each row was run
+at rather than anything a run produced -->
 | entropy | mean | each seed |
 | --- | ---: | --- |
 | 0.01 | 356.5 | 500 143 140 500 500 |
@@ -1959,10 +1980,12 @@ $ python scripts/measure_agents.py --env cliff --agents reinforce \
 **Cliff walk**, twelve seeds, four hundred episodes, exact value of the greedy
 policy:
 
+<!-- not checked, column entropy: the cells hold the setting each row was run
+at rather than anything a run produced -->
 | entropy | mean of those that finish | policy never finishes | each seed |
 | --- | ---: | ---: | --- |
-| 0.01 | **-13.22** | 3 of 12 | -15 -13 never -13 -13 -13 -13 never -13 never -13 -13 |
-| 0.05 | -13.73 | **1 of 12** | -13 -13 -13 -13 -13 -13 -15 -13 -15 never -15 -15 |
+| 0.01 | **-13.22** | 3 | -15 -13 never -13 -13 -13 -13 never -13 never -13 -13 |
+| 0.05 | -13.73 | **1** | -13 -13 -13 -13 -13 -13 -15 -13 -15 never -15 -15 |
 
 So 0.05 is the default. On the cart pole it is the whole score against two
 thirds of it. On the cliff walk it is a trade rather than a win: it loses one
@@ -2348,9 +2371,11 @@ saying so and why, which the report prints instead of listing their numbers as
 missing. The reason is required, because a table that exempts itself silently
 is how a number that moved would hide.
 
-**Almost nothing had drifted.** That is the result. Every table checked so far
-still prints what is written under it, and what the page had wrong was where
-its numbers came from rather than what they were.
+**Nothing had drifted.** That is the result, and it is the whole run rather
+than a sample: **34 of the 34 tables this page states results in are wholly
+accounted for by a command it names, and none by no command at all.** Every
+number that was ever in doubt turned out to be right. What the page had wrong
+was where its numbers came from, and it had that wrong in a dozen places.
 
 ### What it cannot see
 
@@ -2365,10 +2390,10 @@ its numbers came from rather than what they were.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **402 of this
+- **Any number written in a sentence.** It reads tables, and **407 of this
   page's numbers are in prose rather than in a cell**, against 1074 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 402 are settings, seed counts and episode caps rather than anything a
+  those 407 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -2411,9 +2436,13 @@ written as a console block.
 
 ### Where it is weak
 
-- **Three hours.** One command alone is nearly forty minutes. The cache is what
-  makes a second opinion cheap, and without it nobody would run this twice.
-- **786 of 1077 numbers are checked.** The rest are in a table or a column that
+- **Two and a half hours.** Three commands take more than half an hour each,
+  and one of them has never finished: `rel train mcts --env maze --set
+  reuse=off` was still going at fifty minutes and gave up there. The cache is
+  what makes a second opinion cheap, and it writes down which commands ran out
+  of time so a resumed run does not spend the budget on them again. With every
+  command cached the whole page answers in a second.
+- **776 of 1067 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
