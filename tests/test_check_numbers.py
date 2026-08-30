@@ -131,24 +131,28 @@ $ python third.py
         _, claims = script.read(write(tmp_path, self.PAGE))
         assert [claim.line for claim in claims] == [7, 13, 22]
 
-    def test_each_table_remembers_the_command_nearest_above_it(
+    def test_each_table_remembers_the_whole_block_above_it(
         self, script: ModuleType, tmp_path: Path
     ) -> None:
-        """A hint rather than an answer. It settles a tie when two commands
-        account for a table equally well, and the report names it when the
-        command that accounts for a table is a different one."""
+        """All of the block's commands rather than its last one.
+
+        A block that shows four commands and then four tables has all four
+        above every one of them. Taking the last made three of the four read
+        as attributed to a command that was not theirs, which is a false
+        alarm in the one place the report has to be trusted.
+        """
         _, claims = script.read(write(tmp_path, self.PAGE))
-        assert [claim.nearest for claim in claims] == [
-            "python first.py",
-            "python first.py",
-            "python third.py",
+        assert [claim.near for claim in claims] == [
+            ["python first.py"],
+            ["python first.py"],
+            ["python second.py", "python third.py"],
         ]
 
     def test_a_table_before_any_command_is_still_a_table(
         self, script: ModuleType, tmp_path: Path
     ) -> None:
         _, claims = script.read(write(tmp_path, "| a | 1 |\n\n```console\n$ x\n```\n"))
-        assert [claim.nearest for claim in claims] == [""]
+        assert [claim.near for claim in claims] == [[]]
 
     def test_a_block_that_is_not_console_is_not_a_command(
         self, script: ModuleType, tmp_path: Path
@@ -225,7 +229,7 @@ class TestAttributingATableToACommand:
     """
 
     def claim(self, script: ModuleType, row: str, nearest: str = "") -> object:
-        made = script.Claim(1, nearest)
+        made = script.Claim(1, [nearest] if nearest else [])
         made.rows = [row]
         return made
 
@@ -373,8 +377,8 @@ class TestAgainstTheRealPage:
         never names a command for, and matching is the only thing that can
         say which those are."""
         commands, claims = script.read(script.ROOT / "docs" / "algorithms.md")
-        nearest = {claim.nearest for claim in claims}
-        assert len(nearest) < len(commands)
+        blocks = {tuple(claim.near) for claim in claims}
+        assert len(blocks) < len(commands)
 
 
 class TestWhatTheExitCodeMeans:
@@ -1019,3 +1023,60 @@ class TestANarrowedRunKeepsTheWholeCache:
         self.run_with(script, monkeypatch, page, cache, "--only", "2.5")
         capsys.readouterr()
         assert set(self.held(cache)) == {'python -c "print(2.5)"'}
+
+
+class TestABlockOfSeveralCommandsIsAllAboveItsTables:
+    """The false alarm this fixes, at the smallest size that shows it.
+
+    `The same table, four more environments` writes four commands and then
+    four tables. Every table matches one of the four, and taking only the
+    last command as "the one above it" made three of the four report as
+    attributed to a command that was not theirs. A report has to be trusted
+    to be read, and that is three false alarms out of four.
+    """
+
+    PAGE = (
+        "```console\n"
+        '$ python -c "print(1.5)"\n'
+        '$ python -c "print(2.5)"\n'
+        "```\n\n"
+        "| a | b |\n| --- | --- |\n| x | 1.5 |\n\n"
+        "| a | b |\n| --- | --- |\n| y | 2.5 |\n"
+    )
+
+    def go(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        page: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> str:
+        monkeypatch.setattr(sys, "argv", ["check_numbers", "--doc", str(page), "--all"])
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        script.main()
+        return capsys.readouterr().out
+
+    def test_neither_table_is_called_misplaced(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        printed = self.go(script, monkeypatch, write(tmp_path, self.PAGE), capsys)
+        assert "2 of 2 tables are wholly accounted for" in printed
+        assert "in no block above it" not in printed
+
+    def test_a_table_matching_a_command_from_another_block_is_named(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # The case the message is actually for: the numbers come from a
+        # command written somewhere else on the page.
+        page = self.PAGE + '\n```console\n$ python -c "print(9.5)"\n```\n\n'
+        page += "| a | b |\n| --- | --- |\n| z | 1.5 |\n"
+        printed = self.go(script, monkeypatch, write(tmp_path, page), capsys)
+        assert "in no block above it" in printed

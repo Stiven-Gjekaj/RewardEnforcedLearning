@@ -158,9 +158,14 @@ class Claim:
 
     #: The line the table starts on, for a report a reader can navigate by.
     line: int
-    #: The command written closest above it. A hint and not an answer: the
-    #: report says when the command that accounts for a table is not this one.
-    nearest: str = ""
+    #: Every command in the console block closest above it. A hint and not an
+    #: answer: the report says when the command that accounts for a table is
+    #: in no block above it.
+    #:
+    #: All of them rather than the last. A block that shows four commands and
+    #: then four tables has all four above every one of them, and taking the
+    #: last made three of the four read as attributed to the wrong command.
+    near: list[str] = field(default_factory=list)
     #: Why this table is not checked, when it says so itself. Empty otherwise.
     exempt: str = ""
     #: The one column that is not checked, when the marker names one. The rest
@@ -249,6 +254,7 @@ def read(path: Path) -> tuple[list[str], list[Claim]]:
     inside = False
     exempt = ""
     skipped = ""
+    block: list[str] = []
     index = 0
 
     while index < len(lines):
@@ -288,8 +294,13 @@ def read(path: Path) -> tuple[list[str], list[Claim]]:
             index += 1
             claim, inside = None, False
             if language == "console":
-                for command in commands_in(fence):
-                    if command not in commands and not is_this_script(command):
+                block = [
+                    command
+                    for command in commands_in(fence)
+                    if not is_this_script(command)
+                ]
+                for command in block:
+                    if command not in commands:
                         commands.append(command)
             continue
 
@@ -301,7 +312,7 @@ def read(path: Path) -> tuple[list[str], list[Claim]]:
                     if heading_of(text) in NOT_RESULTS
                     else Claim(
                         index + 1,
-                        commands[-1] if commands else "",
+                        list(block),
                         exempt=exempt,
                         skipped=skipped,
                     )
@@ -380,9 +391,9 @@ def missing(wanted: list[str], available: list[str]) -> list[str]:
 def attribute(claim: Claim, printed: dict[str, list[str]]) -> tuple[str, list[str]]:
     """The command that accounts for most of a table, and what it still misses.
 
-    Ties go to the command written nearest above the table, so a page that
-    does say where a table came from is taken at its word whenever the numbers
-    do not disagree with it.
+    Ties go to a command in the block above the table, so a page that does say
+    where a table came from is taken at its word whenever the numbers do not
+    disagree with it.
     """
     wanted = claim.numbers
     best: tuple[str, list[str]] = ("", wanted)
@@ -396,7 +407,7 @@ def attribute(claim: Claim, printed: dict[str, list[str]]) -> tuple[str, list[st
             # to print is enough to make one.
             continue
         if len(absent) < len(best[1]) or (
-            len(absent) == len(best[1]) and command == claim.nearest
+            len(absent) == len(best[1]) and command in claim.near
         ):
             best = (command, absent)
     return best
@@ -444,7 +455,11 @@ def main() -> int:
     every = list(commands)
     if args.only:
         commands = [command for command in commands if args.only in command]
-        claims = [claim for claim in claims if args.only in claim.nearest]
+        claims = [
+            claim
+            for claim in claims
+            if any(args.only in command for command in claim.near)
+        ]
 
     if args.list or not (args.only or args.all):
         stated = sum(len(claim.numbers) for claim in claims if not claim.exempt)
@@ -454,14 +469,14 @@ def main() -> int:
             f"{stated} numbers are checked and {left} are not.\n"
         )
         for line in table(
-            ["line", "numbers", "not checked", "nearest command above it"],
+            ["line", "numbers", "not checked", "the block above it"],
             [
                 [
                     f"{claim.line}",
                     f"{len(claim.numbers)}",
                     claim.exempt
                     or (f"column {claim.skipped}" if claim.skipped else ""),
-                    claim.nearest,
+                    claim.near[0] if claim.near else "",
                 ]
                 for claim in claims
             ],
@@ -542,12 +557,13 @@ def main() -> int:
         stated = len(claim.numbers)
         if not absent:
             clean += 1
-            if command != claim.nearest:
+            if command not in claim.near:
+                above = claim.near[0] if claim.near else "nothing"
                 print(
                     f"line {claim.line}: all {stated} numbers, but from\n"
                     f"  {command}\n"
-                    f"  rather than the command above it, which is\n"
-                    f"  {claim.nearest}"
+                    f"  which is in no block above it. The nearest block starts\n"
+                    f"  {above}"
                 )
             continue
 
