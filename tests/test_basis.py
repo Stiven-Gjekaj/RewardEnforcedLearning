@@ -225,6 +225,31 @@ class TestKeeping:
             0.026, abs=0.001
         )
 
+    def test_the_share_that_is_dropped_is_a_range(self) -> None:
+        """The test above uses one point and the module described the box.
+
+        How much the eight largest carry depends on where the point sits: on
+        a centre they are nearly everything, and between four of them they
+        are not. A single point read as a property of the encoder is the
+        mistake this file has made twice.
+        """
+        exact = RadialBasis(UNIT, bins=6)
+        cheap = RadialBasis(UNIT, bins=6, kept=8)
+
+        shares: list[float] = []
+        moves: list[float] = []
+        for across in range(51):
+            for down in range(51):
+                point = (across / 50, down / 50)
+                whole = weights(exact, point)
+                part = weights(cheap, point)
+                shares.append(sum(whole[index] for index in part))
+                moves.append(max(abs(part[i] - whole[i]) for i in part))
+
+        assert min(shares) == pytest.approx(0.85, abs=0.01)
+        assert max(shares) == pytest.approx(1.00, abs=0.01)
+        assert max(moves) == pytest.approx(0.034, abs=0.001)
+
     def test_a_narrow_enough_width_makes_dropping_nearly_free(self) -> None:
         # The setting in which the sentence would have been true. It is a
         # setting and not the default, which is the whole correction.

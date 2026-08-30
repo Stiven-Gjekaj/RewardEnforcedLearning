@@ -47,10 +47,12 @@ coder and with it the cost of a step.
 It buys eleven percent. It is off by default. Three separate things measuring
 it said, and each one contradicted a sentence that used to stand here.
 
-**The dropped values are not near zero.** At the default width, eight of thirty
-six centres carry 90 percent of the total, and dividing those eight by their
-own smaller total moves the largest of them by 0.026, which is an eighth of
-itself.
+**The dropped values are not near zero.** At the default width the eight
+largest of thirty six centres carry between 85 and 100 percent of the total
+depending on where the point is, and a middling 93. Dividing those eight by
+their own smaller total then moves the largest of them by up to 0.034, which
+where it is worst is a sixth of that feature. At the one point the tests use
+it is 90 percent and 0.026, which is an eighth.
 
 **Dropping brings the boundary back.** Between two centres there is a point
 where the smallest kept value and the largest dropped one cross, and on the two
