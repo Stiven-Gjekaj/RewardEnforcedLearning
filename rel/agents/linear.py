@@ -92,7 +92,7 @@ class Coder(Protocol):
 
 
 class LinearAgent(Agent[Observation]):
-    """The parts that every agent over a tile coder shares."""
+    """The parts that every agent over a coder shares."""
 
     def __init__(
         self,
@@ -123,8 +123,8 @@ class LinearAgent(Agent[Observation]):
 
     def learned(self) -> Iterator[str]:
         # The weights, one line per action. There is no table of states here:
-        # a tile coder turns a state into switches and the weights are per
-        # switch, so what this agent knows is the weights and nothing else.
+        # a coder turns a state into features and the weights are per feature,
+        # so what this agent knows is the weights and nothing else.
         return rows_of(dict(enumerate(self.weights)))
 
     def current_epsilon(self) -> float:
@@ -172,9 +172,10 @@ class LinearAgent(Agent[Observation]):
 
 
 class SemiGradientSarsa(LinearAgent):
-    """SARSA over a tile coder.
+    """SARSA over a coder, which is a tile coder or a radial basis.
 
-    This is the agent the mountain car chapter uses. Like the tabular SARSA it
+    Over a tile coder this is the agent the mountain car chapter uses. Like
+    the tabular SARSA it
     waits for the next action to be taken rather than choosing it early, so
     nothing has to be true about the loop for the update to be right.
     """
@@ -221,7 +222,7 @@ class SemiGradientSarsa(LinearAgent):
 
 
 class SemiGradientQ(LinearAgent):
-    """Q-learning over a tile coder.
+    """Q-learning over a coder, which is a tile coder or a radial basis.
 
     Off-policy, so it needs no held transition: the target is the best value in
     the next state whatever the policy does there.
