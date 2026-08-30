@@ -1445,7 +1445,8 @@ on directly, by arithmetic on the coordinates, and never touches the other
 
 `kept` drops all but the largest few values, and it was going to be the
 default, and it was going to buy back exactly the sparse shape the tile coder
-has. It buys eleven percent.
+has. It buys eleven percent of a step on the mountain car and thirteen on the
+cart pole, and both move by a point between runs of the same machine.
 
 The table above says why. Three quarters of the step is the distances, and they
 are paid before anything can be dropped, because **there is no way to know

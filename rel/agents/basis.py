@@ -44,8 +44,10 @@ same problem. So `kept` drops all but the largest few values, and it was going
 to be the default, and it was going to buy back the sparse shape of a tile
 coder and with it the cost of a step.
 
-It buys eleven percent. It is off by default. Three separate things measuring
-it said, and each one contradicted a sentence that used to stand here.
+It buys eleven percent of a step on the mountain car and thirteen on the cart
+pole, and both move by a point between runs of the same machine. It is off by
+default. Three separate things measuring it said, and each one contradicted a
+sentence that used to stand here.
 
 **The dropped values are not near zero.** At the default width the eight
 largest of thirty six centres carry between 85 and 100 percent of the total
