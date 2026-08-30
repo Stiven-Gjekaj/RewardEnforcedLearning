@@ -14,7 +14,7 @@ How the package is put together, and which decisions the rest of it rests on.
 rel/core.py       the contract: what an environment is, what a step is
 rel/envs/         environments. Never import an agent.
 rel/agents/       agents. Never import an environment.
-rel/nn/           a gradient engine and two networks. Knows nothing of rewards.
+rel/nn/           a gradient engine and three networks. Knows nothing of rewards.
 rel/training.py   the loop that puts an agent in an environment
 rel/ui/           drawing. Nothing that decides anything imports this.
 rel/cli.py        the command line
@@ -317,4 +317,6 @@ negative, an untouched entry of zero is the highest number in the table.
 | Solving exactly | [`rel/agents/dp.py`](../rel/agents/dp.py) |
 | The one step learners | [`rel/agents/td.py`](../rel/agents/td.py) |
 | The gradient engine | [`rel/nn/autograd.py`](../rel/nn/autograd.py) |
+| A point in a box turned into features | [`rel/agents/tiles.py`](../rel/agents/tiles.py) and [`rel/agents/basis.py`](../rel/agents/basis.py) |
 | The rules about layering | [`tests/test_layering.py`](../tests/test_layering.py) |
+| Whether the documentation still says what the code does | [`scripts/check_numbers.py`](../scripts/check_numbers.py) |
