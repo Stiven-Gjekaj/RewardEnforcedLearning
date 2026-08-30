@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -100,6 +102,40 @@ class TestTheLayers:
         # be a suggestion.
         for name in imported_by(PACKAGE / "core.py"):
             assert not name.startswith(("rel.envs", "rel.agents", "rel.ui"))
+
+
+def test_the_readme_says_how_many_tests_there_are() -> None:
+    """The readme states the count in three places and nothing held it.
+
+    It was right when it was written and every test added since made it
+    less right. A number written by hand beside a number a command produces
+    is the fault this project wrote `scripts/check_numbers.py` for, and that
+    checker reads `docs/algorithms.md` rather than this file.
+
+    Collection is asked for in a separate interpreter, because asking the
+    running session how many tests it holds gives a different answer under
+    `pytest -k something`, and a test that passes or fails by how it was
+    invoked is worse than no test.
+    """
+    root = PACKAGE.parent
+    done = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only"],
+        capture_output=True,
+        text=True,
+        cwd=root,
+    )
+    assert done.returncode == 0, done.stdout[-2000:]
+    counted = re.search(r"(\d+) tests collected", done.stdout)
+    assert counted is not None, done.stdout[-2000:]
+    collected = counted.group(1)
+
+    readme = (root / "README.md").read_text()
+    said = re.findall(r"(\d{4}) tests", readme) + re.findall(
+        r"tests-(\d{4})_passing", readme
+    )
+    assert len(said) == 3, said
+    for one in said:
+        assert one == collected, f"the readme says {one} and there are {collected}"
 
 
 def test_every_module_is_counted_in_the_size_table() -> None:
