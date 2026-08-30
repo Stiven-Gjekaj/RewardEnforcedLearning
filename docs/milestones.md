@@ -51,13 +51,20 @@ Seventeen tables carry a comment saying they are not checked and why, because
 some are differences between two runs, or arithmetic, or seconds on a machine.
 The reason is required and printed, because a table that exempts itself
 silently is how a number that moved would hide. A marker can name one column
-rather than the whole table, which keeps 28 numbers under check on a table
-whose only unfixable cell is a timing.
+rather than the whole table, which keeps every number of a table whose only
+unfixable cell is a timing, instead of dropping the model steps and the returns
+beside it.
 
-Five faults in the tool were found by running it and are fixed: it called three
-slow commands broken, it named coincidences as sources, it deleted the cache
-when asked a narrow question, it trusted a cache made from different code, and
-it would have run itself for three hours recursively.
+Nine faults in the tool were found by running it and are fixed. It called
+slow commands broken, named coincidences as sources, deleted the cache when
+asked a narrow question, trusted a cache made from different code, and would
+have run itself for hours recursively. A marker with no end swallowed every
+command and table under it and reported the page clean. A marker naming a
+column its table has not got exempted nothing and said nothing. A command that
+ran out of time was not written down, so every resumed run spent the whole
+budget on it again. And the listing held each reason in a column, which is as
+wide as its widest cell, so the command behind each table sat off the side of
+the terminal.
 
 **A second way of making features, and the reason tile coding wins.** Radial
 basis features answer how close a point is to each of some centres, rather than
@@ -74,8 +81,9 @@ It is cheap because it works out which eight switches are on by arithmetic and
 The plan was to give it one, by keeping only the largest few values. That
 cannot work and the reason is worth the whole track: there is no way to know
 which centres are far away without measuring the distance to all of them, which
-is three quarters of the step. It buys eleven percent, and it pays for that by
-putting the boundary back that the encoder exists to remove. It is off by
+is three quarters of the step. It buys eleven percent of a step on the
+mountain car and thirteen on the cart pole, and it pays for that by putting
+back the boundary the encoder exists to remove. It is off by
 default, and a test named after it sweeps a line across the box to find the
 step it makes.
 
