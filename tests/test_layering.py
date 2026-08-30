@@ -138,6 +138,42 @@ def test_the_readme_says_how_many_tests_there_are() -> None:
         assert one == collected, f"the readme says {one} and there are {collected}"
 
 
+def test_the_milestones_name_the_scripts_that_have_no_test() -> None:
+    """Named rather than counted, because the count went wrong twice.
+
+    The first version of that entry said eleven untested scripts in its
+    heading and twelve in its next sentence, and the real number was nine.
+    A list of names is checkable and a count is only re-countable.
+
+    A script counts as tested when some test loads it by its path, which is
+    how `scripts/` is used from a test: it is not a package, so importing it
+    as one would be a different arrangement than the one that runs.
+    """
+    root = PACKAGE.parent
+    scripts = {found.name for found in (root / "scripts").glob("*.py")}
+    tested = {
+        f"{name}.py"
+        for text in (found.read_text() for found in (root / "tests").glob("*.py"))
+        for name in re.findall(r"scripts[\"/\s]+([a-z_]+)\.py", text)
+    }
+
+    #: The two that measure nothing. One draws the readme banner and one runs
+    #: the gate that continuous integration runs, so neither belongs in a
+    #: note about measurement scripts without tests.
+    apart = {"make_banner.py", "verify.py"}
+
+    # The one sentence that lists them, rather than every mention of a
+    # measurement script in the file. Reading the whole file would let a
+    # script named in that sentence gain a test with nothing complaining,
+    # because the name would still be in the file somewhere else.
+    note = (root / "docs" / "milestones.md").read_text()
+    listed = note.split("So the seven are", 1)
+    assert len(listed) == 2, "the milestones no longer list them"
+    said = set(re.findall(r"`(measure_[a-z_]+\.py)`", listed[1].split(".\n\n")[0]))
+
+    assert said == scripts - tested - apart, sorted(said ^ (scripts - tested - apart))
+
+
 def test_every_module_is_counted_in_the_size_table() -> None:
     """`scripts/lines.py` is what the readme table is copied from.
 
