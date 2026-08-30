@@ -1240,13 +1240,24 @@ choose it because it converges quickly.
 Lengthen the long loop and it pays less per step, so a discounted agent has to
 be more patient to prefer it:
 
+```console
+$ python scripts/measure_average_reward.py --length 2 --episodes 20
+$ python scripts/measure_average_reward.py --length 3 --episodes 20
+$ python scripts/measure_average_reward.py --length 5 --episodes 20
+$ python scripts/measure_average_reward.py --length 8 --episodes 20
+$ python scripts/measure_average_reward.py --length 10 --episodes 20
+```
+
 | long loop | it pays per step | crossover | 0.9 picks | 0.99 picks |
 | ---: | ---: | ---: | ---: | ---: |
-| 2 steps | 5.000 | 0.1111 | long | long |
-| 3 steps | 3.333 | 0.3935 | long | long |
-| 5 steps | 2.000 | 0.7394 | long | long |
-| 8 steps | 1.250 | 0.9408 | **short** | long |
-| 10 steps | 1.000 | 1.0000 | short | short |
+| 2 steps | 5.00 | 0.1111 | long | long |
+| 3 steps | 3.33 | 0.3935 | long | long |
+| 5 steps | 2.00 | 0.7394 | long | long |
+| 8 steps | 1.25 | 0.9408 | **short** | long |
+| 10 steps | 1.00 | 1.0000 | short | short |
+
+One row per command, and the per step column is written to the two places the
+command prints rather than the three it used to carry.
 
 At eight steps the long loop is still a quarter better per step, and **a
 discount of 0.9 takes the short one**. That is not an exotic setting: 0.9 is
