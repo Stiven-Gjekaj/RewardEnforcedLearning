@@ -452,3 +452,67 @@ class TestItRepeats:
 
     def test_keeping_everything_reads_back_as_such(self) -> None:
         assert "kept=None" in repr(RadialBasis(UNIT))
+
+
+class TestWhatTheAgentAsksItFor:
+    """The two answers a linear agent needs and cannot work out itself.
+
+    Both were caught only by a test in `test_linear.py`, which is a test of
+    the agent rather than of the encoder. These are part of what a `Coder`
+    promises, so they are held here as well.
+    """
+
+    def test_the_squared_length_is_the_values_dotted_with_themselves(
+        self,
+    ) -> None:
+        basis = RadialBasis(UNIT, bins=6)
+        _, values = basis.encode((0.31, 0.62))
+        assert basis.squared_length(values) == pytest.approx(
+            sum(value * value for value in values)
+        )
+
+    def test_a_point_on_a_centre_has_the_larger_one(self) -> None:
+        """Which is the whole reason the step size is divided by it.
+
+        A point between centres spreads its value over more features, so the
+        same step in each weight moves the value less, and the divisor is
+        what puts that back.
+        """
+        basis = RadialBasis(UNIT, bins=6)
+        _, on = basis.encode((0.2, 0.4))
+        _, between = basis.encode((0.3, 0.5))
+        assert basis.squared_length(between) < basis.squared_length(on)
+
+    def test_how_much_larger_depends_on_the_width(self) -> None:
+        """The docstring said a point on a centre puts almost everything into
+        that one feature, and at the default width that is false.
+
+        It is true at a quarter of a spacing, where the two points here give
+        0.997 and 0.250. At the default of three quarters they give 0.148 and
+        0.140, because at that width even a point sitting on a centre is
+        spread over its neighbours and its largest feature is 0.287.
+        """
+        narrow = RadialBasis(UNIT, bins=6, width=0.25)
+        assert narrow.squared_length(narrow.encode((0.2, 0.4))[1]) == pytest.approx(
+            0.997, abs=0.001
+        )
+        assert narrow.squared_length(narrow.encode((0.3, 0.5))[1]) == pytest.approx(
+            0.250, abs=0.001
+        )
+
+        wide = RadialBasis(UNIT, bins=6)
+        assert wide.squared_length(wide.encode((0.2, 0.4))[1]) == pytest.approx(
+            0.148, abs=0.001
+        )
+        assert max(wide.encode((0.2, 0.4))[1]) == pytest.approx(0.287, abs=0.001)
+
+    def test_the_starting_weight_is_the_optimism_itself(self) -> None:
+        # The values of a point add to one, so a weight of `optimism` in
+        # every feature makes an unseen state worth exactly `optimism`.
+        basis = RadialBasis(UNIT, bins=6)
+        assert basis.starting_weight(3.0) == 3.0
+
+        _, values = basis.encode((0.31, 0.62))
+        assert sum(basis.starting_weight(3.0) * value for value in values) == (
+            pytest.approx(3.0)
+        )

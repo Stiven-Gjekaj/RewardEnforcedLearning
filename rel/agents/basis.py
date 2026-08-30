@@ -218,12 +218,17 @@ class RadialBasis:
         error the value moves by, which is what it means everywhere else in
         the project. `TileCoder.squared_length` has the arithmetic.
 
-        Here the answer changes from point to point, because the values do. A
-        point sitting on a centre puts almost everything into one feature and
-        the answer is near one; a point equally far from many centres spreads
-        it out and the answer is near one over their count. So the step the
-        weights take is larger where the features are spread out, by exactly
-        the factor that keeps the value moving by the same share of the error.
+        Here the answer changes from point to point, because the values do,
+        and how much it changes depends on the width. At a quarter of a
+        spacing a point sitting on a centre puts almost everything into that
+        one feature and the answer is 0.997, against 0.250 for a point halfway
+        between four of them. At the default of three quarters the same two
+        points give 0.148 and 0.140, because at that width even a point on a
+        centre is spread over its neighbours: its largest feature is 0.287.
+
+        So the step the weights take is larger where the features are spread
+        out, by exactly the factor that keeps the value moving by the same
+        share of the error, and at a wide width that factor barely moves.
         """
         return sum(value * value for value in values)
 
