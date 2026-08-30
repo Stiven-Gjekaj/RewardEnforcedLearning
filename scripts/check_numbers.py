@@ -635,14 +635,21 @@ def main() -> int:
             f"{len(commands)} commands and {len(claims)} tables in {args.doc}.\n"
             f"{stated} numbers are checked and {left} are not.\n"
         )
+        # A word here rather than the reason, and the reasons under the table.
+        # A column is as wide as its widest cell, and the widest reason on
+        # this page is two hundred characters, which pushed the command that
+        # made each table off the side of the terminal.
         for line in table(
-            ["line", "numbers", "not checked", "the block above it"],
+            ["line", "numbers", "checked", "the block above it"],
             [
                 [
                     f"{claim.line}",
                     f"{len(claim.numbers)}",
-                    claim.exempt
-                    or (f"column {', '.join(claim.skipped)}" if claim.skipped else ""),
+                    "no"
+                    if claim.exempt
+                    else (
+                        f"not {', '.join(claim.skipped)}" if claim.skipped else "yes"
+                    ),
                     claim.near[0] if claim.near else "",
                 ]
                 for claim in claims
@@ -650,6 +657,13 @@ def main() -> int:
             align=["right", "right", "left", "left"],
         ):
             print(f"  {line}")
+
+        excused = [claim for claim in claims if claim.exempt]
+        if excused:
+            print(f"\n{len(excused)} tables ask not to be checked, and say why:")
+            for claim in excused:
+                print(f"  line {claim.line}: {claim.exempt}")
+
         if not args.list:
             print("\nRun with --only <text> for one, or --all for every one of them.")
         return 0

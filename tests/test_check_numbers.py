@@ -882,8 +882,37 @@ class TestTheListingSaysWhatIsCovered:
         )
         self.go(script, monkeypatch, page)
         printed = capsys.readouterr().out
-        assert "column time" in printed
+        assert "not time" in printed
         assert "1 numbers are checked" in printed
+
+    def test_the_reasons_go_under_the_table_rather_than_in_it(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A column is as wide as its widest cell.
+
+        The widest reason on the real page is two hundred characters, and
+        holding it in a column pushed the command that made each table off
+        the side of the terminal. A report nobody can read is a report
+        nobody reads.
+        """
+        reason = "a reason long enough to push everything after it off the screen"
+        page = write(
+            tmp_path,
+            "```console\n$ python x.py\n```\n\n"
+            f"<!-- not checked: {reason} -->\n\n"
+            "| a | b |\n| --- | ---: |\n| x | 9 |\n",
+        )
+        self.go(script, monkeypatch, page)
+        printed = capsys.readouterr().out
+
+        rows = [line for line in printed.splitlines() if "python x.py" in line]
+        assert rows and all(reason not in row for row in rows)
+        assert "1 tables ask not to be checked, and say why:" in printed
+        assert reason in printed
 
     def test_most_of_the_page_is_checked(self, script: ModuleType) -> None:
         """A smoke alarm rather than a guard, and it has been moved twice.
