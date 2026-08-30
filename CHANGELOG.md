@@ -314,12 +314,13 @@ Everything below is new.
   Watkins' Q with no decay has to be one step Q-learning cell for cell, and it
   was not, by exactly one row.
 - **The n of n-step SARSA was measuring the step size.** The agent took four
-  steps at a step size of 0.5, and it got stuck more often than any other agent
-  on four grids of five. The obvious reading is that four is too many. It is not: at a step size
-  of 0.1 four steps beats one step by a wide margin, and one step gets stuck on
-  23 of 30 windy grid seeds where four gets stuck on none. The two settings
-  trade, because an n step return carries a value n cells further and n times
-  the spread. Two other explanations were tested first and neither survived.
+  steps at a step size of 0.5, and it got stuck more often than any other
+  agent on four grids of five. The obvious reading is that four is too many.
+  It is not: at a step size of 0.1 four steps beats one step by a wide margin,
+  and one step gets stuck on 23 of 30 windy grid seeds where four gets stuck
+  on none. The two settings trade, because an n step return carries a value n
+  cells further and n times the spread. Two other explanations were tested
+  first and neither survived.
 - **Six seeds said the entropy default was a clean win.** At 0.05 the first
   sweep read -13 on all six cliff walk seeds: the optimal policy every time.
   Twelve seeds says it loses one seed and that the policies it finds are 0.51

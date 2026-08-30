@@ -759,8 +759,9 @@ every entry it takes off the queue.
 optimal, over the seeds where it was. `idle` is the updates per real step over
 the last twenty episodes.*
 
-The median is a factor of nearly ten, and the worst seed the sweeper solves takes
-fewer updates than the median seed the uniform planner solves. Both see the
+The median is a factor of nearly ten, and the worst seed the sweeper
+solves takes fewer updates than the median seed the uniform planner
+solves. Both see the
 same steps and hold the same model. The only difference is which remembered
 step is replayed next.
 
@@ -1480,8 +1481,9 @@ what these runs get, and a radial basis spreads one reward much further than a
 tile does. A tile here is an eighth of the box wide and a point outside it gets
 nothing. A centre is still worth 0.64 at a seventh of the box away, 0.25 at a
 quarter and 0.08 at a third, so the first time a run reaches the flag, far more
-of the space hears about it. The table further up this page runs `tile-sarsa` for 300 episodes and
-it reaches -114.2, which is better than either row here.
+of the space hears about it. The table further up this page runs
+`tile-sarsa` for 300 episodes and it reaches -114.2, which is better than
+either row here.
 
 ### The width is the whole of the setting
 
@@ -2032,7 +2034,8 @@ n  step_size  last 100  error     exact value  stuck
 ```
 
 Two settings give every pair, and that is the point of sweeping two rather than
-one at a time. The trade in [How many steps, and how big a step](#how-many-steps-and-how-big-a-step)
+one at a time. The trade in
+[How many steps, and how big a step](#how-many-steps-and-how-big-a-step)
 is only visible in the grid: at a step size of 0.1 the three values of `n` are
 within noise of each other, and at 0.5 reaching further back costs more with
 every step it reaches.
