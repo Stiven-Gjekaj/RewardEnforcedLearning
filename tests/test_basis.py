@@ -186,6 +186,50 @@ class TestTheWidth:
         assert square[1] == pytest.approx(lopsided[1])
 
 
+class TestTheSquaredLength:
+    """What a step size is divided by, which changes from point to point.
+
+    The module described it with the numbers from two points and called them
+    the encoder's, which is the third time this file has caught that. The
+    range over the box is what the docstring says now, so this measures the
+    range.
+    """
+
+    def spread(self, width: float) -> tuple[float, float, float, float]:
+        basis = RadialBasis(UNIT, bins=6, width=width)
+        whole: list[float] = []
+        inner: list[float] = []
+        for across in range(101):
+            for down in range(101):
+                point = (across / 100, down / 100)
+                length = basis.squared_length(basis.encode(point)[1])
+                whole.append(length)
+                if all(0.2 <= part <= 0.8 for part in point):
+                    inner.append(length)
+        return min(whole), max(whole), min(inner), max(inner)
+
+    def test_a_narrow_width_puts_a_point_on_a_centre_into_one_feature(
+        self,
+    ) -> None:
+        low, high, _, _ = self.spread(0.25)
+        assert low == pytest.approx(0.250, abs=0.001)
+        assert high == pytest.approx(0.999, abs=0.001)
+
+    def test_the_default_width_barely_moves_it(self) -> None:
+        low, high, inner_low, inner_high = self.spread(0.75)
+        assert low == pytest.approx(0.139, abs=0.001)
+        assert high == pytest.approx(0.318, abs=0.001)
+        assert (inner_low, inner_high) == pytest.approx((0.139, 0.153), abs=0.001)
+
+    def test_a_point_on_a_centre_is_spread_over_its_neighbours(self) -> None:
+        # The sentence the module makes out of the two widths. At a quarter
+        # of a spacing a centre keeps nearly all of itself, and at the
+        # default it keeps under a third.
+        for width, largest in ((0.25, 0.999), (0.75, 0.283)):
+            basis = RadialBasis(UNIT, bins=6, width=width)
+            assert max(basis.encode((0.4, 0.4))[1]) == pytest.approx(largest, abs=0.001)
+
+
 class TestKeeping:
     def test_the_default_keeps_every_centre(self) -> None:
         basis = RadialBasis(UNIT, bins=6)

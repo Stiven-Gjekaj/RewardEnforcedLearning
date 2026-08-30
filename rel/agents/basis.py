@@ -225,11 +225,14 @@ class RadialBasis:
 
         Here the answer changes from point to point, because the values do,
         and how much it changes depends on the width. At a quarter of a
-        spacing a point sitting on a centre puts almost everything into that
-        one feature and the answer is 0.997, against 0.250 for a point halfway
-        between four of them. At the default of three quarters the same two
-        points give 0.148 and 0.140, because at that width even a point on a
-        centre is spread over its neighbours: its largest feature is 0.287.
+        spacing it runs over the whole unit square from 0.250, for a point
+        halfway between four centres, to 0.999 for a point sitting on one:
+        at that width a point on a centre puts almost everything into that
+        one feature. At the default of three quarters it runs from 0.139 to
+        0.318, and away from the edges from 0.139 to 0.153, because at that
+        width even a point on a centre is spread over its neighbours. On a
+        centre away from the edge the largest feature is 0.283 rather than
+        the 0.999 a quarter of a spacing gives.
 
         So the step the weights take is larger where the features are spread
         out, by exactly the factor that keeps the value moving by the same
