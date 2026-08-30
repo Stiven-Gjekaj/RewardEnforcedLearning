@@ -56,6 +56,7 @@ names those commands separately.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import math
@@ -124,26 +125,61 @@ COLUMN = ", column "
 ENOUGH = 0.5
 
 
+def without_prose(source: str) -> str:
+    """A module's syntax tree as text, with its docstrings taken out.
+
+    What a command prints depends on what the code does, not on what it says
+    about itself. Hashing the bytes of a file made every corrected comment
+    throw away hours of cache, which is a cost with nothing bought: a
+    docstring cannot change a number.
+
+    Comments are gone already because they are not in the tree. Docstrings
+    are, as the first statement of a module, class or function, so they are
+    removed by hand.
+    """
+    tree = ast.parse(source)
+    holders = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+    for node in ast.walk(tree):
+        if not isinstance(node, holders) or not node.body:
+            continue
+        first = node.body[0]
+        if (
+            isinstance(first, ast.Expr)
+            and isinstance(first.value, ast.Constant)
+            and isinstance(first.value.value, str)
+        ):
+            node.body.pop(0)
+    return ast.dump(tree)
+
+
 def fingerprint() -> str:
-    """A hash of the code every documented command runs.
+    """A hash of the code every documented command runs, and of the Python.
 
     The cache holds what a command printed, and what a command prints depends
     on the code under it. Without this a cache made before a change would
     confirm numbers the code has stopped producing, which is the exact fault
     this whole script exists to catch, committed by the script itself.
 
+    The interpreter is in it because the same code on two Pythons really does
+    print different numbers. CPython 3.12 gave `sum()` compensated summation
+    over floats, and twenty episodes of the cart pole is enough for that to
+    reach the figures a digest hashes. `TestTheDigestIsNotStableAcrossPythons`
+    in `tests/test_linear.py` is that finding.
+
     This file is left out on purpose. Nothing a documented command prints
     depends on the checker, and including it would throw away hours of cache
     every time the report's wording changed.
     """
     running = hashlib.blake2b(digest_size=16)
+    running.update(f"python {sys.version_info[0]}.{sys.version_info[1]}\n".encode())
+
     here = Path(__file__).resolve()
     paths = sorted(ROOT.glob("rel/**/*.py")) + sorted(ROOT.glob("scripts/*.py"))
     for path in paths:
         if path.resolve() == here:
             continue
         running.update(path.relative_to(ROOT).as_posix().encode())
-        running.update(path.read_bytes())
+        running.update(without_prose(path.read_text()).encode())
     return running.hexdigest()
 
 

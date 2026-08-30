@@ -900,12 +900,78 @@ class TestTheCacheKnowsWhenTheCodeChanged:
     ) -> None:
         before = script.fingerprint()
         added = script.ROOT / "scripts" / "a_temporary_file_for_this_test.py"
-        added.write_text("# nothing\n")
+        added.write_text("x = 1\n")
         try:
             assert script.fingerprint() != before
         finally:
             added.unlink()
         assert script.fingerprint() == before
+
+    def test_a_docstring_does_not_move_it(self, script: ModuleType) -> None:
+        """What a command prints depends on what the code does, not on what it
+        says about itself.
+
+        Hashing the bytes of a file made every corrected comment throw away
+        hours of cache, which is a cost with nothing bought.
+        """
+        before = script.fingerprint()
+        path = script.ROOT / "rel" / "agents" / "basis.py"
+        was = path.read_text()
+        try:
+            path.write_text(was.replace('"""Turns a point', '"""Turns a POINT', 1))
+            assert script.fingerprint() == before
+        finally:
+            path.write_text(was)
+
+    def test_a_comment_does_not_move_it(self, script: ModuleType) -> None:
+        before = script.fingerprint()
+        path = script.ROOT / "rel" / "agents" / "basis.py"
+        was = path.read_text()
+        try:
+            path.write_text(was + "\n# a comment that changes nothing\n")
+            assert script.fingerprint() == before
+        finally:
+            path.write_text(was)
+
+    def test_code_does_move_it(self, script: ModuleType) -> None:
+        before = script.fingerprint()
+        path = script.ROOT / "rel" / "agents" / "basis.py"
+        was = path.read_text()
+        try:
+            path.write_text(was.replace("return optimism", "return optimism * 2", 1))
+            assert script.fingerprint() != before
+        finally:
+            path.write_text(was)
+        assert script.fingerprint() == before
+
+    def test_the_interpreter_is_part_of_it(
+        self, script: ModuleType, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The same code on two Pythons really does print different numbers.
+
+        CPython 3.12 gave `sum()` compensated summation over floats, and
+        twenty episodes of the cart pole is enough for that to reach the
+        figures a digest hashes. A cache made on one is not a cache for the
+        other.
+        """
+        before = script.fingerprint()
+        monkeypatch.setattr(sys, "version_info", (9, 9, 9, "final", 0))
+        assert script.fingerprint() != before
+
+    def test_taking_the_prose_out_leaves_the_code(self, script: ModuleType) -> None:
+        one = script.without_prose('def f():\n    """Says a thing."""\n    return 1\n')
+        two = script.without_prose("def f():\n    return 1\n")
+        assert one == two
+
+        three = script.without_prose("def f():\n    return 2\n")
+        assert one != three
+
+    def test_a_string_that_is_not_a_docstring_stays(self, script: ModuleType) -> None:
+        # Only the first statement of a module, class or function is a
+        # docstring. A string used as a value is code.
+        one = script.without_prose('def f():\n    return "a value"\n')
+        two = script.without_prose('def f():\n    return "another"\n')
+        assert one != two
 
     def test_this_script_is_not_part_of_its_own_fingerprint(
         self, script: ModuleType
