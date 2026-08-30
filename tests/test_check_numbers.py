@@ -916,3 +916,106 @@ class TestTheCacheKnowsWhenTheCodeChanged:
             assert script.fingerprint() == before
         finally:
             here.write_bytes(was)
+
+
+class TestANarrowedRunKeepsTheWholeCache:
+    """The bug this class is named after would delete hours of work.
+
+    `--only` narrows which commands run. The cache was written back from the
+    narrowed list, so asking a smaller question threw away every command the
+    question did not ask about. Hours of runs, gone, by looking at one table.
+    """
+
+    PAGE = (
+        "```console\n"
+        '$ python -c "print(1.5)"\n'
+        '$ python -c "print(2.5)"\n'
+        "```\n\n| a | b |\n| --- | --- |\n| x | 1.5 | 2.5 |\n"
+    )
+
+    def run_with(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        page: Path,
+        cache: Path,
+        *rest: str,
+    ) -> None:
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "check_numbers",
+                "--doc",
+                str(page),
+                "--cache",
+                str(cache),
+                "--all",
+                *rest,
+            ],
+        )
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        script.main()
+
+    def held(self, cache: Path) -> dict[str, list[str]]:
+        loaded: dict[str, list[str]] = json.loads(cache.read_text())["printed"]
+        return loaded
+
+    def test_a_whole_run_caches_both(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        cache = tmp_path / "kept.json"
+        self.run_with(script, monkeypatch, write(tmp_path, self.PAGE), cache)
+        capsys.readouterr()
+        assert len(self.held(cache)) == 2
+
+    def test_a_narrowed_run_leaves_the_other_alone(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        cache = tmp_path / "kept.json"
+        page = write(tmp_path, self.PAGE)
+        self.run_with(script, monkeypatch, page, cache)
+        capsys.readouterr()
+
+        # Narrow to one of the two, and make it a command the cache does not
+        # hold, so the run has something to write and therefore something to
+        # write over.
+        page.write_text(self.PAGE.replace("print(1.5)", "print(3.5)"))
+        self.run_with(script, monkeypatch, page, cache, "--only", "3.5")
+        capsys.readouterr()
+
+        assert set(self.held(cache)) == {
+            'python -c "print(2.5)"',
+            'python -c "print(3.5)"',
+        }
+
+    def test_a_command_the_page_dropped_is_still_pruned(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Pruning against the whole page rather than the narrowed run.
+
+        Keeping everything would be the other mistake: a cache that grows for
+        ever and accounts for a table with the output of a command the page
+        stopped naming.
+        """
+        cache = tmp_path / "kept.json"
+        page = write(tmp_path, self.PAGE)
+        self.run_with(script, monkeypatch, page, cache)
+        capsys.readouterr()
+
+        page.write_text(self.PAGE.replace('$ python -c "print(1.5)"\n', ""))
+        self.run_with(script, monkeypatch, page, cache, "--only", "2.5")
+        capsys.readouterr()
+        assert set(self.held(cache)) == {'python -c "print(2.5)"'}

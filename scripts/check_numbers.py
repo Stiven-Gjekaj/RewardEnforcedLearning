@@ -405,11 +405,20 @@ def attribute(claim: Claim, printed: dict[str, list[str]]) -> tuple[str, list[st
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--doc", default="docs/algorithms.md")
-    parser.add_argument("--only", default="", help="run commands containing this")
+    parser.add_argument(
+        "--only",
+        default="",
+        help=(
+            "run only the commands containing this, and report only the "
+            "tables written under one of them. A table whose numbers come "
+            "from a command elsewhere on the page reads as unaccounted for, "
+            "because the command that accounts for it was not run"
+        ),
+    )
     parser.add_argument(
         "--all",
         action="store_true",
-        help="run every command, which takes about an hour",
+        help="run every command, which takes about three hours",
     )
     parser.add_argument("--list", action="store_true", help="say what would run")
     parser.add_argument("--timeout", type=float, default=900.0)
@@ -427,6 +436,12 @@ def main() -> int:
     args = parser.parse_args()
 
     commands, claims = read(ROOT / args.doc)
+    #: Every command on the page, kept before `--only` narrows the run. The
+    #: cache is pruned against this rather than against the narrowed list,
+    #: because a narrowed run that wrote back only what it ran would throw
+    #: away every other command in the cache. That is hours of work, deleted
+    #: by asking a smaller question.
+    every = list(commands)
     if args.only:
         commands = [command for command in commands if args.only in command]
         claims = [claim for claim in claims if args.only in claim.nearest]
@@ -460,6 +475,7 @@ def main() -> int:
     started = time.perf_counter()
     kept = Path(args.cache) if args.cache else None
     printed: dict[str, list[str]] = {}
+    store: dict[str, list[str]] = {}
     code = fingerprint()
     if kept is not None and kept.exists():
         held = json.loads(kept.read_text())
@@ -473,7 +489,8 @@ def main() -> int:
             # outlived the command it was made for would otherwise account
             # for a table with the output of something nobody runs any more.
             was = held["printed"]
-            printed = {name: was[name] for name in commands if name in was}
+            store = {name: was[name] for name in every if name in was}
+            printed = {name: store[name] for name in commands if name in store}
             print(f"{len(printed)} of {len(commands)} commands come from {kept}.\n")
 
     broken: list[str] = []
@@ -493,14 +510,24 @@ def main() -> int:
             broken.append(command)
             continue
         print(f"    {spent:.0f}s", flush=True)
-        printed[command] = NUMBER.findall(output.replace(",", ""))
+        printed[command] = store[command] = NUMBER.findall(output.replace(",", ""))
         if kept is not None:
             # Written after every command rather than at the end, because a
             # run this long is one a person interrupts, and a cache that only
             # exists if the whole thing finished is a cache for nobody.
             kept.write_text(
-                json.dumps({"code": code, "printed": printed}, indent=1, sort_keys=True)
+                json.dumps({"code": code, "printed": store}, indent=1, sort_keys=True)
             )
+
+    if kept is not None:
+        # Again at the end, so the file holds exactly the commands this page
+        # names. Without this a run that had everything already cached would
+        # never rewrite it, and a command the page dropped would sit in the
+        # file for ever. It is pruned on the way in either way, so this is
+        # tidiness rather than correctness.
+        kept.write_text(
+            json.dumps({"code": code, "printed": store}, indent=1, sort_keys=True)
+        )
 
     clean = 0
     orphans = 0
