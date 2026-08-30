@@ -2360,6 +2360,16 @@ row ran 200 where the block runs 400.
 | The engine, faster and unchanged | `python scripts/measure_engine.py` |
 | Decision time against background planning | `python scripts/measure_search.py --episodes 40 --runs 3` |
 | One rule at several dials | `python scripts/measure_exploration.py --rules count-bonus:0.1,count-bonus:2` |
+
+### The commands that are behind no table
+
+These produce nothing on this page. They are how the tool is driven, and the
+settings written in them are examples rather than the ones some table above
+was made with. They sat in the table above until it became clear that a reader
+cannot tell one kind of row from the other by looking.
+
+| What it does | Command |
+| --- | --- |
 | Any one or two settings | `rel sweep <agent> --env <env> --over name=a,b,c` |
 | Specification gaming | `rel gaming` |
 | One run in detail | `rel train q-learning --env cliff --seed 7` |

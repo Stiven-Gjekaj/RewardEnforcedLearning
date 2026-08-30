@@ -52,6 +52,46 @@ def write(tmp_path: Path, text: str) -> Path:
     return path
 
 
+def console_commands(page: Path) -> list[str]:
+    """Every command in a console block, including this script's own.
+
+    `read` drops the ones that run this script, so that a run does not run
+    itself. The closing table is allowed to name it, so the tests that hold
+    that table against the page need the unfiltered list.
+    """
+    import check_numbers
+
+    lines = page.read_text().splitlines()
+    found: list[str] = []
+    index = 0
+    while index < len(lines):
+        if lines[index].strip().startswith("```console"):
+            fence: list[str] = []
+            index += 1
+            while index < len(lines) and not lines[index].strip().startswith("```"):
+                fence.append(lines[index])
+                index += 1
+            found.extend(check_numbers.commands_in(fence))
+        index += 1
+    return found
+
+
+def index_of(page: Path, heading: str) -> list[str]:
+    """The commands one closing table names, in the order it names them."""
+    rows = []
+    inside = False
+    for line in page.read_text().splitlines():
+        text = line.strip()
+        if text == heading:
+            inside = True
+            continue
+        if inside and not text.startswith("|"):
+            break
+        if inside and set(text) - set("|-: "):
+            rows.append(text)
+    return [row.split("`")[-2] for row in rows if "`" in row]
+
+
 class TestReadingACommand:
     def test_one_command(self, script: ModuleType) -> None:
         assert script.commands_in(["$ python one.py"]) == ["python one.py"]
@@ -370,6 +410,48 @@ class TestAgainstTheRealPage:
         for claim in claims:
             for row in claim.rows:
                 assert "scripts/measure" not in row, row
+
+    def test_the_index_names_commands_the_page_runs(self, script: ModuleType) -> None:
+        """The one table this script cannot check, checked here instead.
+
+        The closing table says which command is behind each table on the
+        page, and its cells are commands rather than results, so it is set
+        aside rather than checked. That left nobody looking at it. Five rows
+        had dropped a setting, and four of the five sent a reader to a
+        different table: the importance sampling row ran the default 1500
+        episodes where the block runs 1200.
+        """
+        page = script.ROOT / "docs" / "algorithms.md"
+        named = index_of(page, "| Table | Command |")
+        assert len(named) > 15
+
+        # Every console command, this script's own included. `read` drops
+        # that one so a run does not run itself, and the index still has to
+        # be allowed to name it.
+        runs = set(console_commands(page))
+        for command in named:
+            assert command in runs, command
+
+    def test_the_commands_behind_no_table_are_kept_apart(
+        self, script: ModuleType
+    ) -> None:
+        # The rows that are examples rather than the source of a table. They
+        # have their own heading, so a reader can tell which kind of row is
+        # in front of them and the test above can hold the other kind.
+        page = script.ROOT / "docs" / "algorithms.md"
+        examples = index_of(page, "| What it does | Command |")
+        assert examples
+        assert not set(examples) & set(console_commands(page))
+
+    def test_neither_index_reaches_a_claim(self, script: ModuleType) -> None:
+        # Both are cells full of commands. A number in one of them is part of
+        # a setting, so checking it would ask whether `--seed 7` is still
+        # printed.
+        _, claims = script.read(script.ROOT / "docs" / "algorithms.md")
+        for claim in claims:
+            for row in claim.rows:
+                assert "scripts/" not in row, (claim.line, row)
+                assert "`rel " not in row, (claim.line, row)
 
     def test_every_exempted_column_is_a_column_of_its_table(
         self, script: ModuleType

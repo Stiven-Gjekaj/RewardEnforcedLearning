@@ -82,11 +82,11 @@ ROOT = Path(__file__).resolve().parent.parent
 NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
 
 #: Tables whose cells are commands rather than results, named by their heading
-#: row. The closing table of `algorithms.md` lists what produces every other
-#: table on the page, so every number in it belongs to a command line and not
-#: to a measurement, and checking them would ask whether `--runs 10` is still
-#: printed.
-NOT_RESULTS = frozenset({"table | command"})
+#: row. The two closing tables of `algorithms.md` list what produces every
+#: other table on the page and what the tool's own commands are, so every
+#: number in either belongs to a command line rather than to a measurement.
+#: Checking them would ask whether `--seed 7` is still printed.
+NOT_RESULTS = frozenset({"table | command", "what it does | command"})
 
 #: How a run says it gave up rather than failed. A command that takes longer
 #: than the budget is a fact about the budget, and reporting it beside a
