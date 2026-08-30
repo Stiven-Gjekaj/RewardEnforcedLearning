@@ -1342,6 +1342,8 @@ $ python scripts/measure_approximation.py --runs 10
 
 ### The count of features says the opposite of the cost
 
+<!-- not checked: the microseconds belong to the machine, and the ratio
+between the two encoders is what the section is about -->
 | environment | agent | features | us/step |
 | --- | --- | ---: | ---: |
 | mountain car | tile-sarsa | 648 | **52** |
@@ -1360,6 +1362,7 @@ coder never asks a feature that is off.** It works out which eight switches are
 on directly, by arithmetic on the coordinates, and never touches the other
 52,480. A radial basis has no such route: every centre answers every point.
 
+<!-- not checked: the microseconds belong to the machine -->
 | a step of a four dimensional radial basis, 1296 centres | us |
 | --- | ---: |
 | the distance to all 1296 centres | 755 |
@@ -1904,6 +1907,7 @@ episodes.** The measurement that called it lost runs for four hundred.
 
 Two hundred episodes of the cliff walk, seed 1:
 
+<!-- not checked: the time column belongs to the machine -->
 | agent | time | steps |
 | --- | ---: | ---: |
 | q-learning | 0.05s | 5,159 |
@@ -2093,6 +2097,8 @@ another seed.
 So every change below was checked against the two digests, and every one of
 them left both untouched.
 
+<!-- not checked: every cell is seconds on one machine, and the before
+column is a version of the code that no longer exists -->
 | 20,000 passes each | before | after |
 | --- | ---: | ---: |
 | a whole `reinforce` run | 0.142s | **0.131s** |

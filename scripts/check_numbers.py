@@ -88,6 +88,21 @@ NOT_RESULTS = frozenset({"table | command"})
 #: command that will not run would make the second one unfindable.
 TIMED_OUT = "gave up after"
 
+#: What a table says to be left alone with, and the reason it gives. Written
+#: as an HTML comment above the table, so it is invisible in the rendered page
+#: and in front of the reader who is editing the table.
+#:
+#:     <!-- not checked: these are seconds and belong to the machine -->
+#:
+#: There has to be a way to say this or the tool dies of its own noise. Three
+#: tables on this page report timings, which differ on every machine and every
+#: run, and a report that lists the same twenty unfixable numbers every time
+#: teaches a reader to stop reading it.
+#:
+#: The reason is required and is printed in the report, because a table that
+#: exempts itself without saying why is how a real defect gets hidden.
+EXEMPT = "<!-- not checked:"
+
 #: How much of a table one command has to account for before it is called the
 #: command that table came from. Below this it is a coincidence: three numbers
 #: of seventy is what any output shares with any table, because 0.5 and 10 and
@@ -114,6 +129,8 @@ class Claim:
     #: The command written closest above it. A hint and not an answer: the
     #: report says when the command that accounts for a table is not this one.
     nearest: str = ""
+    #: Why this table is not checked, when it says so itself. Empty otherwise.
+    exempt: str = ""
     rows: list[str] = field(default_factory=list)
 
     @property
@@ -165,10 +182,23 @@ def read(path: Path) -> tuple[list[str], list[Claim]]:
     # heading says it holds commands is skipped whole, and without this the
     # rule under that heading would open a new table of its own.
     inside = False
+    exempt = ""
     index = 0
 
     while index < len(lines):
         text = lines[index].strip()
+
+        if text.startswith(EXEMPT):
+            # A reason worth giving does not always fit on one line, and a
+            # marker that silently does nothing when it wraps is worse than
+            # no marker: the table stops being exempt and nothing says so.
+            said = text[len(EXEMPT) :]
+            while "-->" not in said and index + 1 < len(lines):
+                index += 1
+                said += " " + lines[index].strip()
+            exempt = " ".join(said.split("-->")[0].split()) or "no reason given"
+            index += 1
+            continue
 
         if text.startswith("```"):
             language = text.strip("`")
@@ -191,12 +221,18 @@ def read(path: Path) -> tuple[list[str], list[Claim]]:
                 claim = (
                     None
                     if heading_of(text) in NOT_RESULTS
-                    else Claim(index + 1, commands[-1] if commands else "")
+                    else Claim(
+                        index + 1, commands[-1] if commands else "", exempt=exempt
+                    )
                 )
                 if claim is not None:
                     claims.append(claim)
+                exempt = ""
             if claim is not None:
                 claim.rows.append(text)
+        elif text:
+            claim, inside = None, False
+            exempt = ""
         else:
             claim, inside = None, False
 
@@ -343,8 +379,13 @@ def main() -> int:
 
     clean = 0
     orphans = 0
+    exempt: list[Claim] = []
     print("\n")
     for claim in claims:
+        if claim.exempt:
+            exempt.append(claim)
+            continue
+
         command, absent = attribute(claim, printed)
         stated = len(claim.numbers)
         if not absent:
@@ -373,11 +414,17 @@ def main() -> int:
             f"from\n  {command}\n  missing {shown}{more}"
         )
 
+    checked = len(claims) - len(exempt)
     print(
-        f"\n{clean} of {len(claims)} tables are wholly accounted for by a command "
+        f"\n{clean} of {checked} tables are wholly accounted for by a command "
         f"on the page,\nand {orphans} by no command at all, "
         f"in {time.perf_counter() - started:.0f}s."
     )
+
+    if exempt:
+        print(f"\n{len(exempt)} tables ask not to be checked, and say why:")
+        for claim in exempt:
+            print(f"  line {claim.line}: {claim.exempt}")
     if slow:
         print(
             f"\n{len(slow)} commands took longer than the {args.timeout:.0f}s budget."

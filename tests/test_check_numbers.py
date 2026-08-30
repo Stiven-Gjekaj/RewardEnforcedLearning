@@ -460,3 +460,109 @@ class TestWhatTheExitCodeMeans:
         monkeypatch.setattr(script, "ROOT", page.parent)
         assert script.main() == 0
         assert "definitely-not-a-command" in capsys.readouterr().out
+
+
+class TestATableThatAsksNotToBeChecked:
+    """An HTML comment above a table, invisible in the rendered page.
+
+    There has to be a way to say this or the tool dies of its own noise. Three
+    tables on this page report timings, which differ on every machine and
+    every run, and a report that lists the same twenty unfixable numbers every
+    time teaches a reader to stop reading it.
+    """
+
+    PAGE = (
+        "```console\n$ python x.py\n```\n\n"
+        "<!-- not checked: these are seconds and belong to the machine -->\n\n"
+        "| what | time |\n| --- | ---: |\n| a run | 1.42 |\n"
+    )
+
+    def test_the_reason_is_kept(self, script: ModuleType, tmp_path: Path) -> None:
+        _, claims = script.read(write(tmp_path, self.PAGE))
+        assert claims[0].exempt == "these are seconds and belong to the machine"
+
+    def test_the_table_is_still_read(self, script: ModuleType, tmp_path: Path) -> None:
+        # Read and then set aside, rather than skipped in the parser. A table
+        # nobody parses is a table nobody can report the existence of.
+        _, claims = script.read(write(tmp_path, self.PAGE))
+        assert claims[0].numbers == ["1.42"]
+
+    def test_a_table_without_the_comment_is_not_exempt(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        page = "```console\n$ python x.py\n```\n\n| what | time |\n| --- | ---: |\n| a | 1.42 |\n"
+        _, claims = script.read(write(tmp_path, page))
+        assert claims[0].exempt == ""
+
+    def test_the_exemption_does_not_carry_to_the_next_table(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        """The one way this could quietly turn the whole page off.
+
+        Every table after an exempt one would stop being checked, and the
+        report would say so only by counting, which nobody reads.
+        """
+        page = (
+            self.PAGE
+            + "\nSome prose.\n\n| what | value |\n| --- | ---: |\n| b | 2.5 |\n"
+        )
+        _, claims = script.read(write(tmp_path, page))
+        assert [claim.exempt for claim in claims] == [
+            "these are seconds and belong to the machine",
+            "",
+        ]
+
+    def test_a_reason_that_wraps_onto_a_second_line_still_counts(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        """The mistake this caught, in the page rather than in the script.
+
+        Four tables were marked and two took. The two that did not had a
+        reason long enough to wrap, and the marker read only its first line,
+        so the table quietly went back to being checked.
+        """
+        page = (
+            "```console\n$ python x.py\n```\n\n"
+            "<!-- not checked: the microseconds belong to the machine, and the\n"
+            "ratio between the two is what the section is about -->\n\n"
+            "| a | b |\n| --- | ---: |\n| x | 1.0 |\n"
+        )
+        _, claims = script.read(write(tmp_path, page))
+        assert claims[0].exempt == (
+            "the microseconds belong to the machine, and the ratio between the "
+            "two is what the section is about"
+        )
+
+    def test_a_comment_with_no_reason_says_so(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        # The reason is what stops a table exempting itself to hide a real
+        # defect, so a missing one is recorded rather than accepted quietly.
+        page = (
+            "```console\n$ python x.py\n```\n\n<!-- not checked: -->\n\n"
+            "| a | b |\n| --- | ---: |\n| x | 1.0 |\n"
+        )
+        _, claims = script.read(write(tmp_path, page))
+        assert claims[0].exempt == "no reason given"
+
+    def test_the_report_lists_them_apart_from_the_findings(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        page = write(
+            tmp_path,
+            '```console\n$ python -c "print(9.9)"\n```\n\n'
+            "<!-- not checked: these are seconds -->\n\n"
+            "| what | time |\n| --- | ---: |\n| a run | 1.42 |\n",
+        )
+        monkeypatch.setattr(sys, "argv", ["check_numbers", "--doc", str(page), "--all"])
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        assert script.main() == 0
+
+        printed = capsys.readouterr().out
+        assert "1 tables ask not to be checked" in printed
+        assert "these are seconds" in printed
+        assert "0 of 0 tables are wholly accounted for" in printed
