@@ -103,7 +103,15 @@ step](#how-many-steps-and-how-big-a-step) has the sweep.
 
 ```console
 $ python scripts/measure_agents.py --env windy --runs 10 --episodes 600
+$ python scripts/measure_agents.py --env rooms --runs 10 --episodes 600
+$ python scripts/measure_agents.py --env maze --runs 10 --episodes 600
+$ python scripts/measure_agents.py --env lake --runs 10 --episodes 600
 ```
+
+One command for each of the four tables. This block showed only the first of
+them for nineteen tracks, so three quarters of what follows named no command at
+all, and `python scripts/check_numbers.py` reports a table nothing on the page
+accounts for as exactly that. All four still print what is written under them.
 
 **Windy grid**, best possible **-15**:
 
