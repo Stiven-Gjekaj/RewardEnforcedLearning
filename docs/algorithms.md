@@ -2275,25 +2275,33 @@ a table sitting under a command it did not come from, and the section called
 four tables, and the three other commands were nowhere on this page, so no rule
 about position could have been right.
 
-### Three kinds of thing it finds
+### What it finds
 
-**A command the page never named.** The four environment section is the worst
-case and is fixed: all four commands are written down now, and all four tables
-still print what is under them. There are more of these, and each one is a
-table whose numbers no command on the page accounts for.
+**A command the page never named.** Four tables under one of their four
+commands, in `The same table, four more environments`. Three grids of
+exploration rules with no console block above them at all. Five rows of a
+crossover table, one for each length of the long loop. Every one is written
+down now and every one reproduces.
 
 **A command the page named wrongly.** The importance sampling block said
 `python scripts/measure_importance.py` while the prose beside it said 1200
 episodes. The default is 1500 and 1500 prints a different table. Nothing had
 drifted: the current code at `--episodes 1200` reproduces every number in that
-table exactly, on both grids. The table was right and the line above it was
-wrong, for five tracks.
+table exactly, on both grids. The exploration sweep on a tile coder was the
+same defect with a different setting: it named a command at the default of 300
+episodes where every cart pole row under it is 600.
 
-**A table nothing prints.** Some tables here are differences between two runs,
-or arithmetic, or seconds. No command produces them and none ever will. Those
-carry a comment saying they are not checked and why, which the report prints
-instead of listing their numbers as missing. The reason is required, because a
-table that exempts itself silently is how a number that moved would hide.
+**A table no command could print.** One was a row of updates per seed behind a
+median, which no option of any script produced, so `measure_sweeping.py` gained
+`--each-seed` and prints it. The rest genuinely cannot be printed: differences
+between two runs, arithmetic, seconds on a machine. Those carry a comment
+saying so and why, which the report prints instead of listing their numbers as
+missing. The reason is required, because a table that exempts itself silently
+is how a number that moved would hide.
+
+**Almost nothing had drifted.** That is the result. Every table checked so far
+still prints what is written under it, and what the page had wrong was where
+its numbers came from rather than what they were.
 
 ### What it cannot see
 
