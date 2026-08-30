@@ -2360,20 +2360,55 @@ its numbers came from rather than what they were.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **400 of this
+- **Any number written in a sentence.** It reads tables, and **402 of this
   page's numbers are in prose rather than in a cell**, against 1074 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 400 are settings, seed counts and episode caps rather than anything a
+  those 402 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
   because it is itself a number in a sentence.
 
+### It reads any page
+
+`--doc` takes a path, so the same tool answers for the other documents in this
+repository. Four of them state numbers and all four come back clean:
+
+<!-- not checked: every row is a run of this script, and it does not run
+itself, so no command on this page prints any of these -->
+| page | commands | tables | numbers | it took |
+| --- | ---: | ---: | ---: | ---: |
+| `README.md` | 13 | 4 | 59 | 112s |
+| `docs/specification-gaming.md` | 8 | 6 | 72 | 59s |
+| `docs/milestones.md` | 6 | 1 | 6 | 44s |
+| `docs/grids.md` | 5 | 0 | 0 | 4s |
+
+The grid page's one table is the settings a grid file takes and what each one
+defaults to. Those are the code's own defaults rather than anything a run
+prints, so the column is marked and `tests/test_gridfile.py` holds every one of
+them against the signature that carries it.
+
+Pointing it at those four found six things, and the worst of them was in the
+tool. **It ran `git clone` and `pip install .`**, because the readme's install
+block is a console block and it ran every command in every console block. It
+cloned this repository into itself and installed the package, in order to check
+a table of line counts. It now runs a script under `scripts/` or the package's
+own command line and nothing else, and names in the report what it left alone.
+
+The other five were in the pages. Five commands of the gaming page carry a
+trailing comment, which a shell drops and this handed to the program as
+arguments, so all five were called commands that would not run at all. The
+readme wrote `-4` where `rel gaming` prints `-4.0`, its table of results named
+no command at all, and its table of sizes had drifted by the docstrings this
+sitting rewrote. The grid page shows what a bad setting looks like, which is a
+transcript of a failure rather than a command to run, so it is no longer
+written as a console block.
+
 ### Where it is weak
 
 - **Three hours.** One command alone is nearly forty minutes. The cache is what
   makes a second opinion cheap, and without it nobody would run this twice.
-- **786 of 1061 numbers are checked.** The rest are in a table or a column that
+- **786 of 1077 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
