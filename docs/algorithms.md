@@ -417,15 +417,25 @@ left it out would be a comparison of three answers to a question that has four.
 
 ### On the grids this project already had, all four are the same
 
+```console
+$ python scripts/measure_exploration.py --env cliff
+$ python scripts/measure_exploration.py --env rooms
+$ python scripts/measure_exploration.py --env maze
+```
+
 Ten seeds and three hundred episodes of `q-learning`, each grid at its own
 suggested discount. The four numbers in each cell are the four rules in the
-order above, with optimism last.
+order above, with optimism last. The three runs are one table here and three
+tables on a terminal.
 
 | grid | first episode that reached the goal | settled | value of the policy found |
 | --- | --- | ---: | --- |
-| cliff | 2, 1, 1, 1 | 17, 13, 13, 13 | -13.00 by all four |
-| rooms | 1, 1, 1, 1 | 23, 20, 20, 20 | -20.00 by all four |
+| cliff | 2, 1, 1, 1 | 17, 13, 13, 13 | -13.0000 by all four |
+| rooms | 1, 1, 1, 1 | 23, 20, 20, 20 | -20.0000 by all four |
 | maze | 1, 1, 1, 1 | 16, 15, 16, 14 | 0.5133, 0.4883, 0.4883, 0.5133 |
+
+This section had no command at all above it for nineteen tracks, and the value
+column was rounded to two places where the command prints four.
 
 **Every rule finds the goal on the first episode of nearly every seed.** The
 settled column, which is the mean episode length over the last fifty, only says
