@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-2159_passing-427819?style=for-the-badge" alt="2159 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-2160_passing-427819?style=for-the-badge" alt="2160 tests passing"/>
 </p>
 
 <p align="center">
@@ -360,6 +360,10 @@ scripts/            the scripts that produce the numbers in the documentation,
                     and the one that checks the documentation still says them
 ```
 
+```console
+$ python scripts/lines.py
+```
+
 | Area | Files | Lines |
 | --- | ---: | ---: |
 | Core | 5 | 910 |
@@ -371,8 +375,9 @@ scripts/            the scripts that produce the numbers in the documentation,
 | Command line | 3 | 1658 |
 | **Total** | **56** | **15210** |
 
-Not counting 16329 lines of tests and 4157 of measurement scripts. Run
-`python scripts/lines.py` for the current numbers.
+Not counting 16329 lines of tests and 4157 of measurement scripts. The command
+above prints all of it, and `python scripts/check_numbers.py --doc README.md`
+says whether this table still holds what that command prints.
 
 Three rules about who may import whom are enforced by a test that reads the
 import statements of every module:
@@ -392,7 +397,7 @@ import statements of every module:
 $ pytest
 ```
 
-2159 tests. Some of what they cover, and why each one is there rather than the
+2160 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A

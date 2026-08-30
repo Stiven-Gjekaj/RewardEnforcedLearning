@@ -421,6 +421,22 @@ class TestRunningTheCommand:
         assert trouble == ""
         assert "q-learning" in printed
 
+    def test_a_command_that_reads_a_terminal_is_not_left_waiting(
+        self, script: ModuleType
+    ) -> None:
+        """It would sit there for the whole budget and be called slow.
+
+        Nothing documented here reads from a terminal, and the report for a
+        command that did would say the budget was too small when the budget
+        was never the problem.
+        """
+        printed, taken, trouble = script.run(
+            'python -c "import sys; print(len(sys.stdin.read()))"', 30.0
+        )
+        assert trouble == ""
+        assert printed.strip() == "0"
+        assert taken < 10.0
+
     def test_a_command_that_fails_says_so(self, script: ModuleType) -> None:
         _, _, trouble = script.run("rel train no-such-agent --env cliff", 120.0)
         assert trouble.startswith("exit ")

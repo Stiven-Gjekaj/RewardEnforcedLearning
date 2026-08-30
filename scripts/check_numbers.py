@@ -525,6 +525,10 @@ def run(command: str, seconds: float) -> tuple[str, float, str]:
             cwd=ROOT,
             timeout=seconds,
             check=False,
+            # Nothing documented here reads from a terminal, and a command
+            # that did would sit waiting for the whole budget and then be
+            # reported as slow. An end of file says no rather than nothing.
+            stdin=subprocess.DEVNULL,
         )
     except subprocess.TimeoutExpired:
         return "", time.perf_counter() - started, f"{TIMED_OUT} {seconds:.0f}s"
