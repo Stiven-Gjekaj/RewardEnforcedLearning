@@ -252,10 +252,21 @@ def main() -> int:
     )
 
     print("## Where a radial basis spends a step\n")
-    print("  A four dimensional box at six centres a side, so 1296 of them.\n")
+    # The shape of the cart pole, which is the four dimensional problem here.
+    # The count is worked out rather than written, because a sentence that
+    # says 1296 beside a call that no longer makes 1296 of them is the exact
+    # thing `scripts/check_numbers.py` exists to find.
+    dimensions, bins = 4, 6
+    print(
+        f"  A four dimensional box at six centres a side, "
+        f"so {bins**dimensions} of them.\n"
+    )
     for line in table(
         ["", "us"],
-        [[name, f"{each:.0f}"] for name, each in breakdown(4, 6, args.passes)],
+        [
+            [name, f"{each:.0f}"]
+            for name, each in breakdown(dimensions, bins, args.passes)
+        ],
         align=["left", "right"],
     ):
         print(f"  {line}")

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
+import sys
 from pathlib import Path
 from types import ModuleType
 
@@ -102,6 +103,41 @@ class TestTheBreakdown:
 
     def test_the_centre_count_is_in_the_first_line(self, script: ModuleType) -> None:
         assert "16 centres" in script.breakdown(2, 4, 20)[0][0]
+
+    def test_the_sentence_above_the_table_counts_the_same_centres(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A number written in prose beside a number that came from a run.
+
+        That is the fault `scripts/check_numbers.py` exists to find, and it
+        was in the script that prints both of them: the sentence said 1296
+        while the call beside it decided how many there really were.
+        """
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "measure_approximation",
+                "--runs",
+                "1",
+                "--episodes",
+                "1",
+                "--steps",
+                "10",
+                "--passes",
+                "5",
+            ],
+        )
+        script.main()
+
+        printed = capsys.readouterr().out
+        said = re.search(r"a side, so (\d+) of them", printed)
+        counted = re.search(r"the distance to all (\d+) centres", printed)
+        assert said is not None and counted is not None
+        assert said.group(1) == counted.group(1)
 
     def test_the_distances_are_most_of_the_encoding(self, script: ModuleType) -> None:
         """The claim the section is written to support.
