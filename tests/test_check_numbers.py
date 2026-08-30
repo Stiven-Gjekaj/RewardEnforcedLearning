@@ -52,6 +52,25 @@ def write(tmp_path: Path, text: str) -> Path:
     return path
 
 
+def prose_numbers(script: ModuleType, page: Path) -> int:
+    """How many numbers are on the page outside a table, a fence or a marker.
+
+    The same reading the page states: a table cell is a result by
+    construction, and everything here is what the tool never looks at.
+    """
+    found = 0
+    fenced = False
+    for line in page.read_text().splitlines():
+        text = line.strip()
+        if text.startswith("```"):
+            fenced = not fenced
+            continue
+        if fenced or text.startswith(("|", "<!--")):
+            continue
+        found += len(script.NUMBER.findall(text.replace(",", "")))
+    return found
+
+
 def console_commands(page: Path) -> list[str]:
     """Every command in a console block, including this script's own.
 
@@ -1671,6 +1690,35 @@ class TestThePageSaysHowMuchOfItselfIsChecked:
         checked = sum(len(c.numbers) for c in claims if not c.exempt)
         every = sum(len(c.numbers) for c in claims)
         assert self.stated(script) == (checked, every)
+
+    def test_the_count_of_numbers_in_prose_matches(self, script: ModuleType) -> None:
+        """The page says how much of itself this tool cannot see at all.
+
+        A table cell is a result by construction and a sentence is not, so
+        the tool reads tables. That leaves a quarter of the page's numbers
+        unread, and saying so is the difference between a limitation and a
+        blind spot.
+        """
+        page = script.ROOT / "docs" / "algorithms.md"
+        found = re.search(
+            r"\*\*(\d+) of this\n  page's numbers are in prose", page.read_text()
+        )
+        assert found is not None, "the page no longer says how many are in prose"
+        assert int(found[1]) == prose_numbers(script, page)
+
+    def test_it_counts_neither_tables_nor_fences_as_prose(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        # Otherwise the count above would be the whole page and would say
+        # nothing about what the tool misses.
+        page = write(
+            tmp_path,
+            "Two numbers here, 1 and 2.\n\n"
+            "```console\n$ python x.py --runs 3\n```\n\n"
+            "| a | b |\n| --- | --- |\n| 4 | 5 |\n\n"
+            "<!-- not checked: 6 -->\n\nAnd 7.\n",
+        )
+        assert prose_numbers(script, page) == 3
 
     def test_a_marker_can_name_two_columns(
         self, script: ModuleType, tmp_path: Path

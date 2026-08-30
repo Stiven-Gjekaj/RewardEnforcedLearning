@@ -2324,6 +2324,14 @@ its numbers came from rather than what they were.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
+- **Any number written in a sentence.** It reads tables, and **392 of this
+  page's numbers are in prose rather than in a cell**, against 1074 in cells.
+  A table cell is a result by construction and a sentence is not: most of
+  those 392 are settings, seed counts and episode caps rather than anything a
+  run produced, so matching them against the outputs would bury the report in
+  noise. Two of the wrong numbers found while building this were in prose, and
+  both were found by reading rather than by the tool. A test holds this count,
+  because it is itself a number in a sentence.
 
 ### Where it is weak
 
