@@ -105,6 +105,29 @@ def digest_of(agent: Agent[Any]) -> str | None:
     `None` rather than the hash of nothing, because the hash of nothing is the
     same for every agent that keeps nothing and would read as a fact about the
     agent.
+
+    ## It is not the same on every Python
+
+    CPython 3.12 gave `sum()` compensated summation over floats. That is more
+    accurate than adding them up one at a time and it is therefore a different
+    answer, so an agent whose arithmetic goes through `sum` can learn a table
+    that differs in its last bits between one interpreter and another.
+
+    Measured over five agents at the episode counts their tests use, one moves
+    and four do not. `tile-sarsa` on the cart pole gives 54f7 on 3.11 and 5c5e
+    on 3.12 and above. `expected-sarsa`, `tree-backup`, `off-policy-mc` and
+    `reinforce` all give the same digest on all three, although every one of
+    them sums floats as well. The difference needs enough arithmetic to
+    accumulate before it reaches the twelve figures hashed here, and twenty
+    episodes of a four dimensional tile coder is enough where the others are
+    not.
+
+    **The run digest does not move on any of them.** It hashes transitions,
+    and an observation written to a fixed number of figures survives a
+    difference in the last bits of a value, because a policy is a comparison
+    between values rather than a value. That is the other reason to keep the
+    two apart. `TestTheDigestIsNotStableAcrossPythons` in
+    `tests/test_linear.py` is the demonstration.
     """
     running = hashlib.blake2b(digest_size=8)
     empty = True
