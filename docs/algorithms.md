@@ -850,7 +850,7 @@ model steps beside it are the currency this section counts in -->
 | `mcts`, 10 simulations | 16 | 0.4633 | | 94,296 | 2s |
 | `mcts`, 25 simulations | 16 | 0.4633 | | 180,736 | 4s |
 | `mcts`, 50 simulations | 16 | 0.4633 | | 309,069 | 7s |
-| `mcts`, 50, `reuse=off` | 330 | - | 3 of 3 | 42,345,425 | 815s |
+| `mcts`, 50, `reuse=off` | 330 | - | 3 | 42,345,425 | 815s |
 | `dyna-q`, 5 planning steps | 15 | **0.5133** | | **7,345** | 0s |
 | `dyna-q`, 20 planning steps | 16 | **0.5133** | | 26,480 | 0s |
 | `prioritised-sweeping` | 17 | **0.5133** | | **3,575** | 0s |
@@ -915,9 +915,9 @@ $ python scripts/measure_search.py --env cliff --episodes 10 --runs 3 \
 model steps beside it are the currency this section counts in -->
 | agent | settled | policy found | stuck | model steps | time |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `mcts`, 50 simulations | **500** | - | 3 of 3 | **15,000,000** | 324s |
-| `dyna-q`, 5 planning steps | 56 | - | 3 of 3 | 2,815 | 0s |
-| `prioritised-sweeping` | 44 | **-13.00** | | 2,201 | 0s |
+| `mcts`, 50 simulations | **500** | - | 3 | **15,000,000** | 324s |
+| `dyna-q`, 5 planning steps | 56 | - | 3 | 2,815 | 0s |
+| `prioritised-sweeping` | 44 | **-13.0000** | | 2,201 | 0s |
 
 *The cliff walk, three seeds, ten episodes. The shortest route is 13 steps and
 the step limit is 500.*
@@ -2352,7 +2352,7 @@ its numbers came from rather than what they were.
 
 - **Three hours.** One command alone is nearly forty minutes. The cache is what
   makes a second opinion cheap, and without it nobody would run this twice.
-- **799 of 1074 numbers are checked.** The rest are in a table or a column that
+- **796 of 1071 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
