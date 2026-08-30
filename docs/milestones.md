@@ -270,6 +270,17 @@ value is 0.513.
 
 **Measured.** One agent, two hundred episodes of the cliff walk, seed 1:
 
+```console
+$ rel train q-learning --env cliff --episodes 200 --seed 1
+$ rel train sarsa --env cliff --episodes 200 --seed 1
+$ rel train dyna-q --env cliff --episodes 200 --seed 1 --set planning_steps=20
+$ rel train monte-carlo --env cliff --episodes 200 --seed 1
+$ rel train random --env cliff --episodes 200 --seed 1
+$ rel train reinforce --env cliff --episodes 200 --seed 1
+```
+
+<!-- not checked, column time: seconds belong to the machine, and the machine
+this was measured on is not the one anybody reading it has -->
 | agent | time | steps |
 | --- | ---: | ---: |
 | q-learning | 0.05s | 5,159 |
