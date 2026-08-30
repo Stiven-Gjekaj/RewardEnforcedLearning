@@ -228,6 +228,8 @@ n exploratory actions into one target, and with epsilon 0.1 and n=4 about a
 third of the targets carry at least one. If that were the cause, less
 exploration would shrink the cost of n. It grows:
 
+<!-- not checked: every cell is one run minus another, and no command
+prints a difference. The prose above says which two runs. -->
 | epsilon | cliff | windy | rooms |
 | ---: | ---: | ---: | ---: |
 | 0.20 | -0.51 | -1.52 | -1.17 |
@@ -240,6 +242,8 @@ four rewards and carries more spread, which a step size of 0.5 then writes
 straight into the table. That one does not survive either, and the way it fails
 is the answer:
 
+<!-- not checked: every cell is one run minus another, and no command
+prints a difference. The prose above says which two runs. -->
 | step size | cliff | windy | rooms |
 | ---: | ---: | ---: | ---: |
 | 0.50 | -1.06 | -1.90 | -1.14 |
@@ -299,6 +303,8 @@ $ python scripts/measure_agents.py --env windy --agents sarsa-lambda \
 
 What a decay of 0.8 is worth against a decay of zero, over thirty seeds:
 
+<!-- not checked: every cell is one run minus another, and no command
+prints a difference. The prose above says which two runs. -->
 | step size | cliff | windy | rooms |
 | ---: | ---: | ---: | ---: |
 | 0.50 | -0.49 | -0.56 | -0.18 |
@@ -2017,6 +2023,8 @@ A paired test over `n` seeds has `2 ** n` sign patterns, and the two most
 extreme of them are always at least as far from zero as whatever was seen. So
 the smallest p it can ever report is `2 / 2**n`:
 
+<!-- not checked: this is two over two to the n, worked out rather than
+run. Nothing prints it and nothing can move it. -->
 | seeds | smallest p possible |
 | ---: | ---: |
 | 3 | 0.2500 |

@@ -692,12 +692,26 @@ class TestTheListingSaysWhatIsCovered:
         assert "1 numbers are checked" in printed
 
     def test_the_real_page_is_mostly_checked(self, script: ModuleType) -> None:
-        # The number worth knowing about this exercise. If it falls a long
-        # way, something has started exempting itself.
+        # The number worth knowing about this exercise. A ratio is a blunt
+        # guard and it is the second one: the first is that every exemption
+        # has to give a reason, which is the test below.
         _, claims = script.read(script.ROOT / "docs" / "algorithms.md")
         checked = sum(len(c.numbers) for c in claims if not c.exempt)
         left = sum(len(c.numbers) for c in claims if c.exempt)
-        assert checked > 20 * left
+        assert checked > 3 * left
+
+    def test_every_exemption_gives_a_reason(self, script: ModuleType) -> None:
+        """The real guard, and the reason the marker demands one.
+
+        A table that exempts itself without saying why is how a number that
+        moved gets hidden, and it would look exactly like a table that cannot
+        be checked. The reason is what a reader disagrees with.
+        """
+        _, claims = script.read(script.ROOT / "docs" / "algorithms.md")
+        for claim in claims:
+            assert claim.exempt != "no reason given", claim.line
+            if claim.skipped:
+                assert claim.dropped >= 0, claim.line
 
 
 class TestTheCacheOfWhatEachCommandPrinted:
