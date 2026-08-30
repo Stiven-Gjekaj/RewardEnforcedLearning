@@ -719,6 +719,10 @@ state and action were tried. On a maze where a wall moves after the agent has
 learned a route, that is the difference between finding the new short way and
 keeping the long one:
 
+```console
+$ python scripts/measure_shortcut.py
+```
+
 | agent | mean episode length after a shortcut opens |
 | --- | ---: |
 | dyna-q | 17.9 |
