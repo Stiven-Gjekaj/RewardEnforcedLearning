@@ -1080,3 +1080,85 @@ class TestABlockOfSeveralCommandsIsAllAboveItsTables:
         page += "| a | b |\n| --- | --- |\n| z | 1.5 |\n"
         printed = self.go(script, monkeypatch, write(tmp_path, page), capsys)
         assert "in no block above it" in printed
+
+
+class TestABlockCountsAsOneWhenNoSingleCommandExplainsATable:
+    """A section that runs one script over three grids and shows one table.
+
+    The exploration section does exactly that: a row for the cliff walk, one
+    for four rooms and one for the Dyna maze, from three runs of the same
+    script. No one of the three accounts for the table, and reporting it as
+    two thirds missing would report the shape of the page rather than a
+    number that moved.
+    """
+
+    PAGE = (
+        "```console\n"
+        '$ python -c "print(1.5)"\n'
+        '$ python -c "print(2.5)"\n'
+        "```\n\n"
+        "| grid | value |\n| --- | --- |\n| a | 1.5 |\n| b | 2.5 |\n"
+    )
+
+    def go(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        page: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> str:
+        monkeypatch.setattr(sys, "argv", ["check_numbers", "--doc", str(page), "--all"])
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        script.main()
+        return capsys.readouterr().out
+
+    def test_the_two_together_account_for_it(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        printed = self.go(script, monkeypatch, write(tmp_path, self.PAGE), capsys)
+        assert "1 of 1 tables are wholly accounted for" in printed
+        assert "in no block above it" not in printed
+
+    def test_neither_of_them_does_on_its_own(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        # The half of it that makes the union necessary rather than tidy.
+        _, claims = script.read(write(tmp_path, self.PAGE))
+        for one in ('python -c "print(1.5)"', 'python -c "print(2.5)"'):
+            _command, absent = script.attribute(claims[0], {one: ["1.5"]})
+            assert absent, one
+
+    def test_a_number_in_neither_is_still_missing(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The union must not become a way of explaining anything.
+
+        It is the block's commands and only those, so a number that none of
+        them printed is still reported.
+        """
+        page = write(
+            tmp_path, self.PAGE.replace("| b | 2.5 |", "| b | 2.5 |\n| c | 9.9 |")
+        )
+        printed = self.go(script, monkeypatch, page, capsys)
+        assert "missing 9.9" in printed
+
+    def test_one_command_is_never_joined_to_itself(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        # A block of one has nothing to unite, and a name like "x and x"
+        # appearing in a report would be nonsense.
+        page = '```console\n$ python -c "print(1.5)"\n```\n\n| a | b |\n| --- | --- |\n| x | 1.5 |\n'
+        _, claims = script.read(write(tmp_path, page))
+        command, absent = script.attribute(
+            claims[0], {'python -c "print(1.5)"': ["1.5"]}
+        )
+        assert command == 'python -c "print(1.5)"'
+        assert absent == []

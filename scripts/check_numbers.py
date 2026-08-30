@@ -398,7 +398,20 @@ def attribute(claim: Claim, printed: dict[str, list[str]]) -> tuple[str, list[st
     wanted = claim.numbers
     best: tuple[str, list[str]] = ("", wanted)
     needed = math.ceil(len(wanted) * ENOUGH)
-    for command, available in printed.items():
+
+    #: The commands of one console block, taken together as well as apart. A
+    #: block that runs the same script over three grids and then shows one
+    #: table with a row for each of them cannot be attributed to any one of
+    #: the three, and reporting it as two thirds missing would be reporting
+    #: the shape of the page rather than a number that moved.
+    together: dict[str, list[str]] = {}
+    if len(claim.near) > 1 and all(name in printed for name in claim.near):
+        both: list[str] = []
+        for name in claim.near:
+            both.extend(printed[name])
+        together[" and ".join(claim.near)] = both
+
+    for command, available in {**printed, **together}.items():
         absent = missing(wanted, available)
         if len(wanted) - len(absent) < needed:
             # It accounts for too little of the table to be where the table
@@ -407,7 +420,8 @@ def attribute(claim: Claim, printed: dict[str, list[str]]) -> tuple[str, list[st
             # to print is enough to make one.
             continue
         if len(absent) < len(best[1]) or (
-            len(absent) == len(best[1]) and command in claim.near
+            len(absent) == len(best[1])
+            and (command in claim.near or command in together)
         ):
             best = (command, absent)
     return best
@@ -557,7 +571,7 @@ def main() -> int:
         stated = len(claim.numbers)
         if not absent:
             clean += 1
-            if command not in claim.near:
+            if command not in claim.near and command != " and ".join(claim.near):
                 above = claim.near[0] if claim.near else "nothing"
                 print(
                     f"line {claim.line}: all {stated} numbers, but from\n"
