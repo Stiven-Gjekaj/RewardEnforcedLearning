@@ -66,6 +66,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
+from functools import cache
 from pathlib import Path
 from typing import NotRequired, TypedDict
 
@@ -131,6 +132,7 @@ BESIDE = ","
 ENOUGH = 0.5
 
 
+@cache
 def without_prose(source: str) -> str:
     """A module's syntax tree as text, with its docstrings taken out.
 
@@ -142,6 +144,14 @@ def without_prose(source: str) -> str:
     Comments are gone already because they are not in the tree. Docstrings
     are, as the first statement of a module, class or function, so they are
     removed by hand.
+
+    Held on to by source text rather than by path. Every command's
+    fingerprint parses the whole package, so a run of this page parsed the
+    same fifty six modules sixty three times, which was fourteen seconds of
+    a run whose whole point is to be cheap when everything is cached. Keyed
+    on the text and not the file, so a file that changes under a running
+    process is parsed again and the fingerprint moves, which is what the
+    fingerprint is for.
     """
     tree = ast.parse(source)
     holders = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)

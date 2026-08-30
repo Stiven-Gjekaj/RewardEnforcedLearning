@@ -1276,6 +1276,41 @@ class TestTheCacheKnowsWhenTheCodeChanged:
         two = script.without_prose('def f():\n    return "another"\n')
         assert one != two
 
+    def test_the_same_source_is_parsed_once(self, script: ModuleType) -> None:
+        """Why the parse is held on to at all.
+
+        Every command's fingerprint parses the whole package, so a run of
+        this page parsed the same fifty six modules sixty three times. That
+        was fourteen seconds of a run whose whole point is to cost nothing
+        when everything is cached.
+        """
+        package = len(list(script.ROOT.glob("rel/**/*.py")))
+        script.without_prose.cache_clear()
+
+        script.fingerprint("python scripts/measure_sweeping.py")
+        assert script.without_prose.cache_info().misses == package + 1
+
+        script.fingerprint("python scripts/measure_importance.py")
+        after = script.without_prose.cache_info()
+        # The package again, and one script it has not seen before. Only the
+        # script was parsed: the package came back out of the cache whole.
+        assert after.misses == package + 2
+        assert after.hits == package
+
+    def test_a_file_that_changes_is_parsed_again(self, script: ModuleType) -> None:
+        # Held on to by source text and not by path, so a file edited under a
+        # running process moves the fingerprint. Keying on the path would
+        # make the cache lie about exactly what it exists to catch.
+        before = script.fingerprint()
+        path = script.ROOT / "rel" / "agents" / "basis.py"
+        was = path.read_text()
+        try:
+            path.write_text(was.replace("return optimism", "return optimism * 3", 1))
+            assert script.fingerprint() != before
+        finally:
+            path.write_text(was)
+        assert script.fingerprint() == before
+
     def test_this_script_is_not_part_of_its_own_fingerprint(
         self, script: ModuleType
     ) -> None:
