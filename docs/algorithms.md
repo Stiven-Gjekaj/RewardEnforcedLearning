@@ -2332,28 +2332,34 @@ its numbers came from rather than what they were.
 
 ## Where the numbers on this page can be checked
 
+Every command here is written the way a console block on this page writes it,
+because a row that drops a setting sends a reader to a different table. Five of
+these dropped one, and four of the five changed the answer: the importance
+sampling row ran 1500 episodes where the block runs 1200, and the value network
+row ran 200 where the block runs 400.
+
 | Table | Command |
 | --- | --- |
-| Every agent on a grid | `python scripts/measure_agents.py --env cliff --runs 10` |
-| The agents that approximate | `python scripts/measure_control.py --env cartpole` |
-| One setting swept | `python scripts/measure_control.py --env cartpole --set entropy=0.05` |
-| Every seed behind a mean | `python scripts/measure_agents.py --env cliff --each-seed` |
+| Every agent on a grid | `python scripts/measure_agents.py --runs 10` |
+| The agents that approximate | `python scripts/measure_control.py --env cartpole --episodes 600` |
+| One setting swept | `python scripts/measure_control.py --env cartpole --episodes 600 --agents actor-critic --set entropy=0.05` |
+| Every seed behind a mean | `python scripts/measure_agents.py --env cliff --agents reinforce --runs 12 --episodes 400 --each-seed` |
 | The tile coder offsets | `python scripts/measure_tiling_offsets.py` |
 | Tile coding against a radial basis | `python scripts/measure_approximation.py --runs 10` |
-| Whether this page still says what the code does | `python scripts/check_numbers.py --all` |
-| What importance sampling costs | `python scripts/measure_importance.py` |
+| Whether this page still says what the code does | `python scripts/check_numbers.py --all --cache outputs.json` |
+| What importance sampling costs | `python scripts/measure_importance.py --episodes 1200` |
 | Ordered replay against uniform | `python scripts/measure_sweeping.py --episodes 400` |
-| The seed that gets lost | `python scripts/measure_lost_seed.py --ladder-all` |
+| The seed that gets lost | `python scripts/measure_lost_seed.py --entropies 0.05 0.1 0.2 --ladder-all` |
 | What an option costs | `python scripts/measure_options.py --runs 20` |
 | What crediting the middle buys | `python scripts/measure_intra_option.py --episodes 800 --block 100` |
 | Prediction against a known answer | `python scripts/measure_prediction.py` |
-| Replay and a target network | `python scripts/measure_value_network.py --env cartpole --runs 10 --set step_size=0.02` |
-| Four ways of exploring | `python scripts/measure_exploration.py --runs 10 --each-seed` |
+| Replay and a target network | `python scripts/measure_value_network.py --env cartpole --episodes 400 --runs 10 --set step_size=0.02` |
+| Four ways of exploring | `python scripts/measure_exploration.py` |
 | Which loop a discount chooses | `python scripts/measure_average_reward.py` |
 | How large a difference is noise | `python scripts/measure_noise.py --trials 200` |
 | The engine, faster and unchanged | `python scripts/measure_engine.py` |
 | Decision time against background planning | `python scripts/measure_search.py --episodes 40 --runs 3` |
-| One rule at several dials | `python scripts/measure_exploration.py --rules softmax:0.02,softmax:0.001` |
+| One rule at several dials | `python scripts/measure_exploration.py --rules count-bonus:0.1,count-bonus:2` |
 | Any one or two settings | `rel sweep <agent> --env <env> --over name=a,b,c` |
 | Specification gaming | `rel gaming` |
 | One run in detail | `rel train q-learning --env cliff --seed 7` |
