@@ -208,6 +208,24 @@ def test_the_readme_counts_the_agents_and_the_environments() -> None:
     assert f"{spelled(len(AGENTS))} agents" in readme, len(AGENTS)
 
 
+def test_both_documents_count_the_networks() -> None:
+    """The layer list said two networks and there have been three since the
+    value network track. The readme said three all along, so the two
+    documents disagreed and neither was held to the code."""
+    layers = ast.parse((PACKAGE / "nn" / "layers.py").read_text())
+    networks = [
+        node.name
+        for node in layers.body
+        if isinstance(node, ast.ClassDef) and node.name.endswith("Network")
+    ]
+    assert len(networks) >= 2, networks
+
+    said = spelled(len(networks))
+    for name in ("README.md", "docs/architecture.md"):
+        text = (PACKAGE.parent / name).read_text()
+        assert f"{said} networks" in text, (name, said)
+
+
 def test_the_milestones_name_the_scripts_that_have_no_test() -> None:
     """Named rather than counted, because the count went wrong twice.
 
