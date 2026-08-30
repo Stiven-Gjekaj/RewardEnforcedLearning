@@ -1451,9 +1451,9 @@ p 0.008. Both halves of the answer agree, over ten seeds.
 Read it as an early learning result and not as a verdict. Sixty episodes is
 what these runs get, and a radial basis spreads one reward much further than a
 tile does. A tile here is an eighth of the box wide and a point outside it gets
-nothing. A centre is still worth 0.61 at a seventh of the box away and 0.14 at
-a third, so the first time a run reaches the flag, far more of the space hears
-about it. The table further up this page runs `tile-sarsa` for 300 episodes and
+nothing. A centre is still worth 0.64 at a seventh of the box away, 0.25 at a
+quarter and 0.08 at a third, so the first time a run reaches the flag, far more
+of the space hears about it. The table further up this page runs `tile-sarsa` for 300 episodes and
 it reaches -114.2, which is better than either row here.
 
 ### The width is the whole of the setting

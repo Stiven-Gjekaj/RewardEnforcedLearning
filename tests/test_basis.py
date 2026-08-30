@@ -516,3 +516,33 @@ class TestWhatTheAgentAsksItFor:
         assert sum(basis.starting_weight(3.0) * value for value in values) == (
             pytest.approx(3.0)
         )
+
+
+class TestTheNumbersTheDocumentationQuotes:
+    """Three values of a centre at three distances, quoted in prose.
+
+    Prose is where a number goes unchecked. `check_numbers.py` reads tables
+    and these are in a sentence, and both of them were wrong when written: a
+    seventh of the box gave 0.61 where it is 0.64, and a third gave 0.14 where
+    it is 0.08, because the distances had been rounded before the exponential
+    rather than after.
+    """
+
+    def falls_off_to(self, part: float) -> float:
+        # Centre zero sits at the origin of the unit box, so a point that far
+        # along one axis is exactly that far from it.
+        return RadialBasis(UNIT, bins=6).all_values((0.0, part))[0]
+
+    def test_a_seventh_of_the_box_away(self) -> None:
+        assert self.falls_off_to(1.0 / 7.0) == pytest.approx(0.64, abs=0.005)
+
+    def test_a_quarter_of_the_box_away(self) -> None:
+        assert self.falls_off_to(0.25) == pytest.approx(0.25, abs=0.005)
+
+    def test_a_third_of_the_box_away(self) -> None:
+        assert self.falls_off_to(1.0 / 3.0) == pytest.approx(0.08, abs=0.005)
+
+    def test_a_tile_of_the_documented_coder_is_an_eighth_of_the_box(self) -> None:
+        # The other half of the same sentence. Eight bins a side is what the
+        # registry builds, and a cell is one eighth of the range.
+        assert 1.0 / TileCoder(UNIT, bins=8, grids=8).bins == 0.125
