@@ -454,6 +454,8 @@ eight steps and nothing pays until the end of it. A random policy covers a line
 of length n in about n squared steps, so an agent that has learned nothing
 spends a whole episode not finding out that there is anything to find.
 
+<!-- not checked, column rule, time: the rule column holds the settings
+these rows were run at, and the time column belongs to the machine -->
 | rule | first end | steps to it | settled | value found | time |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `epsilon-greedy` | 18 | 17,500 | 53 | 0.0897 | 24s |
@@ -2300,7 +2302,7 @@ table that exempts itself silently is how a number that moved would hide.
 
 - **Three hours.** One command alone is nearly forty minutes. The cache is what
   makes a second opinion cheap, and without it nobody would run this twice.
-- **806 of 1081 numbers are checked.** The rest are in a table or a column that
+- **799 of 1074 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.

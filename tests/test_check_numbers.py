@@ -602,13 +602,13 @@ class TestATableThatExemptsOneColumn:
         # tables that asked to be left alone.
         _, claims = script.read(write(tmp_path, self.PAGE))
         assert claims[0].exempt == ""
-        assert claims[0].skipped == "time"
+        assert claims[0].skipped == ["time"]
 
     def test_the_column_is_found_by_its_heading(
         self, script: ModuleType, tmp_path: Path
     ) -> None:
         _, claims = script.read(write(tmp_path, self.PAGE))
-        assert claims[0].dropped == 2
+        assert claims[0].dropped == {2}
 
     def test_a_column_that_is_not_there_drops_nothing(
         self, script: ModuleType, tmp_path: Path
@@ -621,7 +621,7 @@ class TestATableThatExemptsOneColumn:
         """
         page = self.PAGE.replace("column time", "column seconds")
         _, claims = script.read(write(tmp_path, page))
-        assert claims[0].dropped == -1
+        assert claims[0].dropped == set()
         assert claims[0].numbers == ["15000", "324"]
 
     def test_naming_no_column_still_exempts_the_whole_table(
@@ -630,14 +630,14 @@ class TestATableThatExemptsOneColumn:
         page = self.PAGE.replace("not checked, column time:", "not checked:")
         _, claims = script.read(write(tmp_path, page))
         assert claims[0].exempt == "seconds belong to the machine"
-        assert claims[0].skipped == ""
+        assert claims[0].skipped == []
 
     def test_the_exemption_does_not_carry_to_the_next_table(
         self, script: ModuleType, tmp_path: Path
     ) -> None:
         page = self.PAGE + "\nProse.\n\n| a | time |\n| --- | ---: |\n| x | 9 |\n"
         _, claims = script.read(write(tmp_path, page))
-        assert [claim.skipped for claim in claims] == ["time", ""]
+        assert [claim.skipped for claim in claims] == [["time"], []]
         assert claims[1].numbers == ["9"]
 
 
@@ -729,8 +729,10 @@ class TestTheListingSaysWhatIsCovered:
         _, claims = script.read(script.ROOT / "docs" / "algorithms.md")
         for claim in claims:
             assert claim.exempt != "no reason given", claim.line
-            if claim.skipped:
-                assert claim.dropped >= 0, claim.line
+            for named in claim.skipped:
+                assert named.strip().lower() in [
+                    cell.strip().lower() for cell in claim.rows[0].strip("|").split("|")
+                ], (claim.line, named)
 
 
 class TestTheCacheOfWhatEachCommandPrinted:
@@ -1297,3 +1299,24 @@ class TestThePageSaysHowMuchOfItselfIsChecked:
         checked = sum(len(c.numbers) for c in claims if not c.exempt)
         every = sum(len(c.numbers) for c in claims)
         assert self.stated(script) == (checked, every)
+
+    def test_a_marker_can_name_two_columns(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        """A table can have more than one column nothing can check.
+
+        The corridor table has both: a rule column whose cells hold settings
+        like `softmax:0.02`, and a time column that belongs to the machine.
+        Exempting the table whole would drop the four results between them.
+        """
+        page = (
+            "```console\n$ python x.py\n```\n\n"
+            "<!-- not checked, column rule, time: the rule column holds settings\n"
+            "and the time column belongs to the machine -->\n\n"
+            "| rule | steps | time |\n| --- | ---: | ---: |\n"
+            "| `softmax:0.02` | 20 | 31s |\n"
+        )
+        _, claims = script.read(write(tmp_path, page))
+        assert claims[0].skipped == ["rule", "time"]
+        assert claims[0].dropped == {0, 2}
+        assert claims[0].numbers == ["20"]

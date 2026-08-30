@@ -114,6 +114,11 @@ EXEMPT = "<!-- not checked"
 #: the section is actually about.
 COLUMN = ", column "
 
+#: What separates two column names inside one marker. A table can have more
+#: than one column nothing can check: the corridor table has a rule column
+#: whose cells hold settings and a time column that belongs to the machine.
+BESIDE = ","
+
 #: How much of a table one command has to account for before it is called the
 #: command that table came from. Below this it is a coincidence: three numbers
 #: of seventy is what any output shares with any table, because 0.5 and 10 and
@@ -235,24 +240,27 @@ class Claim:
     near: list[str] = field(default_factory=list)
     #: Why this table is not checked, when it says so itself. Empty otherwise.
     exempt: str = ""
-    #: The one column that is not checked, when the marker names one. The rest
+    #: The columns that are not checked, when the marker names any. The rest
     #: of the table is checked as usual and `exempt` stays empty.
-    skipped: str = ""
+    skipped: list[str] = field(default_factory=list)
     rows: list[str] = field(default_factory=list)
 
     @property
-    def dropped(self) -> int:
-        """Which column `skipped` is, counting from the left, or minus one.
+    def dropped(self) -> set[int]:
+        """Which columns `skipped` names, counting from the left.
 
         Read off the heading row rather than given, so that a marker naming a
         column that is not there is a marker that does nothing, and the report
         says the table is short of numbers rather than quietly passing.
         """
         if not self.skipped or not self.rows:
-            return -1
+            return set()
         headings = [cell.strip().lower() for cell in self.rows[0].strip("|").split("|")]
-        wanted = self.skipped.strip().lower()
-        return headings.index(wanted) if wanted in headings else -1
+        return {
+            headings.index(name.strip().lower())
+            for name in self.skipped
+            if name.strip().lower() in headings
+        }
 
     @property
     def numbers(self) -> list[str]:
@@ -264,7 +272,7 @@ class Claim:
                 continue
             cells = row.strip("|").split("|")
             for index, cell in enumerate(cells):
-                if index == drop:
+                if index in drop:
                     continue
                 found.extend(NUMBER.findall(cell.replace(",", "").replace("*", "")))
         return found
@@ -320,7 +328,7 @@ def read(path: Path) -> tuple[list[str], list[Claim]]:
     # rule under that heading would open a new table of its own.
     inside = False
     exempt = ""
-    skipped = ""
+    skipped: list[str] = []
     block: list[str] = []
     index = 0
 
@@ -344,10 +352,11 @@ def read(path: Path) -> tuple[list[str], list[Claim]]:
                 said = said.removeprefix(":")
 
             reason = said.strip() or "no reason given"
-            if column.strip():
-                skipped, exempt = column.strip(), ""
+            named = [part.strip() for part in column.split(BESIDE) if part.strip()]
+            if named:
+                skipped, exempt = named, ""
             else:
-                skipped, exempt = "", reason
+                skipped, exempt = [], reason
             index += 1
             continue
 
@@ -386,12 +395,12 @@ def read(path: Path) -> tuple[list[str], list[Claim]]:
                 )
                 if claim is not None:
                     claims.append(claim)
-                exempt, skipped = "", ""
+                exempt, skipped = "", []
             if claim is not None:
                 claim.rows.append(text)
         elif text:
             claim, inside = None, False
-            exempt, skipped = "", ""
+            exempt, skipped = "", []
         else:
             claim, inside = None, False
 
@@ -556,7 +565,7 @@ def main() -> int:
                     f"{claim.line}",
                     f"{len(claim.numbers)}",
                     claim.exempt
-                    or (f"column {claim.skipped}" if claim.skipped else ""),
+                    or (f"column {', '.join(claim.skipped)}" if claim.skipped else ""),
                     claim.near[0] if claim.near else "",
                 ]
                 for claim in claims
