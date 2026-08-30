@@ -711,12 +711,11 @@ def main() -> int:
     for number, command in enumerate(commands, start=1):
         if command in printed:
             continue
+        print(f"[{number}/{len(commands)}] {command}", flush=True)
         if command in already:
-            print(f"[{number}/{len(commands)}] {command}", flush=True)
             print(f"    {TIMED_OUT} {already[command]:.0f}s before", flush=True)
             slow.append((command, already[command]))
             continue
-        print(f"[{number}/{len(commands)}] {command}", flush=True)
         output, spent, trouble = run(command, args.timeout)
         if trouble.startswith(TIMED_OUT):
             print(f"    {trouble}, so nothing below is checked against it", flush=True)
