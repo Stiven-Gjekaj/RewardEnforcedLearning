@@ -791,6 +791,8 @@ agent that was handed the answer is the one to beat.
 
 ### Counted in model steps, because that is what all three spend
 
+<!-- not checked, column time: seconds belong to the machine, and the
+model steps beside it are the currency this section counts in -->
 | agent | settled | policy found | stuck | model steps | time |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `mcts`, 10 simulations | 16 | 0.4633 | | 94,296 | 2s |
@@ -857,6 +859,8 @@ $ python scripts/measure_search.py --env cliff --episodes 10 --runs 3 \
     --only "mcts 50,dyna-q 5,prioritised-sweeping"
 ```
 
+<!-- not checked, column time: seconds belong to the machine, and the
+model steps beside it are the currency this section counts in -->
 | agent | settled | policy found | stuck | model steps | time |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `mcts`, 50 simulations | **500** | - | 3 of 3 | **15,000,000** | 324s |
@@ -1907,7 +1911,8 @@ episodes.** The measurement that called it lost runs for four hundred.
 
 Two hundred episodes of the cliff walk, seed 1:
 
-<!-- not checked: the time column belongs to the machine -->
+<!-- not checked, column time: seconds belong to the machine, and the
+steps beside them are what the section compares -->
 | agent | time | steps |
 | --- | ---: | ---: |
 | q-learning | 0.05s | 5,159 |

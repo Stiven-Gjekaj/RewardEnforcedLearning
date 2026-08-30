@@ -566,3 +566,70 @@ class TestATableThatAsksNotToBeChecked:
         assert "1 tables ask not to be checked" in printed
         assert "these are seconds" in printed
         assert "0 of 0 tables are wholly accounted for" in printed
+
+
+class TestATableThatExemptsOneColumn:
+    """One column out, the rest still checked.
+
+    Two tables here report model steps, returns and a time side by side. The
+    time belongs to the machine and the other five columns are the numbers the
+    section is about, so exempting the table whole to silence one cell would
+    drop the coverage that matters.
+    """
+
+    PAGE = (
+        "```console\n$ python x.py\n```\n\n"
+        "<!-- not checked, column time: seconds belong to the machine -->\n\n"
+        "| agent | steps | time |\n| --- | ---: | ---: |\n| mcts | 15000 | 324s |\n"
+    )
+
+    def test_the_named_column_is_left_out(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        _, claims = script.read(write(tmp_path, self.PAGE))
+        assert claims[0].numbers == ["15000"]
+
+    def test_the_table_is_still_checked(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        # `exempt` stays empty, which is what keeps it out of the list of
+        # tables that asked to be left alone.
+        _, claims = script.read(write(tmp_path, self.PAGE))
+        assert claims[0].exempt == ""
+        assert claims[0].skipped == "time"
+
+    def test_the_column_is_found_by_its_heading(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        _, claims = script.read(write(tmp_path, self.PAGE))
+        assert claims[0].dropped == 2
+
+    def test_a_column_that_is_not_there_drops_nothing(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        """A marker naming a column the table does not have does nothing.
+
+        Read off the heading row rather than trusted, so a heading that gets
+        renamed leaves the report short of numbers and saying so, rather than
+        quietly passing a table nobody is checking any more.
+        """
+        page = self.PAGE.replace("column time", "column seconds")
+        _, claims = script.read(write(tmp_path, page))
+        assert claims[0].dropped == -1
+        assert claims[0].numbers == ["15000", "324"]
+
+    def test_naming_no_column_still_exempts_the_whole_table(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        page = self.PAGE.replace("not checked, column time:", "not checked:")
+        _, claims = script.read(write(tmp_path, page))
+        assert claims[0].exempt == "seconds belong to the machine"
+        assert claims[0].skipped == ""
+
+    def test_the_exemption_does_not_carry_to_the_next_table(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        page = self.PAGE + "\nProse.\n\n| a | time |\n| --- | ---: |\n| x | 9 |\n"
+        _, claims = script.read(write(tmp_path, page))
+        assert [claim.skipped for claim in claims] == ["time", ""]
+        assert claims[1].numbers == ["9"]

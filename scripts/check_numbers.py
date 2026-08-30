@@ -101,7 +101,14 @@ TIMED_OUT = "gave up after"
 #:
 #: The reason is required and is printed in the report, because a table that
 #: exempts itself without saying why is how a real defect gets hidden.
-EXEMPT = "<!-- not checked:"
+EXEMPT = "<!-- not checked"
+
+#: What separates the column named in a marker from the reason for it, so that
+#: one table can say "the time column belongs to the machine" and have the
+#: other five columns still checked. Exempting the whole table over one column
+#: would drop the model steps and the returns beside it, which are the numbers
+#: the section is actually about.
+COLUMN = ", column "
 
 #: How much of a table one command has to account for before it is called the
 #: command that table came from. Below this it is a coincidence: three numbers
@@ -131,16 +138,38 @@ class Claim:
     nearest: str = ""
     #: Why this table is not checked, when it says so itself. Empty otherwise.
     exempt: str = ""
+    #: The one column that is not checked, when the marker names one. The rest
+    #: of the table is checked as usual and `exempt` stays empty.
+    skipped: str = ""
     rows: list[str] = field(default_factory=list)
+
+    @property
+    def dropped(self) -> int:
+        """Which column `skipped` is, counting from the left, or minus one.
+
+        Read off the heading row rather than given, so that a marker naming a
+        column that is not there is a marker that does nothing, and the report
+        says the table is short of numbers rather than quietly passing.
+        """
+        if not self.skipped or not self.rows:
+            return -1
+        headings = [cell.strip().lower() for cell in self.rows[0].strip("|").split("|")]
+        wanted = self.skipped.strip().lower()
+        return headings.index(wanted) if wanted in headings else -1
 
     @property
     def numbers(self) -> list[str]:
         found: list[str] = []
+        drop = self.dropped
         for row in self.rows:
             if set(row) <= set("|-: "):
                 # The rule under a heading row. It carries no claim.
                 continue
-            found.extend(NUMBER.findall(row.replace(",", "").replace("*", "")))
+            cells = row.strip("|").split("|")
+            for index, cell in enumerate(cells):
+                if index == drop:
+                    continue
+                found.extend(NUMBER.findall(cell.replace(",", "").replace("*", "")))
         return found
 
 
@@ -183,6 +212,7 @@ def read(path: Path) -> tuple[list[str], list[Claim]]:
     # rule under that heading would open a new table of its own.
     inside = False
     exempt = ""
+    skipped = ""
     index = 0
 
     while index < len(lines):
@@ -196,7 +226,19 @@ def read(path: Path) -> tuple[list[str], list[Claim]]:
             while "-->" not in said and index + 1 < len(lines):
                 index += 1
                 said += " " + lines[index].strip()
-            exempt = " ".join(said.split("-->")[0].split()) or "no reason given"
+            said = " ".join(said.split("-->")[0].split())
+
+            column = ""
+            if said.startswith(COLUMN.strip()):
+                column, _, said = said[len(COLUMN) - 1 :].partition(":")
+            else:
+                said = said.removeprefix(":")
+
+            reason = said.strip() or "no reason given"
+            if column.strip():
+                skipped, exempt = column.strip(), ""
+            else:
+                skipped, exempt = "", reason
             index += 1
             continue
 
@@ -222,17 +264,20 @@ def read(path: Path) -> tuple[list[str], list[Claim]]:
                     None
                     if heading_of(text) in NOT_RESULTS
                     else Claim(
-                        index + 1, commands[-1] if commands else "", exempt=exempt
+                        index + 1,
+                        commands[-1] if commands else "",
+                        exempt=exempt,
+                        skipped=skipped,
                     )
                 )
                 if claim is not None:
                     claims.append(claim)
-                exempt = ""
+                exempt, skipped = "", ""
             if claim is not None:
                 claim.rows.append(text)
         elif text:
             claim, inside = None, False
-            exempt = ""
+            exempt, skipped = "", ""
         else:
             claim, inside = None, False
 
