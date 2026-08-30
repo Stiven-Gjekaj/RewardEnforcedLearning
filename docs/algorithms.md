@@ -687,12 +687,16 @@ than a weakness that is described.
 
 ```console
 $ rel train dyna-q --env maze --set planning_steps=0
+$ rel train dyna-q --env maze --set planning_steps=5
 $ rel train dyna-q --env maze --set planning_steps=50
 ```
 
 Seed 3, step size 0.1, epsilon 0.1, discount 0.95. Steps taken in each of the
 first ten episodes:
 
+<!-- not checked: the length of each of the first ten episodes of seed 3,
+read off the three runs above rather than printed by any of them. `rel
+train` draws the returns and prints a summary, not a list of step counts -->
 | planning steps | first episode | episodes 2 to 10 |
 | ---: | ---: | --- |
 | 0 | 518 | 321, 1236, 178, 126, 366, 611, 269, 96, 232 |
@@ -2296,7 +2300,7 @@ table that exempts itself silently is how a number that moved would hide.
 
 - **Three hours.** One command alone is nearly forty minutes. The cache is what
   makes a second opinion cheap, and without it nobody would run this twice.
-- **841 of 1081 numbers are checked.** The rest are in a table or a column that
+- **806 of 1081 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
