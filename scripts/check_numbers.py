@@ -67,7 +67,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -218,10 +218,23 @@ class Held(TypedDict):
     The code is per command rather than one stamp for the file, so adding an
     option to one script does not throw away the cached output of the other
     fifty that have never heard of it.
+
+    `gave_up` is the budget a command ran out of, and zero for one that
+    finished. A run that recorded nothing about running out of time re-ran
+    the slowest commands on the page every time, at the full budget each, so
+    resuming a run cost the thing the cache exists to save. It is missing
+    from entries written before this, which is why it is read with a default
+    rather than indexed.
     """
 
     code: str
     numbers: list[str]
+    gave_up: NotRequired[float]
+
+
+def budget_of(entry: Held) -> float:
+    """The budget this command ran out of, or zero if it finished."""
+    return entry.get("gave_up", 0.0)
 
 
 @dataclass
@@ -635,6 +648,10 @@ def main() -> int:
     kept = Path(args.cache) if args.cache else None
     printed: dict[str, list[str]] = {}
     store: dict[str, Held] = {}
+    #: The commands the cache says ran out of a budget at least as large as
+    #: this run's. Empty when there is no cache, which is when every command
+    #: is run and nothing is known about any of them yet.
+    already: dict[str, float] = {}
     if kept is not None and kept.exists():
         was = json.loads(kept.read_text())["printed"]
         # Only the commands this page still asks for, and only those whose
@@ -647,25 +664,57 @@ def main() -> int:
             if name in was and was[name]["code"] == fingerprint(name)
         }
         printed = {
-            name: list(store[name]["numbers"]) for name in commands if name in store
+            name: list(store[name]["numbers"])
+            for name in commands
+            if name in store and not budget_of(store[name])
+        }
+        # A command the file says ran out of a budget at least this large will
+        # run out of this one too. Running it again spends the whole budget to
+        # learn what the file already said, and the slowest commands here are
+        # the ones that made the cache worth having.
+        already = {
+            name: budget_of(store[name])
+            for name in commands
+            if name in store and budget_of(store[name]) >= args.timeout
         }
         stale = sum(1 for name in every if name in was and name not in store)
         print(f"{len(printed)} of {len(commands)} commands come from {kept}.")
+        if already:
+            print(f"{len(already)} of them ran out of time and are not run again.")
         if stale:
             print(f"{stale} were made from code that has since moved.")
         print()
 
     broken: list[str] = []
-    slow: list[str] = []
+    slow: list[tuple[str, float]] = []
+
+    def remember() -> None:
+        """Write the cache out, if there is one.
+
+        After every command rather than at the end, because a run this long
+        is one a person interrupts, and a cache that only exists if the whole
+        thing finished is a cache for nobody.
+        """
+        if kept is not None:
+            kept.write_text(json.dumps({"printed": store}, indent=1, sort_keys=True))
 
     for number, command in enumerate(commands, start=1):
         if command in printed:
+            continue
+        if command in already:
+            print(f"[{number}/{len(commands)}] {command}", flush=True)
+            print(f"    {TIMED_OUT} {already[command]:.0f}s before", flush=True)
+            slow.append((command, already[command]))
             continue
         print(f"[{number}/{len(commands)}] {command}", flush=True)
         output, spent, trouble = run(command, args.timeout)
         if trouble.startswith(TIMED_OUT):
             print(f"    {trouble}, so nothing below is checked against it", flush=True)
-            slow.append(command)
+            slow.append((command, args.timeout))
+            store[command] = Held(
+                code=fingerprint(command), numbers=[], gave_up=args.timeout
+            )
+            remember()
             continue
         if trouble:
             print(f"    could not run it. {trouble}", flush=True)
@@ -673,20 +722,17 @@ def main() -> int:
             continue
         print(f"    {spent:.0f}s", flush=True)
         printed[command] = NUMBER.findall(output.replace(",", ""))
-        store[command] = Held(code=fingerprint(command), numbers=printed[command])
-        if kept is not None:
-            # Written after every command rather than at the end, because a
-            # run this long is one a person interrupts, and a cache that only
-            # exists if the whole thing finished is a cache for nobody.
-            kept.write_text(json.dumps({"printed": store}, indent=1, sort_keys=True))
+        store[command] = Held(
+            code=fingerprint(command), numbers=printed[command], gave_up=0.0
+        )
+        remember()
 
-    if kept is not None:
-        # Again at the end, so the file holds exactly the commands this page
-        # names. Without this a run that had everything already cached would
-        # never rewrite it, and a command the page dropped would sit in the
-        # file for ever. It is pruned on the way in either way, so this is
-        # tidiness rather than correctness.
-        kept.write_text(json.dumps({"printed": store}, indent=1, sort_keys=True))
+    # Again at the end, so the file holds exactly the commands this page
+    # names. Without this a run that had everything already cached would
+    # never rewrite it, and a command the page dropped would sit in the file
+    # for ever. It is pruned on the way in either way, so this is tidiness
+    # rather than correctness.
+    remember()
 
     clean = 0
     orphans = 0
@@ -739,12 +785,12 @@ def main() -> int:
             print(f"  line {claim.line}: {claim.exempt}")
     if slow:
         print(
-            f"\n{len(slow)} commands took longer than the {args.timeout:.0f}s budget."
+            f"\n{len(slow)} commands took longer than the budget they were given."
             f"\nA table of theirs reads as unaccounted for above, because nothing\n"
-            f"ran to account for it. Raise --timeout to check them:"
+            f"ran to account for it. Raise --timeout past the budget shown:"
         )
-        for command in slow:
-            print(f"  {command}")
+        for command, budget in slow:
+            print(f"  {budget:.0f}s: {command}")
 
     if broken:
         # A documented command that will not run is a defect whatever the

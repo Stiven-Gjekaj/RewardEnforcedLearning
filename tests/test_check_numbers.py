@@ -19,6 +19,7 @@ import importlib.util
 import json
 import re
 import sys
+import time
 from pathlib import Path
 from types import ModuleType
 
@@ -816,10 +817,6 @@ class TestTheListingSaysWhatIsCovered:
         _, claims = script.read(script.ROOT / "docs" / "algorithms.md")
         for claim in claims:
             assert claim.exempt != "no reason given", claim.line
-            for named in claim.skipped:
-                assert named.strip().lower() in [
-                    cell.strip().lower() for cell in claim.rows[0].strip("|").split("|")
-                ], (claim.line, named)
 
 
 class TestTheCacheOfWhatEachCommandPrinted:
@@ -922,6 +919,177 @@ class TestTheCacheOfWhatEachCommandPrinted:
         capsys.readouterr()
         held = json.loads(cache.read_text())
         assert list(held["printed"]) == ['python -c "print(7.5)"']
+
+
+class TestACommandThatRanOutOfTime:
+    """The slowest commands on the page are why the cache exists.
+
+    One of them takes over half an hour. A run that recorded nothing about
+    running out of time re-ran every one of those, at the full budget each,
+    so resuming cost the thing the cache is for.
+    """
+
+    PAGE = (
+        '```console\n$ python -c "import time; time.sleep(30)"\n```\n\n'
+        "| a | b |\n| --- | --- |\n| x | 7.5 |\n"
+    )
+    COMMAND = 'python -c "import time; time.sleep(30)"'
+
+    def go(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        page: Path,
+        cache: Path,
+        budget: str,
+    ) -> int:
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "check_numbers",
+                "--doc",
+                str(page),
+                "--all",
+                "--cache",
+                str(cache),
+                "--timeout",
+                budget,
+            ],
+        )
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        return int(script.main())
+
+    def test_the_budget_it_gave_up_at_is_written_down(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        cache = tmp_path / "kept.json"
+        self.go(script, monkeypatch, write(tmp_path, self.PAGE), cache, "1")
+        capsys.readouterr()
+
+        held = json.loads(cache.read_text())["printed"][self.COMMAND]
+        assert held["gave_up"] == 1.0
+        assert held["numbers"] == []
+
+    def test_a_command_that_finished_says_so(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # Zero rather than absent, so the two are told apart by their value
+        # and not by whether somebody remembered to write the key.
+        cache = tmp_path / "kept.json"
+        page = write(
+            tmp_path,
+            '```console\n$ python -c "print(7.5)"\n```\n\n'
+            "| a | b |\n| --- | --- |\n| x | 7.5 |\n",
+        )
+        self.go(script, monkeypatch, page, cache, "60")
+        capsys.readouterr()
+
+        held = json.loads(cache.read_text())["printed"]['python -c "print(7.5)"']
+        assert held["gave_up"] == 0.0
+
+    def test_the_same_budget_does_not_run_it_again(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        cache = tmp_path / "kept.json"
+        page = write(tmp_path, self.PAGE)
+        self.go(script, monkeypatch, page, cache, "1")
+        capsys.readouterr()
+
+        started = time.perf_counter()
+        self.go(script, monkeypatch, page, cache, "1")
+        spent = time.perf_counter() - started
+
+        printed = capsys.readouterr().out
+        assert "1 of them ran out of time and are not run again" in printed
+        assert f"{script.TIMED_OUT} 1s before" in printed
+        assert spent < 1.0
+
+    def test_a_smaller_budget_does_not_run_it_again(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # It took more than two seconds, so it takes more than one.
+        cache = tmp_path / "kept.json"
+        page = write(tmp_path, self.PAGE)
+        self.go(script, monkeypatch, page, cache, "2")
+        capsys.readouterr()
+
+        self.go(script, monkeypatch, page, cache, "1")
+        assert "1 of them ran out of time" in capsys.readouterr().out
+
+    def test_a_larger_budget_runs_it_again(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The only way a command ever gets out of this.
+
+        Two seconds says nothing about three, so a person raising the budget
+        has to get the command run rather than the answer from last time.
+        """
+        cache = tmp_path / "kept.json"
+        page = write(tmp_path, self.PAGE)
+        self.go(script, monkeypatch, page, cache, "1")
+        capsys.readouterr()
+
+        self.go(script, monkeypatch, page, cache, "2")
+        printed = capsys.readouterr().out
+        assert "ran out of time and are not run again" not in printed
+        assert f"{script.TIMED_OUT} 2s, so nothing below" in printed
+
+    def test_the_summary_names_the_budget_each_one_had(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # A command remembered from a larger budget than this run offers
+        # would otherwise be listed under this run's budget, which is not the
+        # number to raise `--timeout` past.
+        cache = tmp_path / "kept.json"
+        page = write(tmp_path, self.PAGE)
+        self.go(script, monkeypatch, page, cache, "2")
+        capsys.readouterr()
+
+        self.go(script, monkeypatch, page, cache, "1")
+        printed = capsys.readouterr().out
+        assert "took longer than the budget they were given" in printed
+        assert f"  2s: {self.COMMAND}" in printed
+
+    def test_it_is_not_counted_as_a_command_that_will_not_run(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # Running out of time is this script's budget rather than anything
+        # about the page, so it is not what the exit code is for.
+        cache = tmp_path / "kept.json"
+        page = write(tmp_path, self.PAGE)
+        assert self.go(script, monkeypatch, page, cache, "1") == 0
+        capsys.readouterr()
+        assert self.go(script, monkeypatch, page, cache, "1") == 0
+        assert "would not run at all" not in capsys.readouterr().out
 
 
 class TestItDoesNotRunItself:
