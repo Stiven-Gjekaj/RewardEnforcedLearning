@@ -174,6 +174,17 @@ class Claim:
         return found
 
 
+def is_this_script(command: str) -> bool:
+    """Whether a command runs this script.
+
+    The page documents this script the way it documents every other, in a
+    console block, and a block is a list of things to run. Running this one
+    from inside itself would spend three hours to say nothing, and the version
+    of it with `--all` would do that recursively.
+    """
+    return Path(__file__).name in command
+
+
 def commands_in(fence: list[str]) -> list[str]:
     """The commands inside one console block, with continuations joined.
 
@@ -254,7 +265,7 @@ def read(path: Path) -> tuple[list[str], list[Claim]]:
             claim, inside = None, False
             if language == "console":
                 for command in commands_in(fence):
-                    if command not in commands:
+                    if command not in commands and not is_this_script(command):
                         commands.append(command)
             continue
 

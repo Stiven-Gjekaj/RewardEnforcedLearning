@@ -799,3 +799,31 @@ class TestTheCacheOfWhatEachCommandPrinted:
         self.go(script, monkeypatch, write(tmp_path, self.PAGE), cache)
         capsys.readouterr()
         assert list(json.loads(cache.read_text())) == ['python -c "print(7.5)"']
+
+
+class TestItDoesNotRunItself:
+    """The page documents this script the way it documents every other one.
+
+    A console block is a list of things to run, and one of the things it now
+    lists is this script with `--all`. Running that from inside a run would
+    spend three hours to say nothing, recursively.
+    """
+
+    def test_a_command_naming_this_script_is_not_collected(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        page = (
+            "```console\n"
+            "$ python scripts/check_numbers.py --all\n"
+            "$ python scripts/measure_agents.py --runs 10\n"
+            "```\n\n| a | b |\n| --- | ---: |\n| x | 1 |\n"
+        )
+        commands, _ = script.read(write(tmp_path, page))
+        assert commands == ["python scripts/measure_agents.py --runs 10"]
+
+    def test_the_real_page_documents_it_and_does_not_run_it(
+        self, script: ModuleType
+    ) -> None:
+        commands, _ = script.read(script.ROOT / "docs" / "algorithms.md")
+        assert "check_numbers" in (script.ROOT / "docs" / "algorithms.md").read_text()
+        assert not any(script.is_this_script(command) for command in commands)

@@ -2181,6 +2181,79 @@ is not here.
 
 ---
 
+## Checking that this page still says what the code does
+
+Every table here names a command. Nineteen tracks have gone past them and
+several changed a default, and a default that changes makes every table
+produced with the old one wrong, silently. Nothing about reading the page says
+which.
+
+```console
+$ python scripts/check_numbers.py --list
+$ python scripts/check_numbers.py --only tiling
+$ python scripts/check_numbers.py --all --cache outputs.json
+```
+
+It runs every command on this page once, then puts each table against every
+output and attributes it to the command that accounts for most of its numbers.
+`--list` runs nothing and says what would be checked. `--cache` keeps what each
+command printed, because a whole run is about three hours and the answer stops
+being true as soon as the page is edited.
+
+### Matching, because position cannot work
+
+The first version took the tables that followed a console block and asked
+whether that block's commands printed them. Two thirds of what it reported was
+a table sitting under a command it did not come from, and the section called
+`The same table, four more environments` is why. It wrote one command and then
+four tables, and the three other commands were nowhere on this page, so no rule
+about position could have been right.
+
+### Three kinds of thing it finds
+
+**A command the page never named.** The four environment section is the worst
+case and is fixed: all four commands are written down now, and all four tables
+still print what is under them. There are more of these, and each one is a
+table whose numbers no command on the page accounts for.
+
+**A command the page named wrongly.** The importance sampling block said
+`python scripts/measure_importance.py` while the prose beside it said 1200
+episodes. The default is 1500 and 1500 prints a different table. Nothing had
+drifted: the current code at `--episodes 1200` reproduces every number in that
+table exactly, on both grids. The table was right and the line above it was
+wrong, for five tracks.
+
+**A table nothing prints.** Some tables here are differences between two runs,
+or arithmetic, or seconds. No command produces them and none ever will. Those
+carry a comment saying they are not checked and why, which the report prints
+instead of listing their numbers as missing. The reason is required, because a
+table that exempts itself silently is how a number that moved would hide.
+
+### What it cannot see
+
+- **Which cell a number is in.** It asks whether a number appears anywhere in
+  an output. A number that moved disappears from every output and is caught. A
+  number that swapped places with another in the same table is not.
+- **A table that rounds.** The digits are compared as text, so a page writing
+  1,970,224,597,202 where the command prints 1970224597202.702 states a number
+  the output does not hold. A rule loose enough to match a truncation is loose
+  enough to confirm a number that really moved, so this page prints what the
+  command prints instead.
+- **Half a table.** A command has to account for half a table before it is
+  called its source. Below that it is a coincidence: a small integer that every
+  output happens to print is enough to win when nothing else matches anything.
+
+### Where it is weak
+
+- **Three hours.** One command alone is nearly forty minutes. The cache is what
+  makes a second opinion cheap, and without it nobody would run this twice.
+- **981 of 1081 numbers.** The rest are in a table or a column that says why it
+  cannot be checked, and `--list` prints the split.
+- **Line numbers go stale.** The report names the line a table starts on, and
+  fixing anything above it moves every one after.
+
+---
+
 ## Where the numbers on this page can be checked
 
 | Table | Command |
