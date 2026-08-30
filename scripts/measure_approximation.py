@@ -2,12 +2,15 @@
 """Tile coding against radial basis features, on cost and on what they learn.
 
 Two ways of turning a point in a box into features, under one agent. The
-question a reader asks is which is better, and the answer is that they learn
-about equally well and one of them costs fifty times as much per step.
+question a reader asks is which is better. Over sixty episodes of the mountain
+car the radial basis learns better, by 21.3 return over ten seeds with the
+interval clear of zero, and it costs between twice and fifty times as much per
+step: twice on a two dimensional box and fifty times on a four dimensional one.
 
     python scripts/measure_approximation.py
     python scripts/measure_approximation.py --runs 8
     python scripts/measure_approximation.py --env cartpole --episodes 60
+    python scripts/measure_approximation.py --env cartpole --runs 8 --bins 4
 
 The cost is the interesting half, and it is not the half either encoder's
 description points at. A tile coder is not cheap because it has few features:
