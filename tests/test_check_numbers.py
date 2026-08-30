@@ -16,6 +16,7 @@ importing it as one would be a different arrangement than the one that runs.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -697,3 +698,90 @@ class TestTheListingSaysWhatIsCovered:
         checked = sum(len(c.numbers) for c in claims if not c.exempt)
         left = sum(len(c.numbers) for c in claims if c.exempt)
         assert checked > 20 * left
+
+
+class TestTheCacheOfWhatEachCommandPrinted:
+    """A whole run is about three hours, and the answer changes on every edit.
+
+    Checking a fix should not cost three hours again, so `--cache` keeps what
+    each command printed and runs only what is missing from it.
+    """
+
+    PAGE = '```console\n$ python -c "print(7.5)"\n```\n\n| a | b |\n| --- | --- |\n| x | 7.5 |\n'
+
+    def go(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        page: Path,
+        cache: Path,
+    ) -> int:
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["check_numbers", "--doc", str(page), "--all", "--cache", str(cache)],
+        )
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        return int(script.main())
+
+    def test_a_run_writes_what_it_saw(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        cache = tmp_path / "kept.json"
+        self.go(script, monkeypatch, write(tmp_path, self.PAGE), cache)
+        capsys.readouterr()
+        assert json.loads(cache.read_text()) == {'python -c "print(7.5)"': ["7.5"]}
+
+    def test_a_second_run_does_not_run_the_command_again(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        cache = tmp_path / "kept.json"
+        page = write(tmp_path, self.PAGE)
+        self.go(script, monkeypatch, page, cache)
+        capsys.readouterr()
+
+        self.go(script, monkeypatch, page, cache)
+        printed = capsys.readouterr().out
+        assert "1 of 1 commands come from" in printed
+        assert "[1/1]" not in printed
+
+    def test_an_edited_page_is_rechecked_against_the_same_outputs(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The reason it exists. Fix a table, ask again, pay nothing."""
+        cache = tmp_path / "kept.json"
+        page = write(tmp_path, self.PAGE.replace("7.5 |", "9.9 |"))
+        self.go(script, monkeypatch, page, cache)
+        assert "no command on this page" in capsys.readouterr().out
+
+        page.write_text(self.PAGE)
+        self.go(script, monkeypatch, page, cache)
+        assert "1 of 1 tables are wholly accounted for" in capsys.readouterr().out
+
+    def test_a_command_the_page_no_longer_names_is_not_used(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A cache outliving the command it was made for would otherwise
+        account for a table with the output of something the page has
+        stopped saying to run, which is the opposite of the point."""
+        cache = tmp_path / "kept.json"
+        cache.write_text(json.dumps({'python -c "print(1)"': ["7.5"]}))
+        self.go(script, monkeypatch, write(tmp_path, self.PAGE), cache)
+        capsys.readouterr()
+        assert list(json.loads(cache.read_text())) == ['python -c "print(7.5)"']

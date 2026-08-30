@@ -56,6 +56,7 @@ names those commands separately.
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import re
 import shlex
@@ -377,6 +378,17 @@ def main() -> int:
     )
     parser.add_argument("--list", action="store_true", help="say what would run")
     parser.add_argument("--timeout", type=float, default=900.0)
+    parser.add_argument(
+        "--cache",
+        default="",
+        help=(
+            "a file to keep what each command printed in. Commands already "
+            "in it are not run again, and the ones that are run are added to "
+            "it. A whole run is about three hours and the answer changes as "
+            "soon as the page is edited, so checking a fix should not cost "
+            "three hours again"
+        ),
+    )
     args = parser.parse_args()
 
     commands, claims = read(ROOT / args.doc)
@@ -411,11 +423,22 @@ def main() -> int:
         return 0
 
     started = time.perf_counter()
+    kept = Path(args.cache) if args.cache else None
     printed: dict[str, list[str]] = {}
+    if kept is not None and kept.exists():
+        # Only the commands this page still asks for. A cache that outlived
+        # the command it was made for would otherwise account for a table
+        # with the output of something the page no longer says to run.
+        held = json.loads(kept.read_text())
+        printed = {name: held[name] for name in commands if name in held}
+        print(f"{len(printed)} of {len(commands)} commands come from {kept}.\n")
+
     broken: list[str] = []
     slow: list[str] = []
 
     for number, command in enumerate(commands, start=1):
+        if command in printed:
+            continue
         print(f"[{number}/{len(commands)}] {command}", flush=True)
         output, spent, trouble = run(command, args.timeout)
         if trouble.startswith(TIMED_OUT):
@@ -428,6 +451,11 @@ def main() -> int:
             continue
         print(f"    {spent:.0f}s", flush=True)
         printed[command] = NUMBER.findall(output.replace(",", ""))
+        if kept is not None:
+            # Written after every command rather than at the end, because a
+            # run this long is one a person interrupts, and a cache that only
+            # exists if the whole thing finished is a cache for nobody.
+            kept.write_text(json.dumps(printed, indent=1, sort_keys=True))
 
     clean = 0
     orphans = 0
