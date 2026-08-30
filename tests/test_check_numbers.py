@@ -762,7 +762,9 @@ class TestTheCacheOfWhatEachCommandPrinted:
         cache = tmp_path / "kept.json"
         self.go(script, monkeypatch, write(tmp_path, self.PAGE), cache)
         capsys.readouterr()
-        assert json.loads(cache.read_text()) == {'python -c "print(7.5)"': ["7.5"]}
+        held = json.loads(cache.read_text())
+        assert held["printed"] == {'python -c "print(7.5)"': ["7.5"]}
+        assert held["code"] == script.fingerprint()
 
     def test_a_second_run_does_not_run_the_command_again(
         self,
@@ -809,10 +811,18 @@ class TestTheCacheOfWhatEachCommandPrinted:
         account for a table with the output of something the page has
         stopped saying to run, which is the opposite of the point."""
         cache = tmp_path / "kept.json"
-        cache.write_text(json.dumps({'python -c "print(1)"': ["7.5"]}))
+        cache.write_text(
+            json.dumps(
+                {
+                    "code": script.fingerprint(),
+                    "printed": {'python -c "print(1)"': ["7.5"]},
+                }
+            )
+        )
         self.go(script, monkeypatch, write(tmp_path, self.PAGE), cache)
         capsys.readouterr()
-        assert list(json.loads(cache.read_text())) == ['python -c "print(7.5)"']
+        held = json.loads(cache.read_text())
+        assert list(held["printed"]) == ['python -c "print(7.5)"']
 
 
 class TestItDoesNotRunItself:
@@ -841,3 +851,68 @@ class TestItDoesNotRunItself:
         commands, _ = script.read(script.ROOT / "docs" / "algorithms.md")
         assert "check_numbers" in (script.ROOT / "docs" / "algorithms.md").read_text()
         assert not any(script.is_this_script(command) for command in commands)
+
+
+class TestTheCacheKnowsWhenTheCodeChanged:
+    """The fault this script exists to catch, committed by this script.
+
+    The cache holds what a command printed, and what a command prints depends
+    on the code under it. A cache made before a change would otherwise confirm
+    numbers the code has stopped producing, which is exactly a documented
+    number that moved and nothing saying so.
+    """
+
+    PAGE = '```console\n$ python -c "print(7.5)"\n```\n\n| a | b |\n| --- | --- |\n| x | 7.5 |\n'
+
+    def test_a_cache_from_other_code_is_not_used(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        cache = tmp_path / "kept.json"
+        cache.write_text(
+            json.dumps(
+                {"code": "from some other tree", "printed": {"python x.py": ["1"]}}
+            )
+        )
+        page = write(tmp_path, self.PAGE)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["check_numbers", "--doc", str(page), "--all", "--cache", str(cache)],
+        )
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        script.main()
+
+        printed = capsys.readouterr().out
+        assert "was made from different code" in printed
+        assert "[1/1]" in printed
+
+    def test_the_fingerprint_moves_when_a_script_moves(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        before = script.fingerprint()
+        added = script.ROOT / "scripts" / "a_temporary_file_for_this_test.py"
+        added.write_text("# nothing\n")
+        try:
+            assert script.fingerprint() != before
+        finally:
+            added.unlink()
+        assert script.fingerprint() == before
+
+    def test_this_script_is_not_part_of_its_own_fingerprint(
+        self, script: ModuleType
+    ) -> None:
+        """Nothing a documented command prints depends on the checker, and
+        including it would throw away hours of cache every time the report's
+        wording changed."""
+        before = script.fingerprint()
+        here = Path(script.__file__)
+        was = here.read_bytes()
+        try:
+            here.write_bytes(was + b"\n# a comment\n")
+            assert script.fingerprint() == before
+        finally:
+            here.write_bytes(was)

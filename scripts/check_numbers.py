@@ -56,6 +56,7 @@ names those commands separately.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import re
@@ -121,6 +122,29 @@ COLUMN = ", column "
 #: in a few cells is still attributed and reported as drifted rather than as
 #: unaccounted for.
 ENOUGH = 0.5
+
+
+def fingerprint() -> str:
+    """A hash of the code every documented command runs.
+
+    The cache holds what a command printed, and what a command prints depends
+    on the code under it. Without this a cache made before a change would
+    confirm numbers the code has stopped producing, which is the exact fault
+    this whole script exists to catch, committed by the script itself.
+
+    This file is left out on purpose. Nothing a documented command prints
+    depends on the checker, and including it would throw away hours of cache
+    every time the report's wording changed.
+    """
+    running = hashlib.blake2b(digest_size=16)
+    here = Path(__file__).resolve()
+    paths = sorted(ROOT.glob("rel/**/*.py")) + sorted(ROOT.glob("scripts/*.py"))
+    for path in paths:
+        if path.resolve() == here:
+            continue
+        running.update(path.relative_to(ROOT).as_posix().encode())
+        running.update(path.read_bytes())
+    return running.hexdigest()
 
 
 def heading_of(row: str) -> str:
@@ -436,13 +460,21 @@ def main() -> int:
     started = time.perf_counter()
     kept = Path(args.cache) if args.cache else None
     printed: dict[str, list[str]] = {}
+    code = fingerprint()
     if kept is not None and kept.exists():
-        # Only the commands this page still asks for. A cache that outlived
-        # the command it was made for would otherwise account for a table
-        # with the output of something the page no longer says to run.
         held = json.loads(kept.read_text())
-        printed = {name: held[name] for name in commands if name in held}
-        print(f"{len(printed)} of {len(commands)} commands come from {kept}.\n")
+        if held.get("code") != code:
+            # Made before the code changed, so every output in it may be a
+            # number the code has stopped producing. Reusing it would be this
+            # script committing the fault it exists to catch.
+            print(f"{kept} was made from different code. Running everything.\n")
+        else:
+            # Only the commands this page still asks for. A cache that
+            # outlived the command it was made for would otherwise account
+            # for a table with the output of something nobody runs any more.
+            was = held["printed"]
+            printed = {name: was[name] for name in commands if name in was}
+            print(f"{len(printed)} of {len(commands)} commands come from {kept}.\n")
 
     broken: list[str] = []
     slow: list[str] = []
@@ -466,7 +498,9 @@ def main() -> int:
             # Written after every command rather than at the end, because a
             # run this long is one a person interrupts, and a cache that only
             # exists if the whole thing finished is a cache for nobody.
-            kept.write_text(json.dumps(printed, indent=1, sort_keys=True))
+            kept.write_text(
+                json.dumps({"code": code, "printed": printed}, indent=1, sort_keys=True)
+            )
 
     clean = 0
     orphans = 0
