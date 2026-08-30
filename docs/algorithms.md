@@ -454,6 +454,14 @@ eight steps and nothing pays until the end of it. A random policy covers a line
 of length n in about n squared steps, so an agent that has learned nothing
 spends a whole episode not finding out that there is anything to find.
 
+```console
+$ python scripts/measure_exploration.py
+```
+
+That is the first of the commands at the top of this section, repeated here
+because the corridor is its default environment and this is the table it
+makes. The block above the table before this one is three other grids.
+
 <!-- not checked, column rule, time: the rule column holds the settings
 these rows were run at, and the time column belongs to the machine -->
 | rule | first end | steps to it | settled | value found | time |
