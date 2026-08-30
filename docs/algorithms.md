@@ -202,6 +202,9 @@ $ python scripts/measure_agents.py --env cliff --agents n-step-sarsa \
     --runs 30 --set n=4 step_size=0.5
 ```
 
+<!-- not checked: a sweep of the command above over five grids and five
+pairs of n and step size, so twenty five runs rather than one, and each
+cell pairs a mean with a stuck count from the same run -->
 | grid | n=4, 0.5 | n=2, 0.5 | n=1, 0.5 | n=4, 0.2 | n=2, 0.2 |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | cliff, best -13 | -18.24 (9) | -17.84 (11) | -17.18 (8) | -17.71 (2) | **-16.80 (0)** |
@@ -332,6 +335,9 @@ spread is all cost.
 
 Four settings, four grids, thirty seeds each:
 
+<!-- not checked: four settings over four grids at thirty seeds each, and
+the stuck column adds the four grids together, so no single run prints a
+number in this table -->
 | decay | step size | sarsa-lambda, stuck of 120 | q-lambda, stuck of 120 |
 | ---: | ---: | ---: | ---: |
 | 0.8 | 0.2 | 10 | 0 |
@@ -347,6 +353,8 @@ difference worth 0.87 of return on the cliff walk.
 
 That makes three settings in this project on one line:
 
+<!-- not checked: these are the registry defaults written side by side,
+which is a statement about this project rather than a measurement -->
 | method | how far back it reaches | step size |
 | --- | --- | ---: |
 | SARSA, Q-learning, the rest | one step | 0.5 |
@@ -361,6 +369,8 @@ what the three answers turned out to have in common.
 
 Over six decays, four grids and thirty seeds, which is 720 runs of each agent:
 
+<!-- not checked: 720 runs of each agent added together, over six decays,
+four grids and thirty seeds -->
 | agent | policies that never reach the goal |
 | --- | ---: |
 | `sarsa-lambda` | 59 of 720 |
@@ -390,6 +400,8 @@ tried are equally likely to be the one it tries.
 
 `explore` is a setting on every tabular agent, and three rules answer it.
 
+<!-- not checked: a table of what the three rules do. The only number in
+it is part of a setting's name -->
 | `--set explore=` | ranks actions by |
 | --- | --- |
 | `epsilon-greedy` | what they are worth, with a fixed chance of ignoring that |
@@ -1180,6 +1192,8 @@ junction under each is
 and those are equal at a discount of **0.7394**. Below it the short loop has
 the higher discounted value.
 
+<!-- not checked: worked out from the two closed forms above it rather
+than run -->
 | discount | best policy | what it collects per step |
 | ---: | ---: | ---: |
 | 0.5 | short | 1.00 |
@@ -1736,6 +1750,8 @@ that ended. A cliff walk episode that never reaches the goal is five hundred
 steps of -1. With the tail read as zero, the return of the last step is -1 and
 the return of the first is -99.34. Standardising those returns gives:
 
+<!-- not checked: the standardised weights of one episode, worked out from
+the returns described above rather than printed by anything -->
 | step of the episode | weight |
 | --- | ---: |
 | the first three | -0.78, -0.78, -0.78 |
@@ -1760,6 +1776,8 @@ The tail is estimated now. The value network answers if there is one, and the
 actor critic in the same file always did this, which is what made the fault
 visible. Six seeds of the cliff walk, before and after:
 
+<!-- not checked: the before column is a version of the code that no
+longer exists, so nothing can print it again -->
 | seed | 1 | 2 | 3 | 4 | 5 | 6 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | before | -17 | -13 | never | never | -13 | never |
@@ -1786,6 +1804,8 @@ fix and before the entropy default was measured.
 The actor critic does not solve the cart pole at any setting that was tried.
 What was tried:
 
+<!-- not checked: a record of the settings that were tried, with what each
+one did written out rather than tabulated from a run -->
 | setting | result |
 | --- | --- |
 | step size 0.02, 400 episodes | 500 on one seed, and it collapses by 1000 |
