@@ -8,6 +8,9 @@ environment does not take rather than dropping it quietly.
 from __future__ import annotations
 
 import inspect
+from inspect import Parameter, signature
+from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -154,3 +157,56 @@ class TestTheSettingsMatchTheEnvironment:
             if parameter.kind is inspect.Parameter.KEYWORD_ONLY
         }
         assert keyword == set(SETTINGS)
+
+
+class TestTheDocumentedDefaults:
+    """`docs/grids.md` lists every setting and what it defaults to.
+
+    Those are the code's own defaults written out by hand, and nothing was
+    comparing them. A default that moves leaves the page telling a reader
+    that a grid does something it no longer does, and no run of anything
+    would say so, because the page states them rather than printing them.
+    """
+
+    PAGE = Path(__file__).resolve().parent.parent / "docs" / "grids.md"
+
+    #: How the page spells a value that is not a plain number.
+    WRITTEN: ClassVar[dict[object, str]] = {
+        None: "none",
+        True: "true",
+        False: "false",
+    }
+
+    def documented(self) -> dict[str, str]:
+        """The setting column and the default column, as the page writes them."""
+        found: dict[str, str] = {}
+        for line in self.PAGE.read_text().splitlines():
+            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+            if len(cells) != 3 or not cells[0].startswith("`"):
+                continue
+            found[cells[0].strip("`")] = cells[2].strip("`")
+        return found
+
+    def test_every_setting_the_reader_accepts_is_documented(self) -> None:
+        assert set(self.documented()) == set(SETTINGS)
+
+    def test_every_documented_default_is_the_one_the_code_has(self) -> None:
+        said = self.documented()
+        for name, parameter in signature(GridWorld.__init__).parameters.items():
+            # `wind` is a shape rather than a value, and the test below it
+            # holds what the page says about that one.
+            if name == "wind" or parameter.default is Parameter.empty:
+                continue
+            if name not in said:
+                continue
+            real = parameter.default
+            wanted = self.WRITTEN.get(real, str(real))
+            if isinstance(real, float) and real == int(real):
+                wanted = str(int(real))
+            assert said[name] == wanted, (name, said[name], real)
+
+    def test_the_one_it_cannot_spell_is_the_wind(self) -> None:
+        # A column of zeros as long as the grid is wide, which is a shape
+        # rather than a value, so the page says what it means instead.
+        assert self.documented()["wind"] == "all zero"
+        assert signature(GridWorld.__init__).parameters["wind"].default is None

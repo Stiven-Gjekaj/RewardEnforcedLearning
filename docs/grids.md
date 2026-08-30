@@ -56,6 +56,9 @@ trailing space, and a test says so.
 
 ## The settings
 
+<!-- not checked, column default: these are the code's own defaults, which
+`tests/test_gridfile.py` holds against the signature that carries them rather
+than against anything a command prints -->
 | Setting | Means | Default |
 | --- | --- | --- |
 | `name` | what the reports call it | `grid` |
@@ -73,9 +76,12 @@ trailing space, and a test says so.
 | `solved_return` | the return that counts as solved | `none` |
 | `suggested_discount` | what a run uses unless `--discount` says otherwise | `1` |
 
-Anything else is refused, and the message names the line:
+Anything else is refused, and the message names the line. This is what that
+looks like, written as a transcript rather than as a console block, because a
+console block on these pages is a list of commands that
+`scripts/check_numbers.py` will run and this one is meant to fail:
 
-```console
+```text
 $ rel solve --env-file mine.txt
 mine.txt, line 3: 'gravity' is not a grid setting. Use one of can_stay,
 goal_reward, king_moves, max_episode_steps, name, pit_ends_episode,

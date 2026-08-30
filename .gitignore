@@ -29,3 +29,8 @@ runs/
 *.swp
 .DS_Store
 Thumbs.db
+
+# A recorded run. The readme documents `rel train --out run.gz` and
+# `scripts/check_numbers.py --doc README.md` runs it, so the file lands here.
+run.gz
+*.rel.gz

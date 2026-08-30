@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-2166_passing-427819?style=for-the-badge" alt="2166 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-2169_passing-427819?style=for-the-badge" alt="2169 tests passing"/>
 </p>
 
 <p align="center">
@@ -104,7 +104,7 @@ $ rel gaming
 | environment | the reward says | what it paid | what it was for |
 | --- | --- | ---: | ---: |
 | boat race | touch a checkpoint, get a point | 198 of 200 | **0 laps** |
-| vase room | one point off per step | -4, the shortest path | **vase broken** |
+| vase room | one point off per step | -4.0, the shortest path | **vase broken** |
 | thermostat | a point when the sensor says comfortable | 200 of 200 | **comfortable 3% of the time** |
 
 **Every number in that table is the best possible policy under the reward it
@@ -301,6 +301,10 @@ measuring this bug.
 
 The cliff walk, ten seeds, five hundred episodes:
 
+```console
+$ python scripts/measure_agents.py --runs 10
+```
+
 | agent | while learning | greedy, exactly | never finishes |
 | --- | ---: | ---: | ---: |
 | random | -5009.56 +/- 47.22 | - | 10 of 10 |
@@ -368,14 +372,14 @@ $ python scripts/lines.py
 | --- | ---: | ---: |
 | Core | 5 | 910 |
 | Environments | 8 | 2489 |
-| Agents | 24 | 7060 |
+| Agents | 24 | 7062 |
 | Network | 4 | 782 |
 | Running | 6 | 1289 |
 | Interface | 6 | 1022 |
 | Command line | 3 | 1658 |
-| **Total** | **56** | **15210** |
+| **Total** | **56** | **15212** |
 
-Not counting 16329 lines of tests and 4157 of measurement scripts. The command
+Not counting 16866 lines of tests and 4450 of measurement scripts. The command
 above prints all of it, and `python scripts/check_numbers.py --doc README.md`
 says whether this table still holds what that command prints.
 
@@ -397,7 +401,7 @@ import statements of every module:
 $ pytest
 ```
 
-2166 tests. Some of what they cover, and why each one is there rather than the
+2169 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A
