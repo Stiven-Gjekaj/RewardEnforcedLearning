@@ -1320,3 +1320,33 @@ class TestThePageSaysHowMuchOfItselfIsChecked:
         assert claims[0].skipped == ["rule", "time"]
         assert claims[0].dropped == {0, 2}
         assert claims[0].numbers == ["20"]
+
+    def test_a_marker_does_not_carry_across_a_console_block(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        """A marker applies to the table straight after it.
+
+        Prose between the two already reset it. A console block did not, so
+        a marker that never got its table would carry down the page and
+        quietly exempt somebody else's, which is the silent failure the
+        marker exists to avoid.
+        """
+        page = (
+            "<!-- not checked: this marker has no table -->\n\n"
+            "```console\n$ python x.py\n```\n\n"
+            "| a | b |\n| --- | ---: |\n| x | 1.0 |\n"
+        )
+        _, claims = script.read(write(tmp_path, page))
+        assert claims[0].exempt == ""
+
+    def test_a_column_marker_does_not_carry_either(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        page = (
+            "<!-- not checked, column time: no table follows this -->\n\n"
+            "```console\n$ python x.py\n```\n\n"
+            "| a | time |\n| --- | ---: |\n| x | 9 |\n"
+        )
+        _, claims = script.read(write(tmp_path, page))
+        assert claims[0].skipped == []
+        assert claims[0].numbers == ["9"]

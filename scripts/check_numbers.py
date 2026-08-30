@@ -347,7 +347,7 @@ def read(path: Path) -> tuple[list[str], list[Claim]]:
 
             column = ""
             if said.startswith(COLUMN.strip()):
-                column, _, said = said[len(COLUMN) - 1 :].partition(":")
+                column, _, said = said.removeprefix(COLUMN.strip()).partition(":")
             else:
                 said = said.removeprefix(":")
 
@@ -368,7 +368,12 @@ def read(path: Path) -> tuple[list[str], list[Claim]]:
                 fence.append(lines[index])
                 index += 1
             index += 1
+            # A marker applies to the table straight after it. Without this
+            # reset one that never got a table would carry across a console
+            # block and quietly exempt a table further down the page, which
+            # is the silent failure the marker is written to avoid.
             claim, inside = None, False
+            exempt, skipped = "", []
             if language == "console":
                 block = [
                     command
