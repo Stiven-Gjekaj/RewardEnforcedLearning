@@ -2175,6 +2175,7 @@ is not here.
 | Every seed behind a mean | `python scripts/measure_agents.py --env cliff --each-seed` |
 | The tile coder offsets | `python scripts/measure_tiling_offsets.py` |
 | Tile coding against a radial basis | `python scripts/measure_approximation.py --runs 10` |
+| Whether this page still says what the code does | `python scripts/check_numbers.py --all` |
 | What importance sampling costs | `python scripts/measure_importance.py` |
 | Ordered replay against uniform | `python scripts/measure_sweeping.py --episodes 400` |
 | The seed that gets lost | `python scripts/measure_lost_seed.py --ladder-all` |
