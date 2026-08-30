@@ -65,7 +65,8 @@ has no way of knowing which centres are far away without measuring the distance
 to all of them. Three quarters of a four dimensional step is spent doing
 exactly that, before a single value can be dropped, and the sort that finds the
 largest eight costs about what dropping the other 1288 saves. On the cart pole
-the whole option is worth 3494 microseconds a step against 3149.
+the whole option is worth about 3500 microseconds a step against about 3100,
+and those two move by a percent or two between runs of the same machine.
 
 That last one is the answer to the question this module was written to ask. A
 tile coder is not cheap because it has few features: it has 52488 on the cart

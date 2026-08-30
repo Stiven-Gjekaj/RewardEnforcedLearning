@@ -2291,8 +2291,10 @@ table that exempts itself silently is how a number that moved would hide.
 
 - **Three hours.** One command alone is nearly forty minutes. The cache is what
   makes a second opinion cheap, and without it nobody would run this twice.
-- **981 of 1081 numbers.** The rest are in a table or a column that says why it
-  cannot be checked, and `--list` prints the split.
+- **841 of 1081 numbers are checked.** The rest are in a table or a column that
+  says why it cannot be, and `--list` prints the split. A test holds this
+  sentence against what `--list` says, because a count written in prose is
+  exactly the kind of number this whole exercise is about.
 - **Line numbers go stale.** The report names the line a table starts on, and
   fixing anything above it moves every one after.
 

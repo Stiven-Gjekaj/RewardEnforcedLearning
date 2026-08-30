@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -1162,3 +1163,25 @@ class TestABlockCountsAsOneWhenNoSingleCommandExplainsATable:
         )
         assert command == 'python -c "print(1.5)"'
         assert absent == []
+
+
+class TestThePageSaysHowMuchOfItselfIsChecked:
+    """The one number about this exercise that lives in a sentence.
+
+    `check_numbers.py` reads tables. A count written in prose is exactly the
+    kind of number it cannot see, and it went stale within an hour of being
+    written: nine more exemptions moved it from 981 to 841 and nothing said
+    so. So the sentence is held against what the parsing actually finds.
+    """
+
+    def stated(self, script: ModuleType) -> tuple[int, int]:
+        page = (script.ROOT / "docs" / "algorithms.md").read_text()
+        found = re.search(r"\*\*(\d+) of (\d+) numbers are checked", page)
+        assert found is not None, "the page no longer says how much it checks"
+        return int(found[1]), int(found[2])
+
+    def test_the_sentence_matches_the_parsing(self, script: ModuleType) -> None:
+        _, claims = script.read(script.ROOT / "docs" / "algorithms.md")
+        checked = sum(len(c.numbers) for c in claims if not c.exempt)
+        every = sum(len(c.numbers) for c in claims)
+        assert self.stated(script) == (checked, every)
