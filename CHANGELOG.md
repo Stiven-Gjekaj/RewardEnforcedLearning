@@ -40,6 +40,15 @@ Everything below is new.
 
 **Environments**
 
+- **A problem whose answer is arithmetic**, as `walk`: five cells in a line
+  between two endings, one paying nothing and one paying 1. A policy that goes
+  each way half the time reaches the paying end from the k-th cell exactly k
+  times in six, so the true values are 0.167, 0.333, 0.500, 0.667 and 0.833
+  with nothing computed to get them. Every other table in this project checks
+  an agent against dynamic programming over the same model, which is a check
+  against another computation. This one is a check against arithmetic, and a
+  test holds the closed form against a sweep over the model so that a fault in
+  either shows up as a disagreement.
 - **A task with no ending**, as `loops`: one decision made over and over,
   between a short loop paying 1 a step and a long one paying 2 a step. Their
   discounted values are equal at 0.7394, and below that the exactly optimal
@@ -72,6 +81,52 @@ Everything below is new.
 
 **Agents**
 
+- **Estimating what a fixed policy is worth**, as `td`, `n-step-td`,
+  `td-lambda` and `mc-prediction`. Control mixes two questions: when a policy
+  improves, its estimates chase a moving target, so a measurement of how good
+  the estimates are cannot say whether the answer moved or the estimate did.
+  Prediction asks one question and the random walk above knows the answer.
+  **TD's best is 0.0343 root mean square error and Monte Carlo's best is
+  0.0590**, from the same episodes, and the one that uses what it already
+  believes about where it ended up gets 42% closer than the one that waits to
+  find out what the return was. Every row is a U in the step size, because a
+  constant step size does not converge at all: it tracks, and the estimate
+  ends in a band around the answer whose width is the step size. Crediting a
+  state once for every visit rather than once for the first is worse
+  everywhere but the smallest step, and at 0.2 it scores 0.2427 where an
+  untrained table scores 0.2357, which is worse than not learning.
+- **Crediting the middle of an option**, as `intra-option-q`. One real step is
+  evidence about every option that would have taken that action there, so
+  every one of them is updated whether or not it was the one running. This was
+  written to test a reading rather than to improve a number: the section above
+  reads the cost of having options off a ladder of exploration rates, and if
+  that reading is right then fixing the credit assignment moves the early
+  episodes and leaves the late ones alone. **It does.** The first hundred
+  episodes are 15% shorter and the second 24%, and by the fourth block the two
+  agents are within noise. It recovers 0.54 of the 2.02 that having the options
+  costs at all, for slightly over twice the work: 1.64 applications of the
+  learning rule for every step taken against 0.78. Two independent
+  measurements now say the cost of an option here is the cost of committing to
+  it while exploring, and not the cost of learning about it slowly.
+- **A second way to make features**, as `rbf-sarsa` and `rbf-q`. Radial basis
+  features answer how close a point is to each of some centres, where a tile
+  coder answers which cells it is in, so there are no boundaries: a point a
+  hair away has a value a hair different, everywhere. They are the same two
+  agents over the other encoder, and nothing in the agent knows which it is
+  talking to. A run over a tile coder gives the numbers it gave before the
+  agent was generalised, to the last bit. **The feature count says the
+  opposite of the cost.** On the cart pole the tile coder has 52,488 features
+  against 1,296 and costs a fiftieth as much per step, because a tile coder
+  never asks a feature that is off: it works out which eight switches are on
+  by arithmetic and never touches the other 52,480. Dropping all but the
+  nearest few centres was going to buy that sparseness back and it buys eleven
+  percent, because three quarters of a step is the distances and they are paid
+  before anything can be dropped. It also brings a boundary back, of size
+  0.036 where the largest feature of the same point is 0.214, so it is off by
+  default. The width is the whole of the setting: three quarters of the
+  spacing between centres beats one whole spacing by 11.2 on the mountain car
+  over twelve seeds and by 183.7 on the cart pole over eight, and at two
+  spacings eight of ten seeds never reach the flag.
 - **Average reward**, as `differential-q`: Q-learning with the rate it is
   collecting subtracted from every reward and no discount anywhere. There is no
   discount setting on it, and that is the point of it. The rate is learned from
