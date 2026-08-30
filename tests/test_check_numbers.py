@@ -370,6 +370,22 @@ class TestAgainstTheRealPage:
             for row in claim.rows:
                 assert "scripts/measure" not in row, row
 
+    def test_every_exempted_column_is_a_column_of_its_table(
+        self, script: ModuleType
+    ) -> None:
+        """The guard on the four column markers the page carries.
+
+        A marker names its column by heading. Rename the heading and the
+        marker stops doing anything, and the only sign of it is six timings
+        reported as numbers that moved. That is the noise the marker exists
+        to stop, so this fails instead.
+        """
+        _, claims = script.read(script.ROOT / "docs" / "algorithms.md")
+        marked = [claim for claim in claims if claim.skipped]
+        assert marked
+        for claim in marked:
+            assert claim.unknown == [], f"line {claim.line}: {claim.headings}"
+
     def test_more_tables_than_commands_that_could_own_them(
         self, script: ModuleType
     ) -> None:
@@ -650,13 +666,50 @@ class TestATableThatExemptsOneColumn:
         """A marker naming a column the table does not have does nothing.
 
         Read off the heading row rather than trusted, so a heading that gets
-        renamed leaves the report short of numbers and saying so, rather than
-        quietly passing a table nobody is checking any more.
+        renamed cannot leave a marker exempting whichever column moved into
+        that position.
         """
         page = self.PAGE.replace("column time", "column seconds")
         _, claims = script.read(write(tmp_path, page))
         assert claims[0].dropped == set()
         assert claims[0].numbers == ["15000", "324"]
+
+    def test_a_column_that_is_not_there_is_named(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        page = self.PAGE.replace("column time", "column seconds")
+        _, claims = script.read(write(tmp_path, page))
+        assert claims[0].unknown == ["seconds"]
+
+    def test_a_column_that_is_there_is_not_named(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        _, claims = script.read(write(tmp_path, self.PAGE))
+        assert claims[0].unknown == []
+
+    def test_the_report_says_the_marker_did_nothing(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Otherwise the only sign is six timings listed as numbers that moved.
+
+        That is the noise the marker exists to stop, arriving with no hint of
+        where it came from. A person reading it has no way to tell a renamed
+        heading from a result that really changed.
+        """
+        page = write(tmp_path, self.PAGE.replace("column time", "column seconds"))
+        monkeypatch.setattr(
+            sys, "argv", ["check_numbers", "--doc", str(page), "--list"]
+        )
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        script.main()
+
+        printed = capsys.readouterr().out
+        assert "1 markers name a column their table has not got" in printed
+        assert "seconds" in printed
 
     def test_naming_no_column_still_exempts_the_whole_table(
         self, script: ModuleType, tmp_path: Path

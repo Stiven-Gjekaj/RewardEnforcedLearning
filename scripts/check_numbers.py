@@ -246,21 +246,45 @@ class Claim:
     rows: list[str] = field(default_factory=list)
 
     @property
+    def headings(self) -> list[str]:
+        """The first row of the table, cell by cell, lowered for matching."""
+        if not self.rows:
+            return []
+        return [cell.strip().lower() for cell in self.rows[0].strip("|").split("|")]
+
+    @property
     def dropped(self) -> set[int]:
         """Which columns `skipped` names, counting from the left.
 
-        Read off the heading row rather than given, so that a marker naming a
-        column that is not there is a marker that does nothing, and the report
-        says the table is short of numbers rather than quietly passing.
+        Read off the heading row rather than given, so a marker cannot exempt
+        a column by number and go on exempting the wrong one after somebody
+        moves the columns around.
         """
-        if not self.skipped or not self.rows:
-            return set()
-        headings = [cell.strip().lower() for cell in self.rows[0].strip("|").split("|")]
+        headings = self.headings
         return {
             headings.index(name.strip().lower())
             for name in self.skipped
             if name.strip().lower() in headings
         }
+
+    @property
+    def unknown(self) -> list[str]:
+        """The columns `skipped` names that this table does not have.
+
+        A marker naming a column that is not there does nothing at all, and
+        the table quietly goes back to being checked with nobody told. That
+        is the same silent failure as a marker with no end, reached by a
+        different road: a column renamed above a marker nobody reread.
+
+        So it is reported. The alternative is a report that lists six timings
+        as numbers that moved, which is the noise the marker exists to stop.
+        """
+        headings = self.headings
+        return [
+            name.strip()
+            for name in self.skipped
+            if name.strip().lower() not in headings
+        ]
 
     @property
     def numbers(self) -> list[str]:
@@ -559,6 +583,20 @@ def main() -> int:
     #: away every other command in the cache. That is hours of work, deleted
     #: by asking a smaller question.
     every = list(commands)
+
+    # Before `--only` narrows anything, because a marker that names a column
+    # its table does not have is a fault in the page rather than in this run,
+    # and asking a smaller question should not hide it.
+    confused = [claim for claim in claims if claim.unknown]
+    if confused:
+        print(
+            f"{len(confused)} markers name a column their table has not got, "
+            f"so they exempt nothing:"
+        )
+        for claim in confused:
+            print(f"  line {claim.line}: {', '.join(claim.unknown)}")
+        print()
+
     if args.only:
         commands = [command for command in commands if args.only in command]
         claims = [
