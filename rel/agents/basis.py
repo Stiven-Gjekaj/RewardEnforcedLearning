@@ -55,10 +55,12 @@ itself.
 **Dropping brings the boundary back.** Between two centres there is a point
 where the smallest kept value and the largest dropped one cross, and on the two
 sides of it the agent reads a different weight for the same feature. The jump
-there is exactly the size of the smallest kept value: at the default width and
-eight kept it is 0.036, where the largest feature of that same point is 0.214.
-That is smaller than a tile coder's boundary, which swaps a whole switch out of
-eight, and it is the same kind of thing.
+there is exactly the size of the smallest kept value, and how large that is
+depends on where the crossing is: at the default width and eight kept it runs
+from 0.006 to 0.054 over the unit square, and it is 0.036 at the crossing the
+tests measure, where the largest feature of that same point is 0.214. Even the
+largest of them is smaller than a tile coder's boundary, which swaps a whole
+switch out of eight, and it is the same kind of thing.
 
 **And it does not make the encoder cheap, because it cannot.** A radial basis
 has no way of knowing which centres are far away without measuring the distance

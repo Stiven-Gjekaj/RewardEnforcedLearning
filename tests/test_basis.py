@@ -332,6 +332,56 @@ class TestKeepingBringsTheBoundaryBack:
             )
         assert all(later < earlier for earlier, later in pairwise(sizes))
 
+    def test_the_jump_is_a_different_size_elsewhere_in_the_box(self) -> None:
+        """0.036 is one crossing's value and not the encoder's.
+
+        Every test above sweeps the line through the middle, where the
+        crossings sit at the midpoints between centres and the jump is the
+        same number at each. That is a property of that line: the kept set
+        changes across a curve, and off the centre line the crossings are
+        somewhere else and are worth something else. The documentation said
+        "0.036 at the default settings" until this was measured.
+        """
+        basis = RadialBasis(UNIT, bins=6, kept=8)
+        step = 5e-3
+
+        def kept_at(point: tuple[float, float]) -> frozenset[int]:
+            return frozenset(basis.encode(point)[0])
+
+        sizes: list[float] = []
+        for row in range(11):
+            height = row / 10
+            was = kept_at((0.0, height))
+            walked = step
+            while walked <= 1.0:
+                here = kept_at((walked, height))
+                if here != was:
+                    # Bisect to the crossing, so what is measured is the jump
+                    # rather than the jump plus the slope across a whole step.
+                    low, high = walked - step, walked
+                    for _ in range(50):
+                        middle = (low + high) / 2
+                        if kept_at((middle, height)) == was:
+                            low = middle
+                        else:
+                            high = middle
+                    sizes.append(
+                        moved(
+                            weights(basis, (low, height)),
+                            weights(basis, (high, height)),
+                        )
+                    )
+                    was = here
+                walked += step
+
+        assert len(sizes) > 50
+        assert min(sizes) == pytest.approx(0.006, abs=0.001)
+        assert max(sizes) == pytest.approx(0.054, abs=0.001)
+        # Still under a tile coder's boundary, which swaps a whole switch of
+        # eight. That is the comparison the section rests on, and it has to
+        # hold for the largest of them rather than for the one measured.
+        assert max(sizes) < 1.0 / 8.0
+
     def test_it_is_still_smaller_than_a_tile_boundary(self) -> None:
         """The jump is real and it is not as large as the one it replaces.
 
