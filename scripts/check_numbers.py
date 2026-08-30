@@ -67,6 +67,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TypedDict
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -152,8 +153,20 @@ def without_prose(source: str) -> str:
     return ast.dump(tree)
 
 
-def fingerprint() -> str:
-    """A hash of the code every documented command runs, and of the Python.
+def script_of(command: str) -> Path | None:
+    """The script a command runs, if it names one.
+
+    `rel` commands name none: they run the package, which is under `rel/` and
+    is hashed for every command anyway.
+    """
+    for part in shlex.split(command):
+        if part.endswith(".py"):
+            return ROOT / part
+    return None
+
+
+def fingerprint(command: str = "") -> str:
+    """A hash of the code this command runs, and of the Python running it.
 
     The cache holds what a command printed, and what a command prints depends
     on the code under it. Without this a cache made before a change would
@@ -166,18 +179,24 @@ def fingerprint() -> str:
     reach the figures a digest hashes. `TestTheDigestIsNotStableAcrossPythons`
     in `tests/test_linear.py` is that finding.
 
-    This file is left out on purpose. Nothing a documented command prints
-    depends on the checker, and including it would throw away hours of cache
-    every time the report's wording changed.
+    Per command rather than for the whole repository. Hashing every script
+    together meant that adding an option to one of them threw away the cached
+    output of the other fifty, which have never heard of it. What a command
+    prints depends on the package and on its own script, and on nothing else
+    in `scripts/`.
+
+    With no command it is the package alone, which is what every command
+    shares and is the most that can be said without knowing which one.
     """
     running = hashlib.blake2b(digest_size=16)
     running.update(f"python {sys.version_info[0]}.{sys.version_info[1]}\n".encode())
 
-    here = Path(__file__).resolve()
-    paths = sorted(ROOT.glob("rel/**/*.py")) + sorted(ROOT.glob("scripts/*.py"))
+    paths = sorted(ROOT.glob("rel/**/*.py"))
+    named = script_of(command) if command else None
+    if named is not None and named.exists():
+        paths.append(named)
+
     for path in paths:
-        if path.resolve() == here:
-            continue
         running.update(path.relative_to(ROOT).as_posix().encode())
         running.update(without_prose(path.read_text()).encode())
     return running.hexdigest()
@@ -186,6 +205,18 @@ def fingerprint() -> str:
 def heading_of(row: str) -> str:
     """A table row as a key, with the pipes and the case taken off."""
     return row.strip("|").strip().lower()
+
+
+class Held(TypedDict):
+    """One command's entry in the cache: what it printed, and under what code.
+
+    The code is per command rather than one stamp for the file, so adding an
+    option to one script does not throw away the cached output of the other
+    fifty that have never heard of it.
+    """
+
+    code: str
+    numbers: list[str]
 
 
 @dataclass
@@ -540,23 +571,26 @@ def main() -> int:
     started = time.perf_counter()
     kept = Path(args.cache) if args.cache else None
     printed: dict[str, list[str]] = {}
-    store: dict[str, list[str]] = {}
-    code = fingerprint()
+    store: dict[str, Held] = {}
     if kept is not None and kept.exists():
-        held = json.loads(kept.read_text())
-        if held.get("code") != code:
-            # Made before the code changed, so every output in it may be a
-            # number the code has stopped producing. Reusing it would be this
-            # script committing the fault it exists to catch.
-            print(f"{kept} was made from different code. Running everything.\n")
-        else:
-            # Only the commands this page still asks for. A cache that
-            # outlived the command it was made for would otherwise account
-            # for a table with the output of something nobody runs any more.
-            was = held["printed"]
-            store = {name: was[name] for name in every if name in was}
-            printed = {name: store[name] for name in commands if name in store}
-            print(f"{len(printed)} of {len(commands)} commands come from {kept}.\n")
+        was = json.loads(kept.read_text())["printed"]
+        # Only the commands this page still asks for, and only those whose
+        # code has not moved since. A cache that outlived either would
+        # account for a table with the output of something nobody runs any
+        # more, or with numbers the code has stopped producing.
+        store = {
+            name: was[name]
+            for name in every
+            if name in was and was[name]["code"] == fingerprint(name)
+        }
+        printed = {
+            name: list(store[name]["numbers"]) for name in commands if name in store
+        }
+        stale = sum(1 for name in every if name in was and name not in store)
+        print(f"{len(printed)} of {len(commands)} commands come from {kept}.")
+        if stale:
+            print(f"{stale} were made from code that has since moved.")
+        print()
 
     broken: list[str] = []
     slow: list[str] = []
@@ -575,14 +609,13 @@ def main() -> int:
             broken.append(command)
             continue
         print(f"    {spent:.0f}s", flush=True)
-        printed[command] = store[command] = NUMBER.findall(output.replace(",", ""))
+        printed[command] = NUMBER.findall(output.replace(",", ""))
+        store[command] = Held(code=fingerprint(command), numbers=printed[command])
         if kept is not None:
             # Written after every command rather than at the end, because a
             # run this long is one a person interrupts, and a cache that only
             # exists if the whole thing finished is a cache for nobody.
-            kept.write_text(
-                json.dumps({"code": code, "printed": store}, indent=1, sort_keys=True)
-            )
+            kept.write_text(json.dumps({"printed": store}, indent=1, sort_keys=True))
 
     if kept is not None:
         # Again at the end, so the file holds exactly the commands this page
@@ -590,9 +623,7 @@ def main() -> int:
         # never rewrite it, and a command the page dropped would sit in the
         # file for ever. It is pruned on the way in either way, so this is
         # tidiness rather than correctness.
-        kept.write_text(
-            json.dumps({"code": code, "printed": store}, indent=1, sort_keys=True)
-        )
+        kept.write_text(json.dumps({"printed": store}, indent=1, sort_keys=True))
 
     clean = 0
     orphans = 0

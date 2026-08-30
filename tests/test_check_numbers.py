@@ -767,9 +767,12 @@ class TestTheCacheOfWhatEachCommandPrinted:
         cache = tmp_path / "kept.json"
         self.go(script, monkeypatch, write(tmp_path, self.PAGE), cache)
         capsys.readouterr()
-        held = json.loads(cache.read_text())
-        assert held["printed"] == {'python -c "print(7.5)"': ["7.5"]}
-        assert held["code"] == script.fingerprint()
+        held = json.loads(cache.read_text())["printed"]
+        assert list(held) == ['python -c "print(7.5)"']
+        assert held['python -c "print(7.5)"']["numbers"] == ["7.5"]
+        assert held['python -c "print(7.5)"']["code"] == script.fingerprint(
+            'python -c "print(7.5)"'
+        )
 
     def test_a_second_run_does_not_run_the_command_again(
         self,
@@ -816,11 +819,13 @@ class TestTheCacheOfWhatEachCommandPrinted:
         account for a table with the output of something the page has
         stopped saying to run, which is the opposite of the point."""
         cache = tmp_path / "kept.json"
+        old = 'python -c "print(1)"'
         cache.write_text(
             json.dumps(
                 {
-                    "code": script.fingerprint(),
-                    "printed": {'python -c "print(1)"': ["7.5"]},
+                    "printed": {
+                        old: {"code": script.fingerprint(old), "numbers": ["7.5"]}
+                    }
                 }
             )
         )
@@ -879,7 +884,14 @@ class TestTheCacheKnowsWhenTheCodeChanged:
         cache = tmp_path / "kept.json"
         cache.write_text(
             json.dumps(
-                {"code": "from some other tree", "printed": {"python x.py": ["1"]}}
+                {
+                    "printed": {
+                        'python -c "print(7.5)"': {
+                            "code": "from some other tree",
+                            "numbers": ["7.5"],
+                        }
+                    }
+                }
             )
         )
         page = write(tmp_path, self.PAGE)
@@ -892,20 +904,54 @@ class TestTheCacheKnowsWhenTheCodeChanged:
         script.main()
 
         printed = capsys.readouterr().out
-        assert "was made from different code" in printed
+        assert "made from code that has since moved" in printed
         assert "[1/1]" in printed
 
-    def test_the_fingerprint_moves_when_a_script_moves(
-        self, script: ModuleType, tmp_path: Path
+    def test_a_script_moving_moves_only_its_own_commands(
+        self, script: ModuleType
     ) -> None:
-        before = script.fingerprint()
-        added = script.ROOT / "scripts" / "a_temporary_file_for_this_test.py"
-        added.write_text("x = 1\n")
+        """Why the fingerprint is per command rather than per repository.
+
+        Hashing every script together meant that adding an option to one of
+        them threw away the cached output of the other fifty, which have
+        never heard of it. That happened twice in one sitting and cost hours
+        each time.
+        """
+        mine = "python scripts/measure_sweeping.py --episodes 400"
+        yours = "python scripts/measure_importance.py --episodes 1200"
+        before = (script.fingerprint(mine), script.fingerprint(yours))
+
+        path = script.ROOT / "scripts" / "measure_sweeping.py"
+        was = path.read_text()
         try:
-            assert script.fingerprint() != before
+            path.write_text(was.replace("PLANNERS = (", "PLANNERS = tuple(", 1))
+            assert script.fingerprint(mine) != before[0]
+            assert script.fingerprint(yours) == before[1]
         finally:
-            added.unlink()
-        assert script.fingerprint() == before
+            path.write_text(was)
+        assert script.fingerprint(mine) == before[0]
+
+    def test_the_package_moving_moves_every_command(self, script: ModuleType) -> None:
+        # Everything runs the package, so a change there is a change to all
+        # of them and the whole cache goes.
+        commands = ["python scripts/measure_sweeping.py", "rel train sarsa"]
+        before = [script.fingerprint(command) for command in commands]
+
+        path = script.ROOT / "rel" / "agents" / "basis.py"
+        was = path.read_text()
+        try:
+            path.write_text(was.replace("return optimism", "return optimism * 2", 1))
+            after = [script.fingerprint(command) for command in commands]
+            assert all(one != two for one, two in zip(before, after, strict=True))
+        finally:
+            path.write_text(was)
+
+    def test_a_command_that_names_no_script_is_the_package_alone(
+        self, script: ModuleType
+    ) -> None:
+        # `rel` commands run the package rather than a file in `scripts/`.
+        assert script.script_of("rel train sarsa --env cliff") is None
+        assert script.fingerprint("rel train sarsa") == script.fingerprint()
 
     def test_a_docstring_does_not_move_it(self, script: ModuleType) -> None:
         """What a command prints depends on what the code does, not on what it
@@ -1028,8 +1074,8 @@ class TestANarrowedRunKeepsTheWholeCache:
         monkeypatch.setattr(script, "ROOT", page.parent)
         script.main()
 
-    def held(self, cache: Path) -> dict[str, list[str]]:
-        loaded: dict[str, list[str]] = json.loads(cache.read_text())["printed"]
+    def held(self, cache: Path) -> dict[str, object]:
+        loaded: dict[str, object] = json.loads(cache.read_text())["printed"]
         return loaded
 
     def test_a_whole_run_caches_both(
