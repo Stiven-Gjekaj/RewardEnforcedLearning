@@ -204,21 +204,61 @@ def learning_section(
     return rows, verdict
 
 
-def width_section(grid: str, runs: int, episodes: int) -> list[list[str]]:
-    rows: list[list[str]] = []
-    for width in (0.5, 0.75, 1.0, 1.5, 2.0, 3.0):
-        values = [
-            one_run(grid, "rbf-sarsa", seed, episodes, width=width)
+#: The widths the sweep tries, as multiples of the spacing between centres.
+#: `DEFAULT` is the one the registry uses, and every other width is compared
+#: against it rather than against its neighbour, because the question the
+#: sweep exists to answer is whether the default is the right one.
+WIDTHS = (0.5, 0.75, 1.0, 1.5, 2.0, 3.0)
+DEFAULT = 0.75
+
+
+def width_section(
+    grid: str, runs: int, episodes: int, rng: Rng, bins: int | None = None
+) -> tuple[list[list[str]], list[list[str]]]:
+    """The sweep, and every width against the default one, paired by seed.
+
+    Both, because the page quoted an interval and a p value for the default
+    against one whole spacing and no command on it printed either. A mean
+    beside a mean says which is larger and says nothing about whether the
+    seeds agree, and this project's rule is that a claim of a difference
+    carries the test that decides it.
+    """
+    # Fewer centres a side where the caller asks for it. The cart pole is
+    # four dimensional, so the default of six is 1296 centres and an hour of
+    # runs; four is 256 and the sweep finishes. The shape of the answer is
+    # what the sweep is for, and it does not need the default to show it.
+    coarser = {} if bins is None else {"bins": bins}
+
+    scores: dict[float, list[float]] = {}
+    for width in WIDTHS:
+        scores[width] = [
+            one_run(grid, "rbf-sarsa", seed, episodes, width=width, **coarser)
             for seed in range(1, runs + 1)
         ]
-        rows.append(
+
+    rows = [
+        [
+            f"{width:g}",
+            f"{statistics.mean(values):.1f}",
+            " ".join(f"{value:.0f}" for value in values),
+        ]
+        for width, values in scores.items()
+    ]
+
+    against: list[list[str]] = []
+    for width in WIDTHS:
+        if width == DEFAULT:
+            continue
+        answer = compare(scores[DEFAULT], scores[width], rng)
+        against.append(
             [
                 f"{width:g}",
-                f"{statistics.mean(values):.1f}",
-                " ".join(f"{value:.0f}" for value in values),
+                f"{answer.difference:+.1f}",
+                f"[{answer.low:+.1f}, {answer.high:+.1f}]",
+                f"{answer.p_value:.3f}",
             ]
         )
-    return rows
+    return rows, against
 
 
 def main() -> int:
@@ -233,6 +273,12 @@ def main() -> int:
         help="steps to time, for the cost table only",
     )
     parser.add_argument("--passes", type=int, default=300)
+    parser.add_argument(
+        "--bins",
+        type=int,
+        default=None,
+        help="centres a side for the width sweep only, where the default is slow",
+    )
     args = parser.parse_args()
 
     started = time.perf_counter()
@@ -289,10 +335,19 @@ def main() -> int:
     print(f"\n{verdict}\n")
 
     print("## The width, which is the radial basis setting that matters\n")
+    widths, against = width_section(
+        args.env, args.runs, args.episodes, Rng(11).stream("compare"), args.bins
+    )
     for line in table(
-        ["width", "mean", "every seed"],
-        width_section(args.env, args.runs, args.episodes),
-        align=["right", "right", "left"],
+        ["width", "mean", "every seed"], widths, align=["right", "right", "left"]
+    ):
+        print(f"  {line}")
+
+    print(f"\n  Each width against the default of {DEFAULT:g}, paired by seed:\n")
+    for line in table(
+        ["width", f"{DEFAULT:g} minus it", "95 percent interval", "p"],
+        against,
+        align=["right", "right", "right", "right"],
     ):
         print(f"  {line}")
 

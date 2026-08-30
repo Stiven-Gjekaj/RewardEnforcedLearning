@@ -261,5 +261,24 @@ class TestTheSections:
         assert "two\nhalves of the answer disagreeing" in verdict
 
     def test_the_width_table_has_a_row_for_each_width(self, script: ModuleType) -> None:
-        rows = script.width_section("mountaincar", 2, 4)
+        rows, _ = script.width_section("mountaincar", 2, 4, Rng(3).stream("compare"))
         assert [row[0] for row in rows] == ["0.5", "0.75", "1", "1.5", "2", "3"]
+
+    def test_every_width_but_the_default_is_compared_against_it(
+        self, script: ModuleType
+    ) -> None:
+        """The page quoted an interval and a p value and no command printed
+        either, so a reader had a claim of a difference and no way to see the
+        test behind it."""
+        _, against = script.width_section("mountaincar", 3, 4, Rng(3).stream("compare"))
+        assert [row[0] for row in against] == ["0.5", "1", "1.5", "2", "3"]
+        assert script.DEFAULT == 0.75
+        assert all(row[2].startswith("[") and row[2].endswith("]") for row in against)
+
+    def test_fewer_centres_a_side_reach_the_encoder(self, script: ModuleType) -> None:
+        # The cart pole is four dimensional, so the default of six centres a
+        # side is 1296 of them and an hour of runs. Without this the sweep
+        # the page quotes for the cart pole cannot be run at all.
+        one, _ = script.width_section("mountaincar", 1, 3, Rng(3).stream("compare"))
+        two, _ = script.width_section("mountaincar", 1, 3, Rng(3).stream("compare"), 4)
+        assert [row[1] for row in one] != [row[1] for row in two]
