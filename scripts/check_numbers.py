@@ -339,9 +339,20 @@ def read(path: Path) -> tuple[list[str], list[Claim]]:
             # A reason worth giving does not always fit on one line, and a
             # marker that silently does nothing when it wraps is worse than
             # no marker: the table stops being exempt and nothing says so.
+            opened = index
             said = text[len(EXEMPT) :]
-            while "-->" not in said and index + 1 < len(lines):
+            while "-->" not in said:
                 index += 1
+                if index >= len(lines) or not lines[index].strip():
+                    # A marker with no end read to the bottom of the file, so
+                    # every command and every table below it went into the
+                    # reason. The report then said nothing was wrong with a
+                    # page it had not read, which is the worst answer it has.
+                    raise SystemExit(
+                        f"{path}, line {opened + 1}: a marker with no '-->' to "
+                        f"close it. Everything under it would be read as part "
+                        f"of the reason, so the page would state nothing."
+                    )
                 said += " " + lines[index].strip()
             said = " ".join(said.split("-->")[0].split())
 

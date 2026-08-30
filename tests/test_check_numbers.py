@@ -539,6 +539,40 @@ class TestATableThatAsksNotToBeChecked:
             "two is what the section is about"
         )
 
+    def test_a_marker_that_never_closes_stops_the_run(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        """The worst answer this script has, and it used to give it silently.
+
+        A marker with no `-->` read to the bottom of the file, so every
+        command and every table under it went into the reason. The report
+        then said nothing was wrong with a page it had never read.
+        """
+        page = write(
+            tmp_path,
+            "<!-- not checked: a reason that never closes\n\n"
+            "```console\n$ python x.py\n```\n\n"
+            "| a | b |\n| --- | ---: |\n| x | 1.0 |\n",
+        )
+        with pytest.raises(SystemExit) as stopped:
+            script.read(page)
+        assert "line 1" in str(stopped.value)
+        assert "-->" in str(stopped.value)
+
+    def test_a_marker_that_closes_on_a_later_line_is_fine(
+        self, script: ModuleType, tmp_path: Path
+    ) -> None:
+        # The guard is a blank line, not the second line, because a reason
+        # worth giving is allowed to wrap as far as it needs to.
+        page = write(
+            tmp_path,
+            "```console\n$ python x.py\n```\n\n"
+            "<!-- not checked: one\ntwo\nthree\nfour -->\n\n"
+            "| a | b |\n| --- | ---: |\n| x | 1.0 |\n",
+        )
+        _, claims = script.read(page)
+        assert claims[0].exempt == "one two three four"
+
     def test_a_comment_with_no_reason_says_so(
         self, script: ModuleType, tmp_path: Path
     ) -> None:
