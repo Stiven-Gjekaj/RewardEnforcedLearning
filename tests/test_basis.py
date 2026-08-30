@@ -127,9 +127,10 @@ class TestTheDefaultWidth:
     """Three quarters of a spacing, which was measured rather than reasoned.
 
     One whole spacing is the value that looks right, and it loses on both of
-    the environments this project has to try it on: by 11 points of return on
-    the mountain car over twelve seeds and by 184 on the cart pole over eight,
-    with the bootstrap interval clear of zero both times.
+    the environments this project has to try it on: by 11.2 points of return
+    on the mountain car over twelve seeds and by 267.6 on the cart pole over
+    eight, with the bootstrap interval clear of zero both times. Both come out
+    of `scripts/measure_approximation.py`, which the page names for each.
 
     Written down here so that changing it means reading that.
     """

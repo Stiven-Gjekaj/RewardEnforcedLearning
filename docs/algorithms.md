@@ -1408,6 +1408,7 @@ the other encoder. Nothing about `LinearAgent` knows which it is talking to.
 
 ```console
 $ python scripts/measure_approximation.py --runs 10
+$ python scripts/measure_approximation.py --env cartpole --runs 8 --bins 4
 ```
 
 ### The count of features says the opposite of the cost
@@ -1508,17 +1509,23 @@ the point is, and the agent is learning one number for the whole box.
 
 One whole spacing is the value that looks right and it is not the best one. It
 loses to three quarters on the mountain car by 11.2 over twelve seeds, interval
-[+4.1, +19.6], p 0.010, and on the cart pole by 183.7 over eight seeds,
-interval [+147, +223], p 0.008. Half a spacing beats one on both and does not
-beat three quarters on either. So the default is three quarters, and
+[+4.3, +20.1], p 0.010, and on the cart pole by 267.6 over eight seeds,
+interval [+222.1, +304.1], p 0.008. Half a spacing beats one on both and does
+not beat three quarters on either. So the default is three quarters, and
 `TestTheDefaultWidth` in `tests/test_basis.py` holds it there with the reason
 written next to it.
 
+Both come out of the second command above, which prints every width against
+the default under the table of means. The first version of this paragraph
+quoted an interval and a p value that no command on this page produced, and
+its cart pole figure was 183.7 against the 267.6 the command really prints.
+
 ### Where it is weak
 
-- **One environment for the learning comparison.** The cart pole would take an
-  hour at the exact settings, so it was compared at `bins=4` for the width
-  sweep only.
+- **One environment for the learning comparison.** The cart pole at six
+  centres a side is 1296 of them and about an hour of runs, so it is swept at
+  `bins=4`, which is 256 and ten minutes. The comparison of the two encoders
+  is the mountain car only.
 - **Sixty episodes.** The comparison is of early learning. Which encoder is
   ahead after three hundred episodes is not measured here.
 - **The width was swept on a grid of six values.** The best of six is not the
@@ -2328,10 +2335,10 @@ its numbers came from rather than what they were.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **395 of this
+- **Any number written in a sentence.** It reads tables, and **399 of this
   page's numbers are in prose rather than in a cell**, against 1074 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 395 are settings, seed counts and episode caps rather than anything a
+  those 399 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,

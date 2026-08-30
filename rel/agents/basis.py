@@ -30,9 +30,9 @@ information about where the point is.
 
 The default is three quarters of the spacing, and it is measured rather than
 reasoned. One whole spacing is the value that looks right, and it is worse on
-both of the environments this project has to try it on: by 11 points of return
-on the mountain car over twelve seeds, and by 184 on the cart pole over eight,
-with the interval clear of zero both times. Two and above does not solve the
+both of the environments this project has to try it on: by 11.2 points of
+return on the mountain car over twelve seeds, and by 267.6 on the cart pole
+over eight, with the interval clear of zero both times. Two and above does not solve the
 mountain car at all. `docs/algorithms.md` has the sweep.
 
 ## The nearest few can be kept, and it does not work
