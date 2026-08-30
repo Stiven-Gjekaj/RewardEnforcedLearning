@@ -127,8 +127,9 @@ Everything below is new.
   to 0.054, against the eighth of itself a tile coder's boundary costs. So it
   is off by default. The width is the whole of the setting: three quarters of
   the spacing between centres beats one whole spacing by 11.2 return on the
-  mountain car over twelve seeds, with the interval clear of zero, and at two
-  spacings eight of ten seeds never reach the flag.
+  mountain car over twelve seeds and by 267.6 on the cart pole over eight,
+  with the interval clear of zero both times, and at two spacings eight of ten
+  seeds never reach the flag.
 - **Average reward**, as `differential-q`: Q-learning with the rate it is
   collecting subtracted from every reward and no discount anywhere. There is no
   discount setting on it, and that is the point of it. The rate is learned from
