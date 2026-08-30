@@ -430,15 +430,14 @@ buffer. Putting one on this critic is the test that is still not run.
 
 ## Things that would be nice and are not milestones
 
-- Tests for the seven measurement scripts that have none. Twelve of the twenty
-  one scripts in `scripts/` are loaded by a test and nine are not. Two of
-  those nine measure nothing: one draws the readme banner and one runs the
-  gate that continuous integration runs. So the seven are
-  `measure_control.py`, `measure_engine.py`, `measure_intra_option.py`,
-  `measure_lost_seed.py`, `measure_options.py`, `measure_pressure.py` and
-  `measure_tiling_offsets.py`. They are named rather than counted, because
-  the first version of this entry said eleven in one sentence and twelve in
-  the next and neither was right.
+- Tests for the measurement scripts that have none. Two scripts in `scripts/`
+  measure nothing, one drawing the readme banner and one running the gate that
+  continuous integration runs, and every other one that no test loads is here.
+  So they are: `measure_control.py`, `measure_engine.py`,
+  `measure_intra_option.py`, `measure_lost_seed.py`, `measure_pressure.py` and
+  `measure_tiling_offsets.py`. They are named rather than counted, because the
+  first version of this entry said eleven untested in one sentence and twelve
+  in the next and neither was right.
 
   `measure_sweeping.py` gained its first tests when the check went looking
   for the command behind a table, and writing them turned up something worth

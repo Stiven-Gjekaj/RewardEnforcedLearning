@@ -267,7 +267,7 @@ def test_the_milestones_name_the_scripts_that_have_no_test() -> None:
     # script named in that sentence gain a test with nothing complaining,
     # because the name would still be in the file somewhere else.
     note = (root / "docs" / "milestones.md").read_text()
-    listed = note.split("So the seven are", 1)
+    listed = note.split("So they are:", 1)
     assert len(listed) == 2, "the milestones no longer list them"
     said = set(re.findall(r"`(measure_[a-z_]+\.py)`", listed[1].split(".\n\n")[0]))
 

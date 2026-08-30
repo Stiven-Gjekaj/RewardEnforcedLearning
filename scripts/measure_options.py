@@ -39,9 +39,17 @@ from rel.ui.table import table
 
 LADDER = (0.2, 0.1, 0.05, 0.02)
 
+#: The registry default, and the rate the collapse is measured at.
+DEFAULT_EPSILON = 0.1
+
 
 def measure(
-    grid: str, hallways: bool, epsilon: float, episodes: int, runs: int
+    grid: str,
+    hallways: bool,
+    epsilon: float,
+    episodes: int,
+    runs: int,
+    agent_name: str = "options-q",
 ) -> tuple[float, float, int, float, float]:
     returns: list[float] = []
     values: list[float] = []
@@ -53,14 +61,10 @@ def measure(
         root = Rng(seed)
         env = ENVIRONMENTS.make(grid, root.stream("env"))
         discount = env.spec.suggested_discount
-        agent = AGENTS.make(
-            "options-q",
-            root.stream("agent"),
-            env,
-            hallways=hallways,
-            epsilon=epsilon,
-        )
-        assert isinstance(agent, OptionsQ)
+        settings: dict[str, object] = {"epsilon": epsilon}
+        if agent_name == "options-q":
+            settings["hallways"] = hallways
+        agent = AGENTS.make(agent_name, root.stream("agent"), env, **settings)
 
         record = train(env, agent, episodes, discount=discount)
         returns.append(statistics.mean(record.returns[-100:]))
@@ -72,8 +76,15 @@ def measure(
         else:
             stuck += 1
 
-        longs.append(agent.long_chosen / max(agent.finished, 1))
-        lengths.append(agent.steps_in_options / max(agent.finished, 1))
+        # Only an agent that chooses options counts them. Q-learning is here
+        # to be the row the collapse is measured against, and it has no
+        # options to have chosen or to have run for any number of steps.
+        if isinstance(agent, OptionsQ):
+            longs.append(agent.long_chosen / max(agent.finished, 1))
+            lengths.append(agent.steps_in_options / max(agent.finished, 1))
+        else:
+            longs.append(0.0)
+            lengths.append(1.0)
 
     return (
         statistics.mean(returns),
@@ -100,6 +111,37 @@ def main() -> int:
         f"discount {discount:g}.\nThe best possible return is {best:.2f}."
     )
 
+    # The collapse, at the default exploration rate. An option that stops
+    # after every step is a primitive action, so an agent holding only those
+    # is Q-learning. The page states that as three rows and nothing printed
+    # the first of them, which is the one that makes it a claim rather than a
+    # tautology: `q-learning` is a different class reaching the same number.
+    print(f"\n## The collapse, at epsilon {DEFAULT_EPSILON:g}\n")
+    collapse: list[tuple[str, ...]] = []
+    for label, name, hallways in (
+        ("q-learning", "q-learning", False),
+        ("options-q, hallways=off", "options-q", False),
+        ("options-q", "options-q", True),
+    ):
+        found = measure(
+            args.grid, hallways, DEFAULT_EPSILON, args.episodes, args.runs, name
+        )
+        collapse.append(
+            (
+                label,
+                f"{found[0]:.2f}",
+                f"{found[1]:.2f}",
+                str(found[2]) if found[2] else "",
+            )
+        )
+    for line in table(
+        ["agent", "while learning", "greedy, exactly", "stuck"],
+        collapse,
+        align=["left", "right", "right", "right"],
+    ):
+        print(f"  {line}")
+
+    print("\n## The cost against a ladder of exploration rates\n")
     rows: list[tuple[str, ...]] = []
     for epsilon in args.epsilons:
         without = measure(args.grid, False, epsilon, args.episodes, args.runs)

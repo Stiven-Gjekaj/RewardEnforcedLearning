@@ -961,7 +961,7 @@ one would make this the shape that plays board games, and it is not built.
 ```console
 $ rel train options-q --env rooms
 $ rel train options-q --env rooms --set hallways=off
-$ python scripts/measure_options.py --runs 10
+$ python scripts/measure_options.py
 $ python scripts/measure_options.py --runs 20
 ```
 
@@ -996,8 +996,11 @@ none of them has an interior wall.
 | options-q, `hallways=off` | -22.44 | -20.00 | |
 | options-q | -25.01 | -20.00 | 1 |
 
-*Four rooms, ten seeds, 500 episodes, the row at the default epsilon of 0.1.
-The best possible return is -20.*
+*Four rooms, ten seeds, 500 episodes, at the default epsilon of 0.1. The best
+possible return is -20. The third command above prints this table, and the row
+that says `q-learning` is why it prints it: that row is a different class
+reaching the same number, and without it the first two rows are one agent
+compared with itself.*
 
 The first two rows are the collapse. An option that stops after every step is a
 primitive action, so an agent holding only those is Q-learning, and it is
