@@ -2349,10 +2349,12 @@ its numbers came from rather than what they were.
 ## Where the numbers on this page can be checked
 
 Every command here is written the way a console block on this page writes it,
-because a row that drops a setting sends a reader to a different table. Five of
-these dropped one, and four of the five changed the answer: the importance
-sampling row ran 1500 episodes where the block runs 1200, and the value network
-row ran 200 where the block runs 400.
+because a row that drops a setting sends a reader to a different table. Ten of
+these rows named a command this page does not run, and seven of the ten would
+have produced a different table: the importance sampling row ran the default of
+1500 episodes where the block runs 1200, and the value network row ran 200
+where the block runs 400. The other three named the same run in other words,
+which is harmless and still worth spelling one way.
 
 | Table | Command |
 | --- | --- |
