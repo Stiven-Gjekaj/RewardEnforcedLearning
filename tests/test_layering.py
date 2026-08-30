@@ -138,6 +138,76 @@ def test_the_readme_says_how_many_tests_there_are() -> None:
         assert one == collected, f"the readme says {one} and there are {collected}"
 
 
+#: The numbers under a hundred, written the way the readme writes them.
+ONES = (
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+)
+TENS = ("twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety")
+
+
+def spelled(count: int) -> str:
+    """A count under a hundred, in words."""
+    if count < 20:
+        return ONES[count - 1]
+    tens, units = divmod(count, 10)
+    return TENS[tens - 2] if not units else f"{TENS[tens - 2]} {ONES[units - 1]}"
+
+
+def test_the_speller_writes_what_the_readme_writes() -> None:
+    # The check above passes if the readme holds the string this makes, so a
+    # speller that was wrong in the same way as the readme would agree with
+    # it and say nothing.
+    assert [spelled(count) for count in (9, 15, 19, 20, 21, 34, 40, 99)] == [
+        "nine",
+        "fifteen",
+        "nineteen",
+        "twenty",
+        "twenty one",
+        "thirty four",
+        "forty",
+        "ninety nine",
+    ]
+
+
+def test_the_readme_counts_the_agents_and_the_environments() -> None:
+    """Two more numbers written in words beside a registry that can count.
+
+    They are right today and nothing was holding them. Every other count
+    about this repository has gone stale at least once: the readme said 2083
+    tests where the suite collects 2119, and the untested scripts were
+    eleven in one sentence and twelve in the next.
+
+    The registries are imported here rather than at the top of the file,
+    because every other test in it reads the source with the parser instead
+    of importing anything, and that is what lets them check a module which
+    would fail to import.
+    """
+    from rel.agents import AGENTS
+    from rel.envs import ENVIRONMENTS
+
+    readme = (PACKAGE.parent / "README.md").read_text()
+    assert f"{spelled(len(ENVIRONMENTS))} environments" in readme, len(ENVIRONMENTS)
+    assert f"{spelled(len(AGENTS))} agents" in readme, len(AGENTS)
+
+
 def test_the_milestones_name_the_scripts_that_have_no_test() -> None:
     """Named rather than counted, because the count went wrong twice.
 
