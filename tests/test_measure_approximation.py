@@ -67,14 +67,23 @@ class TestTheCostIsPerStep:
         assert tile_features > basis_features
         assert tiles < basis
 
-    def test_the_step_count_asked_for_is_the_step_count_timed(
+    def test_the_answer_does_not_grow_with_the_step_count(
         self, script: ModuleType
     ) -> None:
-        # Not a tautology. The loop resets the environment when an episode
-        # ends, and an earlier version of that loop would have stopped there.
-        few, _ = script.microseconds_per_step("mountaincar", "tile-sarsa", 50)
-        many, _ = script.microseconds_per_step("mountaincar", "tile-sarsa", 400)
+        """What "per step" means, and the only thing that checks the division.
+
+        A mutation that dropped the divide by `steps` survived every other
+        test here, and it would multiply every number in the cost table by the
+        step count. Timing more steps has to give about the same answer per
+        step, so this times four times as many and holds the two within a
+        factor of three of each other, which is loose enough for a shared
+        machine and far tighter than a factor of four.
+        """
+        few, _ = script.microseconds_per_step("mountaincar", "tile-sarsa", 200)
+        many, _ = script.microseconds_per_step("mountaincar", "tile-sarsa", 800)
         assert few > 0.0 and many > 0.0
+        assert many < 3.0 * few
+        assert few < 3.0 * many
 
     def test_it_passes_the_settings_through_to_the_encoder(
         self, script: ModuleType
