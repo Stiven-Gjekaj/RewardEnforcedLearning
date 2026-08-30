@@ -274,8 +274,11 @@ Everything below is new.
   from, because one section writes one command and then four tables and the
   other three commands were nowhere on the page.
 
-  **Almost nothing had drifted.** That is the result of the exercise. What the
-  pages had wrong was where their numbers came from rather than what they were:
+  **Nothing had drifted.** That is the result of the exercise, and it is the
+  whole run rather than a sample: 34 of the 34 tables that state results on the
+  algorithms page are wholly accounted for by a command it names, and none by
+  no command at all. Every number that was ever in doubt turned out to be
+  right. What the pages had wrong was where their numbers came from:
   four tables under one of their four commands, three grids of exploration
   rules with no console block at all, five rows of a crossover table, two
   blocks naming a command at the wrong setting, and a closing index that named

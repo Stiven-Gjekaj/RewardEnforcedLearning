@@ -31,8 +31,10 @@ thirds of that first report was a table sitting under a command it did not come
 from, because `The same table, four more environments` writes one command and
 then four tables and the other three commands were nowhere on the page.
 
-What it found was not what the exercise expected. Almost nothing had drifted.
-What the page had was tables whose command it never named, or named wrongly:
+What it found was not what the exercise expected. Nothing had drifted: 34 of
+the 34 tables that state results are wholly accounted for by a command the page
+names. What it had instead was tables whose command it never named, or named
+wrongly:
 
 - Four tables under one of their four commands, for nineteen tracks.
 - Ten rows of an epsilon sweep under a command that takes the default episode
