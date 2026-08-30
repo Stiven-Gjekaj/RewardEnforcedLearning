@@ -430,6 +430,13 @@ buffer. Putting one on this critic is the test that is still not run.
 
 ## Things that would be nice and are not milestones
 
+- Tests for the eleven measurement scripts that have none. Nine of the twenty
+  one scripts are tested and the rest are not, which was found by looking
+  rather than by anything failing. `measure_sweeping.py` gained its first
+  tests when the check went looking for the command behind a table, and
+  writing them turned up something worth knowing about the episode cap, which
+  is the argument for the other eleven.
+
 - A `--out` that writes a run to a file, and a `rel replay` that reads one.
 - Sweeping a setting from the command line, with the table falling out.
 - An environment described entirely by a text file, so that a new grid needs no
