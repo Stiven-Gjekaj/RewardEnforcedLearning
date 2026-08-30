@@ -113,14 +113,28 @@ def digest_of(agent: Agent[Any]) -> str | None:
     answer, so an agent whose arithmetic goes through `sum` can learn a table
     that differs in its last bits between one interpreter and another.
 
-    Measured over five agents at the episode counts their tests use, one moves
-    and four do not. `tile-sarsa` on the cart pole gives 54f7 on 3.11 and 5c5e
-    on 3.12 and above. `expected-sarsa`, `tree-backup`, `off-policy-mc` and
-    `reinforce` all give the same digest on all three, although every one of
-    them sums floats as well. The difference needs enough arithmetic to
-    accumulate before it reaches the twelve figures hashed here, and twenty
-    episodes of a four dimensional tile coder is enough where the others are
-    not.
+    Measured on 3.11 against 3.12 and 3.13. Two of six move and four do not:
+
+        tile-sarsa      cart pole, 20 episodes     moves
+        reinforce       cliff walk, 50 episodes    moves
+        expected-sarsa  cliff walk, 100 episodes   the same on all three
+        tree-backup     cliff walk, 100 episodes   the same on all three
+        off-policy-mc   cliff walk, 100 episodes   the same on all three
+        q-learning      cliff walk, 100 episodes   the same on all three
+
+    The two that move are the two whose value is a sum over many floats: eight
+    tile weights, or a whole network. A tabular agent keeps one number for
+    each cell and adds to it in place, so there is no long sum for the
+    compensation to change. Every one of the four sums floats somewhere and
+    none of them sums enough of them.
+
+    It is a threshold rather than a property of an agent. The same
+    `tile-sarsa` run is the same on all three at ten episodes and moves at
+    twenty, `reinforce` is the same at twenty and moves at fifty, and
+    `actor-critic` is the same at a hundred and moves at four hundred.
+    `TestWhichDigestsMoveBetweenPythons` in `tests/test_training.py` holds the
+    six, and the check on it is the version matrix in CI rather than anything
+    the test does: the same numbers run on all three interpreters.
 
     **The run digest does not move on any of them.** It hashes transitions,
     and an observation written to a fixed number of figures survives a

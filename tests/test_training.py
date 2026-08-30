@@ -7,13 +7,17 @@ one would be worthless, and nothing else in the suite would notice.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Mapping, Sequence
+from functools import cache
 
 import pytest
 
+from rel.agents import AGENTS
 from rel.agents.base import Agent, RandomAgent, Transition
 from rel.agents.td import DoubleQ, ExpectedSarsa, QLearning
 from rel.core import Env, EnvSpec, Outcome, Step, TabularEnv
+from rel.envs import ENVIRONMENTS
 from rel.envs.classic import cliff_walk
 from rel.rng import Rng
 from rel.spaces import Discrete
@@ -464,3 +468,89 @@ class TestTheDigestOfWhatAnAgentLearned:
         )
         record = train(env, agent, 50)
         assert record.digest.hexdigest() == "0de6831e401c7ddd"
+
+
+@cache
+def digests(name: str, grid: str, episodes: int) -> tuple[str, str | None]:
+    """One run's two digests, kept so that two tests cost one run."""
+    root = Rng(1)
+    env = ENVIRONMENTS.make(grid, root.stream("env"))
+    agent = AGENTS.make(name, root.stream("agent"), env)
+    record = train(env, agent, episodes, discount=env.spec.suggested_discount)
+    return record.digest.hexdigest(), digest_of(agent)
+
+
+class TestWhichDigestsMoveBetweenPythons:
+    """The learned digest is not the same number on every interpreter.
+
+    CPython 3.12 gave `sum()` compensated summation over floats. That is more
+    accurate than adding them up one at a time and it is therefore a different
+    answer, so an agent whose value is a long sum can learn a table that
+    differs in its last bits from one interpreter to the next.
+
+    What checks this is the version matrix in CI rather than anything the
+    tests below do. The same numbers run on 3.11, 3.12 and 3.13, so an agent
+    written here as settled that starts to move fails on one of the three,
+    and an agent written here as moving that stops fails on the others.
+
+    The docstring of `digest_of` said four agents were settled and one of them
+    was `reinforce`, which moves after fifty episodes. Nothing held the claim,
+    so nothing said it had stopped being true.
+    """
+
+    #: The agent, the grid, the episodes, the path digest, and every learned
+    #: digest any interpreter gives. One where they agree, two where 3.11
+    #: disagrees with 3.12 and above.
+    RUNS = (
+        (
+            "tile-sarsa",
+            "cartpole",
+            20,
+            "979877443e6c00a3",
+            ("54f776207a734d90", "5c5e9c0f6fd6d467"),
+        ),
+        (
+            "reinforce",
+            "cliff",
+            50,
+            "2193ddacf7ade68a",
+            ("767e0edcd040a76a", "8347fbc29e4eb199"),
+        ),
+        ("expected-sarsa", "cliff", 100, "c3eb8cdd36d792b0", ("d069bcadd897b1c5",)),
+        ("tree-backup", "cliff", 100, "4e770664ec3b44c2", ("de9e528a3f24e728",)),
+        ("off-policy-mc", "cliff", 100, "e093b9be677f4db3", ("53c21c59bb55d97f",)),
+        ("q-learning", "cliff", 100, "6a1dfba7a7a9193d", ("4b61dd694663d8df",)),
+    )
+
+    @pytest.mark.parametrize(("name", "grid", "episodes", "path", "learned"), RUNS)
+    def test_the_path_digest_is_the_same_on_every_interpreter(
+        self, name: str, grid: str, episodes: int, path: str, learned: tuple[str, ...]
+    ) -> None:
+        """One value, not a pair, for every agent here.
+
+        A transition is an observation, an action and a reward written to a
+        fixed number of figures, and those survive a difference in the last
+        bits of a value, because a policy is a comparison between values
+        rather than a value. That is the reason the two digests are kept
+        apart, and it is checked rather than argued.
+        """
+        assert digests(name, grid, episodes)[0] == path
+
+    @pytest.mark.parametrize(("name", "grid", "episodes", "path", "learned"), RUNS)
+    def test_the_learned_digest_is_the_one_for_this_interpreter(
+        self, name: str, grid: str, episodes: int, path: str, learned: tuple[str, ...]
+    ) -> None:
+        # The exact number rather than either of two, so that an agent which
+        # started moving fails here and not only on another job of the
+        # matrix. A settled agent has the same number written twice.
+        wanted = learned[0] if sys.version_info < (3, 12) else learned[-1]
+        assert digests(name, grid, episodes)[1] == wanted
+
+    def test_something_moves_and_something_does_not(self) -> None:
+        # Otherwise a table that had quietly become all one thing or all the
+        # other would still pass every row above, and the two claims the
+        # class is written to make would have nothing behind them.
+        sizes = {len(row[4]) for row in self.RUNS}
+        assert sizes == {1, 2}
+        for row in self.RUNS:
+            assert len(set(row[4])) == len(row[4]), row[0]
