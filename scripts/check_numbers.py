@@ -50,7 +50,22 @@ machine. Those lines will differ on every run and there is nothing to fix.
 
 **A command that takes longer than the budget.** Nothing ran, so nothing
 accounts for its tables, and they are reported as unaccounted for. The summary
-names those commands separately.
+names those commands separately, with the budget each one had, and the cache
+remembers it so that a resumed run does not spend the budget again.
+
+## What it will run
+
+A script under `scripts/`, or the package's own command line. Nothing else,
+whatever a page writes. `--doc` takes any page and the readme's install block
+is a console block, so the first version of this cloned the repository into
+itself and installed the package in order to check a table of line counts.
+Checking a document must not change the machine it is checked on, and a rule
+that has to be remembered is not a rule.
+
+Every other command a page names is printed in the report and left alone, so a
+reader looking for a table's source can see that the block above it holds
+something that was never run. A trailing comment is taken off first, because a
+shell drops it and a page is written for a shell.
 """
 
 from __future__ import annotations
