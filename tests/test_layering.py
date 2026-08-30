@@ -1,7 +1,7 @@
-"""Rules about which module may import which, enforced by reading the imports.
+"""Claims the documentation makes about this repository, held to what is here.
 
-Four claims in the documentation rest on these, and none of them can be
-checked by running an agent:
+None of them can be checked by running an agent. Three are rules about which
+module may import which:
 
 - The package imports nothing outside the standard library.
 - An environment never imports an agent, and an agent never imports an
@@ -9,13 +9,25 @@ checked by running an agent:
   for it, and the tuning would be invisible in the returns.
 - Nothing that decides anything imports the drawing code, so a whole
   experiment runs with no terminal attached.
-- Every module of the package is counted in the table of sizes in the readme.
-  A total that quietly leaves a module out is worse than no total, and two of
-  them had been missing from it for as long as they had existed.
 
-These are read out of the source with the standard library's own parser rather
-than by importing anything, so a module that would fail to import is still
-checked.
+Those three are read out of the source with the standard library's own parser
+rather than by importing anything, so a module that would fail to import is
+still checked.
+
+The rest are counts, and every one of them was written by hand next to
+something that can count itself:
+
+- Every module of the package is in the table of sizes in the readme. A total
+  that quietly leaves a module out is worse than no total, and two of them had
+  been missing from it for as long as they had existed.
+- The readme says how many tests there are. It said 2083 for as long as
+  tests kept being added to the suite, and nothing said so.
+- The readme says how many agents and environments there are, in words.
+- Both the readme and the architecture page say how many networks there are.
+  They disagreed.
+- The milestones name the measurement scripts that have no test. That note
+  said eleven in one sentence and twelve in the next, and the number was
+  nine.
 """
 
 from __future__ import annotations
