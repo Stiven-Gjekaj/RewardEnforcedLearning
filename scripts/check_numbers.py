@@ -385,18 +385,25 @@ def main() -> int:
         claims = [claim for claim in claims if args.only in claim.nearest]
 
     if args.list or not (args.only or args.all):
-        stated = sum(len(claim.numbers) for claim in claims)
+        stated = sum(len(claim.numbers) for claim in claims if not claim.exempt)
+        left = sum(len(claim.numbers) for claim in claims if claim.exempt)
         print(
-            f"{len(commands)} commands and {len(claims)} tables in {args.doc},\n"
-            f"stating {stated} numbers between them.\n"
+            f"{len(commands)} commands and {len(claims)} tables in {args.doc}.\n"
+            f"{stated} numbers are checked and {left} are not.\n"
         )
         for line in table(
-            ["line", "numbers", "nearest command above it"],
+            ["line", "numbers", "not checked", "nearest command above it"],
             [
-                [f"{claim.line}", f"{len(claim.numbers)}", claim.nearest]
+                [
+                    f"{claim.line}",
+                    f"{len(claim.numbers)}",
+                    claim.exempt
+                    or (f"column {claim.skipped}" if claim.skipped else ""),
+                    claim.nearest,
+                ]
                 for claim in claims
             ],
-            align=["right", "right", "left"],
+            align=["right", "right", "left", "left"],
         ):
             print(f"  {line}")
         if not args.list:

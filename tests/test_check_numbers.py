@@ -633,3 +633,67 @@ class TestATableThatExemptsOneColumn:
         _, claims = script.read(write(tmp_path, page))
         assert [claim.skipped for claim in claims] == ["time", ""]
         assert claims[1].numbers == ["9"]
+
+
+class TestTheListingSaysWhatIsCovered:
+    """`--list` runs nothing, so it is the only way to see coverage cheaply.
+
+    A whole run takes about two and a half hours. A reader deciding whether to
+    start one wants to know how much of the page it would check before they
+    wait for it.
+    """
+
+    def go(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        page: Path,
+    ) -> str:
+        monkeypatch.setattr(
+            sys, "argv", ["check_numbers", "--doc", str(page), "--list"]
+        )
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        return str(script.main())
+
+    def test_it_counts_the_checked_and_the_unchecked_apart(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        page = write(
+            tmp_path,
+            "```console\n$ python x.py\n```\n\n"
+            "| a | b |\n| --- | ---: |\n| x | 1 | 2 |\n\n"
+            "<!-- not checked: seconds -->\n\n"
+            "| c | time |\n| --- | ---: |\n| y | 9 |\n",
+        )
+        self.go(script, monkeypatch, page)
+        assert "2 numbers are checked and 1 are not" in capsys.readouterr().out
+
+    def test_a_column_left_out_is_named(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        page = write(
+            tmp_path,
+            "```console\n$ python x.py\n```\n\n"
+            "<!-- not checked, column time: seconds -->\n\n"
+            "| a | steps | time |\n| --- | ---: | ---: |\n| x | 15 | 9 |\n",
+        )
+        self.go(script, monkeypatch, page)
+        printed = capsys.readouterr().out
+        assert "column time" in printed
+        assert "1 numbers are checked" in printed
+
+    def test_the_real_page_is_mostly_checked(self, script: ModuleType) -> None:
+        # The number worth knowing about this exercise. If it falls a long
+        # way, something has started exempting itself.
+        _, claims = script.read(script.ROOT / "docs" / "algorithms.md")
+        checked = sum(len(c.numbers) for c in claims if not c.exempt)
+        left = sum(len(c.numbers) for c in claims if c.exempt)
+        assert checked > 20 * left
