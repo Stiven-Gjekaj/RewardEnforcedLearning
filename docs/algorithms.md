@@ -1558,8 +1558,22 @@ that is what the classes here default to. It is the wrong default for this
 project, and the measurement says so plainly.
 
 ```console
-$ python scripts/measure_control.py --env cartpole --agents tile-sarsa
+$ python scripts/measure_control.py --env mountaincar --episodes 300 \
+    --agents tile-sarsa tile-q --set epsilon=0.0
+$ python scripts/measure_control.py --env mountaincar --episodes 300 \
+    --agents tile-sarsa --set epsilon=0.01
+$ python scripts/measure_control.py --env cartpole --episodes 600 \
+    --agents tile-sarsa tile-q --set epsilon=0.0
+$ python scripts/measure_control.py --env cartpole --episodes 600 \
+    --agents tile-sarsa --set epsilon=0.01
 ```
+
+The rows at 0.05 are the registry default and come from the two commands in
+`The two control problems` above.
+
+This block said `--env cartpole --agents tile-sarsa` for nineteen tracks. That
+command takes the default of 300 episodes, so it produced no row of the table
+under it, and there were no commands at all for the other nine.
 
 Five seeds each, greedy return afterwards:
 
