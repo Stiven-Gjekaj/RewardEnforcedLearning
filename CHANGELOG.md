@@ -259,6 +259,51 @@ Everything below is new.
   the cliff walk that line is smooth while the runs under it swing by a hundred
   and fifty.
 
+**Checking the documentation**
+
+- **A command that checks the numbers in the documentation.**
+  `scripts/check_numbers.py` runs every command a page names, then puts each of
+  its tables against every output and attributes it to the command that
+  accounts for most of its numbers. `--list` says what would be checked without
+  running anything, and `--cache` keeps what each command printed, because a
+  whole run of the algorithms page is hours and the answer stops being true as
+  soon as the page is edited.
+
+  Matching rather than position, and the first version did it by position. Two
+  thirds of that report was a table sitting under a command it did not come
+  from, because one section writes one command and then four tables and the
+  other three commands were nowhere on the page.
+
+  **Almost nothing had drifted.** That is the result of the exercise. What the
+  pages had wrong was where their numbers came from rather than what they were:
+  four tables under one of their four commands, three grids of exploration
+  rules with no console block at all, five rows of a crossover table, two
+  blocks naming a command at the wrong setting, and a closing index that named
+  ten commands the page does not run. Every table with no command that could
+  print it turned out to be right, and two of them gained one: the exploration
+  bonus table is `scripts/measure_shortcut.py` now, and the collapse of options
+  into Q-learning is a section of `scripts/measure_options.py`.
+
+  A table can say it is not checked, or name a column that is not, and the
+  reason is required and printed. Seventeen tables of the algorithms page say
+  so, because some are differences between two runs, or arithmetic, or seconds
+  on a machine.
+
+  Nine faults in the tool were found by running it. The worst is that it ran
+  `git clone` and `pip install .` when pointed at the readme, because those are
+  in a console block and it ran every command in every console block. It runs a
+  script under `scripts/` or the package's own command line and nothing else
+  now. The rest: it called slow commands broken, named coincidences as sources,
+  deleted the cache when asked a narrow question, trusted a cache made from
+  different code, would have run itself recursively, let a marker with no end
+  swallow the page, let a marker name a column that is not there and say
+  nothing, forgot a command that ran out of time so every resumed run paid the
+  budget again, and held each exemption's reason in a column wide enough to
+  push the commands off the screen.
+
+  `--doc` takes any page. The readme, the gaming page, the milestones and the
+  grid page all come back clean, in under two minutes each.
+
 ### Faults found while building it, and fixed
 
 - **REINFORCE read the step limit as an ending.** The return of an episode
