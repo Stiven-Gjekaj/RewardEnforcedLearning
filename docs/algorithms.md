@@ -1143,6 +1143,11 @@ up as a disagreement rather than as a plausible number.
 root mean square error against the true values, over the five states an agent
 can be in. An untrained table scores 0.2357.*
 
+The rows are `td`, `n-step-td`, `td-lambda` and `mc-prediction` twice, the last
+of them with `--set first_visit=off`. The first four are the registry defaults:
+`n-step-td` takes three steps and `td-lambda` decays at 0.8 without being told
+to. Every row here sets `start_value` to 0.5.
+
 **TD's best is 0.0343 and Monte Carlo's best is 0.0590.** Both are estimating
 the same thing from the same episodes, and the one that uses what it already
 believes about where it ended up gets 42% closer than the one that waits to
