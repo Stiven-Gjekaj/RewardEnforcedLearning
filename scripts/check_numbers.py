@@ -88,6 +88,14 @@ NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
 #: Checking them would ask whether `--seed 7` is still printed.
 NOT_RESULTS = frozenset({"table | command", "what it does | command"})
 
+#: What this script is willing to run. Every measurement in this repository is
+#: one of these, and a page can hold anything at all: the readme's install
+#: block has `git clone` and `pip install .`, and pointing this at the readme
+#: ran both of them to check a table of line counts. Checking a document must
+#: not change the machine it is checked on, and a rule that has to be
+#: remembered is not a rule.
+OURS = ("python scripts/", "python -m rel", "rel ")
+
 #: How a run says it gave up rather than failed. A command that takes longer
 #: than the budget is a fact about the budget, and reporting it beside a
 #: command that will not run would make the second one unfindable.
@@ -323,6 +331,16 @@ class Claim:
                     continue
                 found.extend(NUMBER.findall(cell.replace(",", "").replace("*", "")))
         return found
+
+
+def is_ours(command: str) -> bool:
+    """Whether this command is one of this project's, and so safe to run.
+
+    Every table in this repository comes from a script under `scripts/` or
+    from the package's own command line. Anything else a page writes is there
+    to be read rather than run.
+    """
+    return command.startswith(OURS)
 
 
 def is_this_script(command: str) -> bool:
@@ -637,6 +655,18 @@ def main() -> int:
     #: because a narrowed run that wrote back only what it ran would throw
     #: away every other command in the cache. That is hours of work, deleted
     #: by asking a smaller question.
+    # Commands the page names that are not this project's. They are named in
+    # the report rather than dropped quietly, because a reader looking for a
+    # table's source needs to know the block above it holds something that
+    # was never run.
+    theirs = [command for command in commands if not is_ours(command)]
+    commands = [command for command in commands if is_ours(command)]
+    if theirs:
+        print(f"{len(theirs)} commands are not this project's, so none is run:")
+        for command in theirs:
+            print(f"  {command}")
+        print()
+
     every = list(commands)
 
     # Before `--only` narrows anything, because a marker that names a column

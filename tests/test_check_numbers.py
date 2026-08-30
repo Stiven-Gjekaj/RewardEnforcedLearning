@@ -15,6 +15,7 @@ importing it as one would be a different arrangement than the one that runs.
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import re
@@ -44,6 +45,20 @@ def script() -> ModuleType:
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+@pytest.fixture(autouse=True)
+def anything_may_run(script: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The pages written inline below use `python -c` to print a number.
+
+    The script runs only this project's own commands, so that pointing it at
+    a page with an install block cannot install anything, and `python -c` is
+    neither a script under `scripts/` nor the package's command line. The
+    tuple is widened here rather than in the script, and
+    `TestItRunsOnlyThisProjectsCommands` reads the real rule out of the source
+    file so that this cannot hide a change to it.
+    """
+    monkeypatch.setattr(script, "OURS", (*script.OURS, "python -c"))
 
 
 def write(tmp_path: Path, text: str) -> Path:
@@ -598,11 +613,31 @@ class TestWhatTheExitCodeMeans:
     def test_a_command_that_will_not_run_is_one(
         self, script: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
+        """One of this project's own, because those are the only ones it runs.
+
+        A page can name `git clone` or `pip install .`, and this neither runs
+        them nor holds the page to them. What the exit code is for is a
+        command of this project that has stopped working: a renamed script,
+        or a flag that was taken away.
+        """
         page = write(
             tmp_path,
-            "```console\n$ definitely-not-a-command\n```\n\n| a | b |\n| --- | --- |\n| x | 1 |\n",
+            "```console\n$ python scripts/not-a-script.py\n```\n\n"
+            "| a | b |\n| --- | --- |\n| x | 1 |\n",
         )
         assert self.go(script, monkeypatch, page) == 1
+
+    def test_a_command_that_is_not_ours_is_zero(
+        self, script: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        # Not run, so nothing is known about it, so it is not a defect this
+        # can report. The report names it instead.
+        page = write(
+            tmp_path,
+            "```console\n$ definitely-not-a-command\n```\n\n"
+            "| a | b |\n| --- | --- |\n| x | 1 |\n",
+        )
+        assert self.go(script, monkeypatch, page) == 0
 
     def test_it_says_which_numbers_moved_and_where(
         self,
@@ -1275,6 +1310,88 @@ class TestACommandThatRanOutOfTime:
         capsys.readouterr()
         assert self.go(script, monkeypatch, page, cache, "1") == 0
         assert "would not run at all" not in capsys.readouterr().out
+
+
+class TestItRunsOnlyThisProjectsCommands:
+    """Checking a document must not change the machine it is checked on.
+
+    `--doc` takes any page, and the readme's install block holds `git clone`
+    and `pip install .`. Pointing this at the readme ran both of them to
+    check a table of line counts: it cloned the repository into itself and
+    installed the package. A rule that has to be remembered is not a rule.
+    """
+
+    PAGE = (
+        "```console\n$ pip install .\n$ python scripts/lines.py\n```\n\n"
+        "| a | b |\n| --- | --- |\n| x | 1 |\n"
+    )
+
+    def test_the_rule_is_what_the_source_says(self, script: ModuleType) -> None:
+        # Read out of the file, because the fixture at the top of this module
+        # widens the tuple in the loaded script for every other test here.
+        found = re.search(r"^OURS = (\(.*?\))$", SCRIPT.read_text(), re.MULTILINE)
+        assert found is not None
+        assert ast.literal_eval(found[1]) == (
+            "python scripts/",
+            "python -m rel",
+            "rel ",
+        )
+
+    def test_the_project_owns_its_own_commands(self, script: ModuleType) -> None:
+        assert script.is_ours("python scripts/measure_agents.py --runs 10")
+        assert script.is_ours("python -m rel train sarsa")
+        assert script.is_ours("rel gaming")
+
+    def test_everything_else_is_not_ours(self, script: ModuleType) -> None:
+        for command in (
+            "pip install .",
+            "git clone https://example.com/a/b",
+            "cd somewhere",
+            "pytest",
+        ):
+            assert not script.is_ours(command), command
+
+    def test_it_does_not_run_them(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        page = write(tmp_path, self.PAGE)
+        monkeypatch.setattr(sys, "argv", ["check_numbers", "--doc", str(page), "--all"])
+        monkeypatch.setattr(script, "ROOT", page.parent)
+
+        ran: list[str] = []
+        real = script.run
+        monkeypatch.setattr(
+            script,
+            "run",
+            lambda command, seconds: (ran.append(command), real(command, seconds))[1],
+        )
+        script.main()
+
+        assert "pip install ." not in ran
+        printed = capsys.readouterr().out
+        assert "1 commands are not this project's, so none is run" in printed
+        assert "pip install ." in printed
+
+    def test_the_listing_names_them_too(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # `--list` runs nothing either way, and a reader deciding whether to
+        # start a run wants to know what it will leave out.
+        page = write(tmp_path, self.PAGE)
+        monkeypatch.setattr(
+            sys, "argv", ["check_numbers", "--doc", str(page), "--list"]
+        )
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        script.main()
+        assert "pip install ." in capsys.readouterr().out
 
 
 class TestItDoesNotRunItself:
