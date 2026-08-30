@@ -758,7 +758,12 @@ fewer updates than the median seed the uniform planner solves. Both see the
 same steps and hold the same model. The only difference is which remembered
 step is replayed next.
 
-Per seed, in updates:
+```console
+$ python scripts/measure_sweeping.py --episodes 400 --each-seed
+```
+
+Per seed, in updates. The command above had no way to print this until the
+check went looking for the command behind the table and found none:
 
 | seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |

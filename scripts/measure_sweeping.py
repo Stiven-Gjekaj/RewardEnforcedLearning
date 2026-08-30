@@ -7,6 +7,7 @@ whole question, because the question is how many replays it takes.
 
     python scripts/measure_sweeping.py
     python scripts/measure_sweeping.py --planning 20 --runs 20
+    python scripts/measure_sweeping.py --episodes 400 --each-seed
 
 An update is one application of the learning rule to one cell. `dyna-q` makes
 one for the real step and `planning_steps` more, every step, forever.
@@ -69,12 +70,19 @@ def updates_of(agent: Agent[int], planning: int) -> int:
 
 def measure(
     planner: str, grid: str, episodes: int, runs: int, planning: int
-) -> tuple[str, ...]:
+) -> tuple[tuple[str, ...], list[str]]:
+    """A row of the summary, and what each seed took on its own.
+
+    Both, because a median of ten is a summary of ten numbers and this
+    project's rule is that a mean or a median has the numbers behind it
+    available. `docs/algorithms.md` prints a row per seed beside this table
+    and had no command to produce it.
+    """
     probe = ENVIRONMENTS.make(grid, Rng(1).stream("env"))
     discount = probe.spec.suggested_discount
     best = value_iteration(probe, discount=discount).start_value
 
-    solved: list[int] = []
+    each: list[str] = []
     idles: list[float] = []
 
     for seed in range(1, runs + 1):
@@ -107,10 +115,10 @@ def measure(
                 if report.reaches_end and report.start_value >= best - 1e-9:
                     first = updates_of(agent, planning)
 
-        if first is not None:
-            solved.append(first)
+        each.append("-" if first is None else str(first))
         idles.append(tail_updates / tail_steps if tail_steps else 0.0)
 
+    solved = [int(value) for value in each if value != "-"]
     return (
         planner,
         f"{len(solved)} of {runs}",
@@ -118,7 +126,7 @@ def measure(
         f"{min(solved)}" if solved else "-",
         f"{max(solved)}" if solved else "-",
         f"{sum(idles) / len(idles):.3f}",
-    )
+    ), each
 
 
 def main() -> int:
@@ -127,6 +135,11 @@ def main() -> int:
     parser.add_argument("--episodes", type=int, default=200)
     parser.add_argument("--runs", type=int, default=10)
     parser.add_argument("--planning", type=int, default=5)
+    parser.add_argument(
+        "--each-seed",
+        action="store_true",
+        help="also print what every seed took, which the median summarises",
+    )
     args = parser.parse_args()
 
     probe = ENVIRONMENTS.make(args.grid, Rng(1).stream("env"))
@@ -138,13 +151,15 @@ def main() -> int:
         f"The best possible policy is worth {best:.3f}."
     )
 
-    rows = [
+    measured = [
         measure(planner, args.grid, args.episodes, args.runs, args.planning)
         for planner in PLANNERS
     ]
     headings = ["planner", "solved", "updates", "fewest", "most", "idle"]
     print()
-    for line in table(headings, rows, align=["left"] + ["right"] * 5):
+    for line in table(
+        headings, [row for row, _ in measured], align=["left"] + ["right"] * 5
+    ):
         print(f"  {line}")
 
     print(
@@ -152,6 +167,17 @@ def main() -> int:
         "before the greedy policy was exactly optimal, over the seeds where it\n"
         "was. 'idle' is the updates per real step in the last twenty episodes."
     )
+
+    if args.each_seed:
+        print("\nUpdates before the policy was optimal, per seed:\n")
+        seeds = [str(seed) for seed in range(1, args.runs + 1)]
+        for line in table(
+            ["seed", *seeds],
+            [[planner, *each] for (planner, *_), each in measured],
+            align=["left"] + ["right"] * args.runs,
+        ):
+            print(f"  {line}")
+        print("\nA dash is a seed whose policy never became optimal.")
     return 0
 
 
