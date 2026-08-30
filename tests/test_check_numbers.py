@@ -140,6 +140,45 @@ class TestReadingACommand:
         assert script.commands_in(["$ a \\"]) == ["a"]
 
 
+class TestATrailingComment:
+    """A shell drops what follows a hash and this did not.
+
+    `docs/specification-gaming.md` writes `rel gaming  # all three, with the
+    repairs`, and five of its commands were run with the words after the hash
+    handed to them as arguments. All five were reported as commands that
+    would not run at all, which is the one thing this script's exit code is
+    for, so the page read as broken when it was right.
+    """
+
+    def test_the_comment_is_taken_off(self, script: ModuleType) -> None:
+        assert (
+            script.without_comment("rel gaming   # all three, with the repairs")
+            == "rel gaming"
+        )
+
+    def test_a_command_with_no_comment_is_untouched(self, script: ModuleType) -> None:
+        assert script.without_comment("rel gaming") == "rel gaming"
+
+    def test_a_hash_inside_a_quoted_argument_stays(self, script: ModuleType) -> None:
+        # Cutting at the first hash would leave an unbalanced quote, so the
+        # words after the cut would not be the words a shell reads.
+        command = 'python x.py --label "a # in a name"'
+        assert script.without_comment(command) == command
+
+    def test_a_line_that_is_only_a_comment_is_dropped(self, script: ModuleType) -> None:
+        assert script.without_comment("# just a note") == ""
+        assert script.commands_in(["$ # just a note", "$ rel gaming"]) == ["rel gaming"]
+
+    def test_the_command_it_finds_is_the_one_that_runs(
+        self, script: ModuleType
+    ) -> None:
+        found = script.commands_in(["$ rel gaming    # all three"])
+        assert found == ["rel gaming"]
+        printed, _, trouble = script.run(found[0] + " --no-learn", 300.0)
+        assert trouble == ""
+        assert printed
+
+
 class TestFindingTheCommandsAndTheTables:
     PAGE = """# A page
 

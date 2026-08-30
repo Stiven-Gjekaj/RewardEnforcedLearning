@@ -336,6 +336,30 @@ def is_this_script(command: str) -> bool:
     return Path(__file__).name in command
 
 
+def without_comment(text: str) -> str:
+    """A documented command with any trailing comment taken off.
+
+    `docs/specification-gaming.md` writes `rel gaming  # all three, with the
+    repairs`. A shell drops that and this did not, so five commands of that
+    page were run with the words after the hash handed to them as arguments,
+    and all five were reported as commands that would not run at all.
+
+    Cut at the hash only when doing so leaves the same words `shlex` reads
+    when it is told about comments. A hash inside a quoted argument is then
+    left where it is.
+    """
+    if "#" not in text:
+        return text
+    wanted = shlex.split(text, comments=True)
+    cut = text.split("#", 1)[0].rstrip()
+    try:
+        # A hash inside a quoted argument leaves the quote open when the cut
+        # is made there, and an open quote is not a command at all.
+        return cut if shlex.split(cut) == wanted else text
+    except ValueError:
+        return text
+
+
 def commands_in(fence: list[str]) -> list[str]:
     """The commands inside one console block, with continuations joined.
 
@@ -353,10 +377,14 @@ def commands_in(fence: list[str]) -> list[str]:
         if text.endswith("\\"):
             building += text[:-1].strip() + " "
             continue
-        found.append((building + text).strip())
+        command = without_comment((building + text).strip())
+        if command:
+            found.append(command)
         building = ""
     if building:
-        found.append(building.strip())
+        command = without_comment(building.strip())
+        if command:
+            found.append(command)
     return found
 
 
