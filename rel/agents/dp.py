@@ -298,9 +298,14 @@ def evaluate_shares(
             break
     else:
         raise DidNotSettleError(
-            f"Evaluating a policy of shares ran {max_sweeps} sweeps and the "
-            f"values were still moving by {largest:g}. The policy probably "
-            f"never ends."
+            _did_not_settle(
+                env,
+                _shares_edges(env, shares, terminal),
+                terminal,
+                "Evaluating a policy of shares",
+                max_sweeps,
+                largest,
+            )
         )
 
     return tuple(values)
@@ -590,11 +595,80 @@ def _evaluate(
             break
     else:
         raise DidNotSettleError(
-            f"Policy evaluation ran {max_sweeps} sweeps and the values were "
-            f"still moving by {largest:g}. The policy probably never ends."
+            _did_not_settle(
+                env,
+                _policy_edges(env, policy, terminal),
+                terminal,
+                "Policy evaluation",
+                max_sweeps,
+                largest,
+            )
         )
 
     return tuple(values)
+
+
+def _did_not_settle(
+    env: TabularEnv,
+    edges: dict[int, list[int]],
+    terminal: frozenset[int],
+    what: str,
+    max_sweeps: int,
+    largest: float,
+) -> str:
+    """Why a sweep ran to its cap, worked out rather than guessed at.
+
+    There are two reasons and they need different answers. A policy that
+    circles somewhere it can never leave has no value to find, and no number
+    of sweeps will change that. A policy that does reach an ending has one,
+    and a sweep that has not found it yet needs more sweeps or a looser
+    tolerance.
+
+    Both messages used to guess the first one every time. On the gambler at a
+    fair coin the guess is wrong: every policy there ends, and an undiscounted
+    walk over a hundred states settles slowly enough that a tolerance of
+    1e-12 runs past twenty thousand sweeps while still converging. A reader
+    told to look for a policy that never ends would have looked for a long
+    time.
+    """
+    common = (
+        f"{what} ran {max_sweeps} sweeps and the values were still moving by "
+        f"{largest:g}. "
+    )
+    stuck = _reachable_from_start(env, edges) - _can_finish(edges, terminal)
+    if stuck:
+        return common + (
+            f"This policy never ends: it can reach {len(stuck)} states from "
+            f"which no ending can be reached, the lowest of them "
+            f"{min(stuck)}. More sweeps will not help."
+        )
+    return common + (
+        "This policy does reach an ending, so it has a value and the sweep "
+        "has not found it yet. Raise max_sweeps or loosen the tolerance."
+    )
+
+
+def _shares_edges(
+    env: TabularEnv, shares: Sequence[Sequence[float]], terminal: frozenset[int]
+) -> dict[int, list[int]]:
+    """Where each state can land, under a policy that spreads over actions.
+
+    Every action with a share above nothing, rather than one action. A policy
+    of shares reaches anywhere any of its actions can.
+    """
+    edges: dict[int, list[int]] = {}
+    for state in range(env.observation_space.n):
+        if state in terminal:
+            edges[state] = []
+            continue
+        edges[state] = [
+            outcome.observation
+            for action, share in zip(env.action_space, shares[state], strict=True)
+            if share > 0.0
+            for outcome in env.transitions(state, action)
+            if outcome.probability > 0.0
+        ]
+    return edges
 
 
 class FixedPolicyAgent(DiscreteAgent[int]):

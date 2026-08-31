@@ -301,6 +301,59 @@ class TestFailingLoudly:
             evaluate_policy(env, solved.policy, max_sweeps=1)
 
 
+class TestASweepSaysWhyItDidNotSettle:
+    """Two reasons, and they need different answers.
+
+    A policy that circles somewhere it can never leave has no value to find,
+    and no number of sweeps will change that. A policy that does reach an
+    ending has one, and a sweep that has not found it yet needs more sweeps or
+    a looser tolerance.
+
+    The message used to guess the first every time. On the gambler at a fair
+    coin the guess is wrong: every policy there ends, and an undiscounted walk
+    over a hundred states settles slowly enough that a tolerance of 1e-12 runs
+    past twenty thousand sweeps while still converging.
+    """
+
+    def test_a_policy_that_never_ends_is_named_as_one(self) -> None:
+        env = two_loops(Rng(1).stream("env"))
+        with pytest.raises(DidNotSettleError, match="never ends") as raised:
+            evaluate_shares(env, uniform_shares(env), discount=1.0)
+        assert "More sweeps will not help" in str(raised.value)
+
+    def test_a_policy_that_does_end_is_told_to_sweep_more(self) -> None:
+        env = cliff_walk(Rng(1).stream("env"))
+        solved = value_iteration(env)
+        with pytest.raises(DidNotSettleError, match="does reach an ending") as raised:
+            evaluate_policy(env, solved.policy, max_sweeps=1)
+        assert "Raise max_sweeps" in str(raised.value)
+
+    def test_it_says_how_many_states_are_stuck_and_names_one(self) -> None:
+        # A count and a state to look at, rather than a verdict on its own.
+        env = two_loops(Rng(1).stream("env"))
+        with pytest.raises(DidNotSettleError) as raised:
+            evaluate_shares(env, uniform_shares(env), discount=1.0)
+        assert "states from" in str(raised.value)
+        assert "the lowest of them" in str(raised.value)
+
+    def test_a_policy_of_shares_reaches_wherever_any_of_its_actions_can(
+        self,
+    ) -> None:
+        """Which is what makes the diagnosis right for a stochastic policy.
+
+        Reading one action per state would call a policy stuck whenever the
+        action it happened to read circled, even where another action with a
+        share on it leaves.
+        """
+        from rel.agents.dp import _policy_edges, _shares_edges
+
+        env = cliff_walk(Rng(1).stream("env"))
+        edges = _shares_edges(env, uniform_shares(env), env.terminal_states())
+        one = _policy_edges(env, [0] * env.observation_space.n, env.terminal_states())
+        assert set(one[24]) <= set(edges[24])
+        assert len(set(edges[24])) > len(set(one[24]))
+
+
 class TestFixedPolicyAgent:
     def test_it_plays_the_policy_it_was_given(self) -> None:
         env = cliff_walk(Rng(1))
@@ -467,7 +520,7 @@ class TestEvaluatingAPolicyOfShares:
     def test_a_policy_that_never_ends_says_so(self) -> None:
         # Undiscounted, on an environment with no ending, the sweep runs away.
         env = two_loops(Rng(1).stream("env"))
-        with pytest.raises(DidNotSettleError, match="probably never ends"):
+        with pytest.raises(DidNotSettleError, match="never ends"):
             evaluate_shares(env, uniform_shares(env), discount=1.0)
 
     def test_a_discount_makes_the_endless_one_answer(self) -> None:
