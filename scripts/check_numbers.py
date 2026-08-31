@@ -946,6 +946,14 @@ def main() -> int:
             f"{len(broken)} would not run."
         )
         return 1
+    if not checked:
+        # A run that checked nothing passes every other way of asking, and a
+        # job whose whole output is a tick cannot tell it from a run that
+        # checked everything. It happens when the commands asked for are real
+        # and no table sits under any of them, which is what an edit that
+        # moves a table away from its command leaves behind.
+        print("\nStrict: no table was checked at all.")
+        return 1
     print(f"\nStrict: all {clean} tables are accounted for.")
     return 0
 

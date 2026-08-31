@@ -2147,3 +2147,27 @@ class TestStrictFailsOnAStaleNumber:
     ) -> None:
         self.run_with(script, monkeypatch, tmp_path, self.RIGHT, "--strict")
         assert "Strict: all 1 tables are accounted for" in capsys.readouterr().out
+
+    def test_a_run_that_checked_no_table_fails(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The one way a check like this passes while covering nothing.
+
+        The commands are real and no table sits under any of them, which is
+        what an edit that moves a table away from its command leaves behind.
+        Every other way of asking says the run was clean.
+        """
+        page = '```console\n$ python -c "print(1.5)"\n```\n\nNo table here.\n'
+        got = self.run_with(script, monkeypatch, tmp_path, page, "--strict")
+        assert got == 1
+        assert "no table was checked at all" in capsys.readouterr().out
+
+    def test_without_strict_the_same_run_passes(
+        self, script: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        page = '```console\n$ python -c "print(1.5)"\n```\n\nNo table here.\n'
+        assert self.run_with(script, monkeypatch, tmp_path, page) == 0
