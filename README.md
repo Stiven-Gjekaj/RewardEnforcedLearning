@@ -373,15 +373,15 @@ $ python scripts/lines.py
 | Area | Files | Lines |
 | --- | ---: | ---: |
 | Core | 5 | 910 |
-| Environments | 9 | 2766 |
-| Agents | 26 | 7655 |
+| Environments | 9 | 2770 |
+| Agents | 26 | 7690 |
 | Network | 4 | 782 |
 | Running | 6 | 1289 |
 | Interface | 6 | 1022 |
 | Command line | 3 | 1658 |
-| **Total** | **59** | **16082** |
+| **Total** | **59** | **16121** |
 
-Not counting 18075 lines of tests and 4881 of measurement scripts. The command
+Not counting 18290 lines of tests and 4898 of measurement scripts. The command
 above prints all of it, and `python scripts/check_numbers.py --doc README.md`
 says whether this table still holds what that command prints.
 
