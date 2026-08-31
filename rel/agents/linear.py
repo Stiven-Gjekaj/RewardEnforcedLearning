@@ -53,7 +53,7 @@ digests in `docs/algorithms.md` are the ones from before the change.
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from typing import Protocol
+from typing import Protocol, TypeVar
 
 from rel.agents.base import Agent, Transition, rows_of
 from rel.rng import Rng
@@ -67,22 +67,31 @@ Observation = tuple[float, ...]
 #: in the inner loop of every step and pairs would allocate a tuple for each.
 Encoded = tuple[tuple[int, ...], tuple[float, ...]]
 
+#: What a coder reads. Contravariant, so a coder that reads any sequence of
+#: floats is a coder for an environment whose observation is a tuple of them.
+Read = TypeVar("Read", contravariant=True)
 
-class Coder(Protocol):
+
+class Coder(Protocol[Read]):
     """Everything a linear agent needs from whatever makes its features.
 
     Written here, next to the only thing that uses it, rather than in a module
     of its own. A coder does not have to know it is one: `TileCoder` and
     `RadialBasis` both satisfy this without importing it, and adding a third
     means writing four methods rather than joining a hierarchy.
+
+    The observation is a parameter because not every coder reads a point.
+    `TileCoder` and `RadialBasis` are coders over a sequence of floats, and
+    `Lookup`, which reads a state and returns the row it was handed for it, is
+    a coder over an int. Nothing else about a coder changes between the two.
     """
 
     @property
     def features(self) -> int:
         """How many weights an agent needs for each action."""
 
-    def encode(self, observation: Sequence[float]) -> Encoded:
-        """Which features are on for this point, and how strongly."""
+    def encode(self, observation: Read) -> Encoded:
+        """Which features are on for this observation, and how strongly."""
 
     def squared_length(self, values: Sequence[float]) -> float:
         """The features of a point dotted with themselves, for the step size."""
@@ -98,7 +107,7 @@ class LinearAgent(Agent[Observation]):
         self,
         rng: Rng,
         actions: Discrete,
-        coder: Coder,
+        coder: Coder[Observation],
         *,
         step_size: float | Schedule = 0.5,
         discount: float = 1.0,
@@ -244,4 +253,11 @@ class SemiGradientQ(LinearAgent):
         self._nudge(encoded, transition.action, target - current)
 
 
-__all__ = ["Coder", "Encoded", "LinearAgent", "SemiGradientQ", "SemiGradientSarsa"]
+__all__ = [
+    "Coder",
+    "Encoded",
+    "LinearAgent",
+    "Read",
+    "SemiGradientQ",
+    "SemiGradientSarsa",
+]
