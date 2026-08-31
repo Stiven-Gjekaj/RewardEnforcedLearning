@@ -338,32 +338,32 @@ an agent when it is fifty times too large.
 ## Project structure
 
 ```
-rel/core.py         the contract: what an environment is, what a step is
-rel/rng.py          PCG written out, with named independent streams
-rel/envs/           sixteen environments. Never import an agent.
-rel/agents/         thirty six agents. Never import an environment.
-  dp.py             value iteration, policy iteration, exact policy values
-  td.py             SARSA, Q-learning, Expected SARSA, Double Q, n-step
-  tiles.py          tile coding, worked out exactly rather than hashed
-  basis.py          radial basis features, which have no boundaries
-  lookup.py         features handed in as a table, one row per state
+rel/core.py             the contract: what an environment is, what a step is
+rel/rng.py              PCG written out, with named independent streams
+rel/envs/               sixteen environments. Never import an agent.
+rel/agents/             thirty six agents. Never import an environment.
+  dp.py                 value iteration, policy iteration, exact policy values
+  td.py                 SARSA, Q-learning, Expected SARSA, Double Q, n-step
+  tiles.py              tile coding, worked out exactly rather than hashed
+  basis.py              radial basis features, which have no boundaries
+  lookup.py             features handed in as a table, one row per state
   linear_prediction.py  prediction over features, and the deadly triad
-  explore.py        how an agent picks an action from what it knows
-  policy.py         REINFORCE and an actor critic
-  average.py        learning with no discount, by subtracting the rate
-  search.py         a tree search that plans at the moment of choosing
-  value_network.py  Q-learning over a network, with replay and a target
-rel/options.py      an action that lasts several steps, built from a model
-rel/pressure.py     following a fixed policy with a dial on how hard it tries
-rel/recording.py    a run written down step by step, and read back
-rel/nn/             reverse mode gradients, three networks, SGD and Adam
-rel/training.py     the loop, the record and the run digest
-rel/compare.py      whether a difference between two agents is real
-rel/ui/             braille charts, grid pictures, tables. Draws only.
-rel/cli.py          the command line
-grids/              every built in grid, written as a text file
-scripts/            the scripts that produce the numbers in the documentation,
-                    and the one that checks the documentation still says them
+  explore.py            how an agent picks an action from what it knows
+  policy.py             REINFORCE and an actor critic
+  average.py            learning with no discount, by subtracting the rate
+  search.py             a tree search that plans at the moment of choosing
+  value_network.py      Q-learning over a network, with replay and a target
+rel/options.py          an action that lasts several steps, built from a model
+rel/pressure.py         following a fixed policy with a dial on how hard it tries
+rel/recording.py        a run written down step by step, and read back
+rel/nn/                 reverse mode gradients, three networks, SGD and Adam
+rel/training.py         the loop, the record and the run digest
+rel/compare.py          whether a difference between two agents is real
+rel/ui/                 braille charts, grid pictures, tables. Draws only.
+rel/cli.py              the command line
+grids/                  every built in grid, written as a text file
+scripts/                the scripts that produce the numbers in the documentation,
+                        and the one that checks the documentation still says them
 ```
 
 ```console
