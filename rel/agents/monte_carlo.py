@@ -32,10 +32,25 @@ class MonteCarloControl(TabularAgent[ObsT]):
     environment that stays still.
 
     With a number, the update keeps a fixed weight on the newest return. That
-    forgets, which is what an environment that changes needs, and it is also
-    what a control agent needs even in a fixed environment: the policy is
-    changing, so a return from three hundred episodes ago was collected by a
-    policy that no longer exists.
+    forgets, which is what an environment that changes needs.
+
+    **It is not what control needs in a fixed environment, which this used to
+    say.** The argument was that the policy keeps changing, so a return from
+    three hundred episodes ago was collected by a policy that no longer exists.
+    `scripts/measure_blackjack.py` scores what is learned against an exact
+    answer at three budgets, and the argument holds only early:
+
+        hands       running average   step 0.01   step 0.05
+        50,000             -0.06258    -0.06557    -0.05994
+        200,000            -0.05210    -0.05341    -0.05865
+        500,000            -0.04841    -0.05227    -0.06007
+
+    Perfect play is worth -0.04656. A fixed step wins at fifty thousand hands
+    and loses at five hundred thousand, and the larger it is the worse it gets
+    with more data, which is what a weight that never falls does. The default
+    here stays a fixed 0.1 because the grids this project measures on are run
+    for hundreds of episodes rather than hundreds of thousands, which is the
+    end of that table where forgetting pays.
 
     ## A truncated episode has no return
 
