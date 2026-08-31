@@ -125,4 +125,44 @@ class Lookup:
         return f"Lookup(states={self.states}, features={self.features})"
 
 
-__all__ = ["Lookup"]
+def aggregated(states: int, groups: int) -> Lookup:
+    """One weight for each group of states, and every state in exactly one.
+
+    The friendly use of this class, and the smallest approximation there is.
+    A thousand states in ten groups is ten weights: every state in a group
+    shares all of its learning with the others, and the estimate of any of
+    them is the estimate of the group.
+
+    ## Where the boundaries go
+
+    State `s` of `n` goes into group `s * groups // n`, so the groups are as
+    even as whole numbers allow and the remainder is spread rather than piled
+    onto the last one. Eleven states in three groups gives four, four and
+    three, and not four, four and three the other way round.
+
+    ## What it can and cannot say
+
+    The estimate of a group is one number, so the value function it can write
+    down is a staircase. On a walk whose true values run in a straight line
+    the best a staircase can do is a known amount of error, and how much
+    depends only on how many steps it has. `scripts/measure_aggregation.py`
+    measures the error an agent reaches against the error the staircase cannot
+    do better than.
+    """
+    if states < 1:
+        raise ValueError("There is nothing to group.")
+    if not 1 <= groups <= states:
+        raise ValueError(
+            f"{groups} groups for {states} states. There is at least one "
+            f"group and no more of them than there are states."
+        )
+
+    rows = []
+    for state in range(states):
+        row = [0.0] * groups
+        row[state * groups // states] = 1.0
+        rows.append(row)
+    return Lookup(rows)
+
+
+__all__ = ["Lookup", "aggregated"]

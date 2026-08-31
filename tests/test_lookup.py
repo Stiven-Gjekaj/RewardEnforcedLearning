@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from rel.agents.lookup import Lookup
+from rel.agents.lookup import Lookup, aggregated
 
 #: Baird's counterexample, whose rows are the whole of the counterexample.
 #: Six upper states worth `2 * w[i] + w[7]` and one lower state worth
@@ -135,3 +135,69 @@ class TestTheOptimisticStart:
     def test_a_table_of_zeros_says_so_rather_than_dividing(self) -> None:
         with pytest.raises(ValueError, match="worth zero whatever"):
             Lookup([[0.0, 0.0], [0.0, 0.0]]).starting_weight(1.0)
+
+
+class TestGroupingStatesTogether:
+    """The friendly use of this class, and the smallest approximation there is.
+
+    What is worth holding is the shape of the groups. A split that piled the
+    remainder onto one end would give that group more states to average over
+    than any other, and the staircase it draws would have one step of a
+    different width, which is not what a reader of a group count expects.
+    """
+
+    def test_every_state_is_in_exactly_one_group(self) -> None:
+        coder = aggregated(1000, 10)
+        for state in range(1000):
+            indices, values = coder.encode(state)
+            assert len(indices) == 1
+            assert values == (1.0,)
+
+    def test_the_weight_count_is_the_group_count(self) -> None:
+        assert aggregated(1000, 10).features == 10
+        assert aggregated(1000, 250).states == 1000
+
+    def test_the_groups_are_in_order(self) -> None:
+        groups = [aggregated(20, 4).encode(state)[0][0] for state in range(20)]
+        assert groups == sorted(groups)
+
+    def test_states_that_divide_evenly_give_even_groups(self) -> None:
+        groups = [aggregated(12, 3).encode(state)[0][0] for state in range(12)]
+        assert groups == [0] * 4 + [1] * 4 + [2] * 4
+
+    def test_a_remainder_is_spread_rather_than_piled_on_the_end(self) -> None:
+        groups = [aggregated(11, 3).encode(state)[0][0] for state in range(11)]
+        assert groups == [0] * 4 + [1] * 4 + [2] * 3
+
+        sizes = [groups.count(group) for group in range(3)]
+        assert max(sizes) - min(sizes) <= 1
+
+    def test_every_group_holds_at_least_one_state(self) -> None:
+        for states, groups in ((11, 3), (1000, 7), (100, 99), (5, 5)):
+            found = {aggregated(states, groups).encode(s)[0][0] for s in range(states)}
+            assert found == set(range(groups)), (states, groups)
+
+    def test_one_group_is_one_number_for_everything(self) -> None:
+        coder = aggregated(50, 1)
+        assert coder.features == 1
+        assert {coder.encode(state) for state in range(50)} == {((0,), (1.0,))}
+
+    def test_a_group_for_each_state_is_a_table(self) -> None:
+        coder = aggregated(6, 6)
+        assert [coder.encode(state)[0][0] for state in range(6)] == list(range(6))
+
+    def test_more_groups_than_states_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="no more of them than there are states"):
+            aggregated(5, 6)
+
+    def test_no_groups_at_all_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="at least one group"):
+            aggregated(5, 0)
+
+    def test_nothing_to_group_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="nothing to group"):
+            aggregated(0, 1)
+
+    def test_an_optimistic_start_works_because_the_rows_agree(self) -> None:
+        # Every row adds up to one, so the share is the value itself.
+        assert aggregated(100, 5).starting_weight(0.4) == pytest.approx(0.4)

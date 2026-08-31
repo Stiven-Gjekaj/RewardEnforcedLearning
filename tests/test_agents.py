@@ -273,10 +273,15 @@ class TestNoAgentLearnsAboutACellItNeverStoodIn:
 
 
 class TestWhatALinearPredictorIsHanded:
-    def test_an_environment_with_no_table_says_which_one_has_it(self) -> None:
+    def test_an_environment_with_no_table_is_grouped_rather_than_refused(
+        self,
+    ) -> None:
+        # It was refused until the groups arrived, because Baird's
+        # counterexample was the only table there was.
         env = ENVIRONMENTS.make("cliff", Rng(1).stream("env"))
-        with pytest.raises(TypeError, match="needs 'baird'"):
-            AGENTS.make("linear-td", Rng(1).stream("agent"), env)
+        agent = AGENTS.make("linear-td", Rng(1).stream("agent"), env)
+        assert agent.coder.features == 10
+        assert agent.coder.states == env.observation_space.n
 
     def test_a_table_that_does_not_cover_the_states_is_refused(self) -> None:
         """Rather than an index error thousands of steps into a run.
@@ -294,6 +299,44 @@ class TestWhatALinearPredictorIsHanded:
         env = OneRowShort(Rng(1).stream("env"))
         with pytest.raises(ValueError, match="7 states and hands out 6 rows"):
             AGENTS.make("linear-td", Rng(1).stream("agent"), env)
+
+
+class TestGroupingAnEnvironmentThatCarriesNoTable:
+    """The other way a linear predictor gets a table of features.
+
+    Baird's counterexample carries its own, because the table is what makes it
+    a counterexample. Every other tabular environment carries none, and
+    grouping its states is the smallest approximation there is.
+    """
+
+    @staticmethod
+    def _coder(name: str, **options: int) -> object:
+        env = ENVIRONMENTS.make(name, Rng(1).stream("env"))
+        agent = AGENTS.make("linear-td", Rng(1).stream("agent"), env, **options)
+        return agent.coder
+
+    def test_a_tabular_environment_is_grouped(self) -> None:
+        coder = self._coder("long-walk", groups=10)
+        assert coder.states == 1002
+        assert coder.features == 10
+
+    def test_the_group_count_is_a_setting(self) -> None:
+        assert self._coder("long-walk", groups=25).features == 25
+
+    def test_an_environment_that_carries_a_table_keeps_it(self) -> None:
+        # The table is the point of that environment, and a setting is not
+        # something to override it with.
+        assert self._coder("baird", groups=3).features == 8
+
+    def test_an_environment_with_no_table_and_no_states_is_refused(self) -> None:
+        env = ENVIRONMENTS.make("cartpole", Rng(1).stream("env"))
+        with pytest.raises(TypeError, match="nothing to group"):
+            AGENTS.make("linear-td", Rng(1).stream("agent"), env)
+
+    def test_the_message_says_where_to_look(self) -> None:
+        env = ENVIRONMENTS.make("mountaincar", Rng(1).stream("env"))
+        with pytest.raises(TypeError, match="tagged 'tabular'"):
+            AGENTS.make("gradient-td", Rng(1).stream("agent"), env)
 
 
 class TestTheLinearPredictorsStartOffTheAnswer:

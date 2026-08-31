@@ -60,7 +60,7 @@ from rel.agents.linear_prediction import (
     SemiGradientTD,
     fixed,
 )
-from rel.agents.lookup import Lookup
+from rel.agents.lookup import Lookup, aggregated
 from rel.agents.monte_carlo import MonteCarloControl
 from rel.agents.off_policy import Estimator, OffPolicyMonteCarlo
 from rel.agents.options import IntraOptionQ, OptionsQ
@@ -735,23 +735,34 @@ def _whole_numbers(env: Env[Any, Any]) -> Discrete:
     return space
 
 
-def _handed_features(env: Env[Any, Any]) -> Lookup:
-    """The table of features the environment carries, if it carries one.
+def _handed_features(env: Env[Any, Any], groups: int = 10) -> Lookup:
+    """The table of features to predict this environment over.
 
-    This is the third door of its kind, after `tiling_space` and the model a
-    tabular environment writes out: a builder reads one thing off the
-    environment for one turn and the agent never sees it. Baird's
-    counterexample is the whole reason. Its features are what makes it a
-    counterexample, and an agent that carried them would be an agent that knew
-    which environment it was in.
+    Two ways to get one, and the environment decides which.
+
+    **It carries its own.** This is the third door of its kind, after
+    `tiling_space` and the model a tabular environment writes out: a builder
+    reads one thing off the environment for one turn and the agent never sees
+    it. Baird's counterexample is the whole reason. Its features are what makes
+    it a counterexample, and an agent that carried them would be an agent that
+    knew which environment it was in.
+
+    **It does not, and its states are whole numbers.** Then they are grouped,
+    `groups` of them, which is the smallest approximation there is. `groups`
+    does nothing on an environment that carries a table, because a table that
+    is the point of the environment is not one to override with a setting.
     """
     rows = getattr(env, "feature_rows", None)
     if rows is None:
-        raise TypeError(
-            f"{env.spec.name} carries no table of features, and a linear "
-            f"predictor is handed one by the environment rather than working "
-            f"it out. This agent needs 'baird'."
-        )
+        space = env.observation_space
+        if not isinstance(space, Discrete):
+            raise TypeError(
+                f"{env.spec.name} carries no table of features and its "
+                f"observation is a {type(space).__name__} rather than a whole "
+                f"number, so there is nothing to group. This agent needs "
+                f"'baird', or an environment tagged 'tabular'."
+            )
+        return aggregated(space.n, groups)
 
     space = env.observation_space
     if isinstance(space, Discrete) and len(rows) != space.n:
@@ -799,6 +810,7 @@ def _linear_prediction(cls: type[SemiGradientTD[int]]) -> AgentBuilder:
     def build(
         rng: Rng,
         env: Env[Any, Any],
+        groups: int = 10,
         step_size: float | Schedule = 0.05,
         discount: float = 0.99,
         start_value: float = STARTS_AT,
@@ -807,7 +819,7 @@ def _linear_prediction(cls: type[SemiGradientTD[int]]) -> AgentBuilder:
         return cls(
             rng,
             _whole_numbers(env),
-            _handed_features(env),
+            _handed_features(env, groups),
             behaviour,
             target,
             step_size=step_size,
@@ -821,6 +833,7 @@ def _linear_prediction(cls: type[SemiGradientTD[int]]) -> AgentBuilder:
 def _gradient_td(
     rng: Rng,
     env: Env[Any, Any],
+    groups: int = 10,
     helper_step: float = 0.25,
     step_size: float | Schedule = 0.05,
     discount: float = 0.99,
@@ -830,7 +843,7 @@ def _gradient_td(
     return GradientTD(
         rng,
         _whole_numbers(env),
-        _handed_features(env),
+        _handed_features(env, groups),
         behaviour,
         target,
         helper_step=helper_step,
