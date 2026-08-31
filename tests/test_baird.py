@@ -51,9 +51,7 @@ class TestWhereTheActionsGo:
     def test_solid_goes_to_the_lower_state_from_anywhere(self) -> None:
         env = build()
         for state in range(7):
-            assert env.transitions(state, SOLID) == (
-                *env.transitions(0, SOLID),
-            ), state
+            assert env.transitions(state, SOLID) == (*env.transitions(0, SOLID),), state
         assert env.transitions(3, SOLID)[0].observation == 6
 
     def test_dashed_spreads_over_the_upper_states_only(self) -> None:
@@ -158,6 +156,62 @@ class TestThePolicies:
 
     def test_the_ratio_on_a_dashed_step_is_zero(self) -> None:
         assert TARGET[DASHED] / BEHAVIOUR[DASHED] == 0.0
+
+
+class TestTheDiscountItNeeds:
+    def test_six_upper_states_cross_at_fifteen_seventeenths(self) -> None:
+        assert build().runs_away_above() == pytest.approx(15.0 / 17.0)
+
+    def test_the_number_in_the_literature_is_above_the_crossing(self) -> None:
+        # Which is why it is 0.99 and not a round number.
+        env = build()
+        assert env.spec.suggested_discount > env.runs_away_above()
+
+    def test_more_upper_states_make_it_easier(self) -> None:
+        crossings = [build(upper=n).runs_away_above() for n in (5, 6, 8, 10, 20)]
+        assert crossings == sorted(crossings, reverse=True)
+
+    def test_four_upper_states_or_fewer_never_run_away(self) -> None:
+        # A crossing at or above one is a crossing no discount can reach.
+        for upper in (2, 3, 4):
+            assert build(upper=upper).runs_away_above() >= 1.0, upper
+        assert build(upper=5).runs_away_above() < 1.0
+
+    def test_the_crossing_agrees_with_running_the_update(self) -> None:
+        """The closed form against the thing it is a closed form of.
+
+        The expected update is written out here rather than imported, because
+        importing the script that measures it would make this test agree with
+        that script rather than with the arithmetic.
+        """
+        env = build()
+        rows = [list(row) for row in env.feature_rows]
+        width = len(rows[0])
+        states = env.observation_space.n
+        share = 1.0 / states
+
+        def grows(discount: float, step: float = 0.05, steps: int = 4000) -> bool:
+            # Below the crossing this settles at 6.8 and stays there, and
+            # above it there is nothing to settle at, so a hundred tells the
+            # two apart with a wide margin either side.
+            weights = list(STARTING_WEIGHTS)
+            for _ in range(steps):
+                change = [0.0] * width
+                for state in range(states):
+                    here, below = rows[state], rows[states - 1]
+                    error = discount * sum(
+                        weights[i] * below[i] for i in range(width)
+                    ) - sum(weights[i] * here[i] for i in range(width))
+                    for i in range(width):
+                        change[i] += share * error * here[i]
+                weights = [weights[i] + step * change[i] for i in range(width)]
+                if max(abs(w) for w in weights) > 1e40:
+                    return True
+            return max(abs(w) for w in weights) > 100.0
+
+        crossing = env.runs_away_above()
+        assert not grows(crossing - 0.05)
+        assert grows(crossing + 0.05)
 
 
 class TestTheStartingWeights:

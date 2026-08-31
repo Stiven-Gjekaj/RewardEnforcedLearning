@@ -149,6 +149,43 @@ class Baird(TabularEnv):
 
         return tuple(rows)
 
+    def runs_away_above(self) -> float:
+        """The discount above which semi-gradient TD diverges here.
+
+        `(9 + n) / (5 + 2n)`, for `n` upper states. Six of them gives 15 over
+        17, which is 0.882, and it is why the discount in the literature is
+        0.99 rather than a round number: below the crossing the same three
+        ingredients over the same features are stable.
+
+        A number at or above one means no discount below one diverges, which
+        is what four upper states or fewer gives.
+
+        ## Where it comes from
+
+        The expected update is `w <- w - a A w` with `A` the average over
+        states of `x(s)` times `(x(s) - discount * x(lower))` transposed, since
+        the target policy always goes to the lower state. It runs away when an
+        eigenvalue of `A` has a negative real part.
+
+        The six upper states are alike, so `A` splits. On the directions where
+        their weights differ it is four sevenths times the identity, which is
+        positive and is never the problem. What is left is three by three, in
+        the weight every upper state shares, the lower state's own weight, and
+        the weight all of them share. Its determinant is zero at every discount
+        and that is the direction in which no state's value changes, so the
+        other two eigenvalues decide, and they have positive real parts exactly
+        when the trace and the sum of the principal minors are both positive.
+
+            minors  (1 - discount) * (20 + n) / (1 + n) squared, always above
+                    zero below a discount of one
+            trace   (9 + n - (5 + 2n) * discount) / (1 + n)
+
+        So the trace is the whole of it. `scripts/measure_triad.py` finds the
+        same crossing by running the update rather than by this argument, and a
+        test holds the two together.
+        """
+        return (9.0 + self.upper) / (5.0 + 2.0 * self.upper)
+
     @property
     def behaviour_shares(self) -> tuple[float, ...]:
         """How often the policy that collects the data takes each action."""
