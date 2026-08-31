@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-3011_passing-427819?style=for-the-badge" alt="3011 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-3038_passing-427819?style=for-the-badge" alt="3038 tests passing"/>
 </p>
 
 <p align="center">
@@ -36,7 +36,7 @@ environments where the reward is not the point_
 **A reinforcement learning laboratory that runs in a terminal and needs
 nothing installed.**
 
-Twenty three environments, thirty nine agents, a gradient engine, a dynamic
+Twenty three environments, forty agents, a gradient engine, a dynamic
 programming solver that says what the best possible policy is worth, and a
 command line that draws a learning curve out of braille dots.
 
@@ -341,7 +341,7 @@ an agent when it is fifty times too large.
 rel/core.py             the contract: what an environment is, what a step is
 rel/rng.py              PCG written out, with named independent streams
 rel/envs/               twenty three environments. Never import an agent.
-rel/agents/             thirty nine agents. Never import an environment.
+rel/agents/             forty agents. Never import an environment.
   dp.py                 value iteration, policy iteration, exact policy values
   td.py                 SARSA, Q-learning, Expected SARSA, Double Q, n-step
   tiles.py              tile coding, worked out exactly rather than hashed
@@ -376,14 +376,14 @@ $ python scripts/lines.py
 | --- | ---: | ---: |
 | Core | 5 | 937 |
 | Environments | 14 | 4057 |
-| Agents | 28 | 8624 |
+| Agents | 28 | 8811 |
 | Network | 4 | 782 |
 | Running | 6 | 1301 |
 | Interface | 6 | 1022 |
 | Command line | 3 | 1674 |
-| **Total** | **66** | **18397** |
+| **Total** | **66** | **18584** |
 
-Not counting 23856 lines of tests and 6073 of measurement scripts. The command
+Not counting 24067 lines of tests and 6073 of measurement scripts. The command
 above prints all of it, and `python scripts/check_numbers.py --doc README.md`
 says whether this table still holds what that command prints.
 
@@ -405,7 +405,7 @@ import statements of every module:
 $ pytest
 ```
 
-3011 tests. Some of what they cover, and why each one is there rather than the
+3038 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A
@@ -454,7 +454,7 @@ what it was for.
 
 ## Status
 
-Alpha, and complete enough to be useful. Twenty three environments and thirty nine
+Alpha, and complete enough to be useful. Twenty three environments and forty
 agents, all of them covered by a suite that runs in about eight minutes with no
 browser, no display and no network.
 

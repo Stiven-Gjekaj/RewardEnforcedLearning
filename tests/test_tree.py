@@ -21,7 +21,7 @@ import pytest
 from rel.agents.base import Transition
 from rel.agents.dp import evaluate_policy
 from rel.agents.td import ExpectedSarsa, NStepSarsa, QLearning
-from rel.agents.tree import TARGETS, TreeBackup
+from rel.agents.tree import TARGETS, QSigma, TreeBackup
 from rel.envs.classic import cliff_walk
 from rel.rng import Rng
 from rel.spaces import Discrete
@@ -239,3 +239,214 @@ class TestAgainstTheNeighbour:
         feed(sarsa)
         feed(tree)
         assert tree.q != sarsa.q
+
+
+def a_sigma(sigma: float, target: str = "greedy", n: int = 3) -> QSigma[int]:
+    return QSigma(
+        Rng(1).stream("a"),
+        Discrete(2),
+        n=n,
+        sigma=sigma,
+        target=target,  # type: ignore[arg-type]
+        step_size=0.5,
+        discount=0.9,
+        epsilon=0.1,
+    )
+
+
+def a_tree(target: str = "greedy", n: int = 3) -> TreeBackup[int]:
+    return TreeBackup(
+        Rng(1).stream("a"),
+        Discrete(2),
+        n=n,
+        target=target,  # type: ignore[arg-type]
+        step_size=0.5,
+        discount=0.9,
+        epsilon=0.1,
+    )
+
+
+def cells(agent) -> list[float]:  # type: ignore[no-untyped-def]
+    return [value for state in range(5) for value in agent.peek(state)]
+
+
+class TestSigmaOfNothingIsTreeBackup:
+    """The end of the family that this project already had.
+
+    A method that did not reach the agent it says it contains would be a
+    different algorithm wearing the name, so this is checked cell for cell
+    rather than approximately.
+    """
+
+    def test_a_greedy_target_agrees_bit_for_bit(self) -> None:
+        # Exactly, because a greedy target has shares of one and nothing, so
+        # nothing is rearranged between the two ways of writing the step.
+        tree, sigma = a_tree("greedy"), a_sigma(0.0, "greedy")
+        feed(tree)
+        feed(sigma)
+        assert cells(tree) == cells(sigma)
+
+    def test_an_averaged_target_agrees_too(self) -> None:
+        tree, sigma = a_tree("policy"), a_sigma(0.0, "policy")
+        feed(tree)
+        feed(sigma)
+        assert cells(tree) == cells(sigma)
+
+    @pytest.mark.parametrize("target", TARGETS)
+    def test_it_holds_over_a_whole_run(self, target: str) -> None:
+        """One episode of four steps could agree by accident.
+
+        This is sixty episodes of the cliff walk, where the two agents also
+        have to choose the same action every step of the way, and a
+        difference in the last bits of a value can flip which action is best.
+        """
+        got = []
+        shared = {
+            "n": 3,
+            "target": target,
+            "step_size": 0.2,
+            "discount": 1.0,
+            "epsilon": 0.1,
+        }
+        for sigma in (None, 0.0):
+            env = cliff_walk(Rng(1).stream("env"))
+            agent = (
+                TreeBackup(Rng(1).stream("a"), env.action_space, **shared)
+                if sigma is None
+                else QSigma(Rng(1).stream("a"), env.action_space, sigma=sigma, **shared)
+            )
+            train(env, agent, 60, discount=1.0)
+            got.append([value for state in range(48) for value in agent.peek(state)])
+
+        worst = max(abs(one - other) for one, other in zip(*got, strict=True))
+        # Not always zero for an averaged target. Tree backup sums the actions
+        # that were not taken and adds the taken one separately; this sums all
+        # of them and subtracts the taken one back out. Float addition is not
+        # associative, so the two can land a few bits apart and stay there.
+        assert worst < 1e-12, target
+
+
+class TestSigmaChangesTheAnswer:
+    def test_the_two_ends_do_not_agree(self) -> None:
+        # Without this the class above would pass on a sigma that was ignored.
+        nothing, everything = a_sigma(0.0), a_sigma(1.0)
+        feed(nothing)
+        feed(everything)
+        assert cells(nothing) != cells(everything)
+
+    def test_the_middle_is_neither_end(self) -> None:
+        middle = a_sigma(0.5)
+        nothing, everything = a_sigma(0.0), a_sigma(1.0)
+        for agent in (middle, nothing, everything):
+            feed(agent)
+        assert cells(middle) != cells(nothing)
+        assert cells(middle) != cells(everything)
+
+    def test_the_middle_lies_between_the_two_ends(self) -> None:
+        """Which is what makes it an interpolation rather than a third thing.
+
+        The coefficient is a straight line in sigma, so at a half it is the
+        average of the two ends. That is a claim about one update, so it is
+        checked on the first update of a fresh agent rather than after a run,
+        where the ends would have moved apart.
+        """
+        got = {}
+        for sigma in (0.0, 0.5, 1.0):
+            agent = a_sigma(sigma)
+            agent.start_episode()
+            for step in WALK:
+                agent.observe(step)
+            got[sigma] = agent.peek(0)[0]
+
+        assert got[0.5] == pytest.approx((got[0.0] + got[1.0]) / 2.0)
+
+
+class TestTheCoefficient:
+    def test_at_sigma_of_nothing_it_is_the_share(self) -> None:
+        agent = a_sigma(0.0)
+        assert agent._coefficient(0, 0, 0.25) == 0.25
+
+    def test_at_sigma_of_everything_it_is_the_ratio(self) -> None:
+        """The share divided by how often the behaviour policy takes it.
+
+        With one action clearly ahead, an epsilon of 0.1 over two actions
+        takes it 0.95 of the time, so a target share of one is a ratio of one
+        over 0.95. On a fresh table the two actions are tied and the answer
+        would be two, which is a fact about ties rather than about the ratio.
+        """
+        agent = a_sigma(1.0)
+        agent.values(0)[1] = 5.0
+        assert agent.greedy(0) == 1
+        assert agent._coefficient(0, 1, 1.0) == pytest.approx(1.0 / 0.95)
+
+    def test_it_is_a_straight_line_between_them(self) -> None:
+        agents = [a_sigma(sigma) for sigma in (0.0, 0.5, 1.0)]
+        for agent in agents:
+            agent.values(0)[1] = 5.0
+        low, middle, high = (agent._coefficient(0, 1, 1.0) for agent in agents)
+        assert middle == pytest.approx((low + high) / 2.0)
+
+    def test_an_action_the_behaviour_would_never_take_has_no_ratio(self) -> None:
+        # A division by nothing, answered rather than raised. It cannot happen
+        # on an action the behaviour policy really took.
+        agent = a_sigma(1.0, "greedy")
+        agent.explore.epsilon = lambda episodes: 0.0  # type: ignore[assignment]
+        worst = 1 - agent.greedy(0)
+        assert agent._coefficient(0, worst, 0.0) == 0.0
+
+
+class TestSigmaCanChange:
+    def test_a_schedule_is_read_on_every_step(self) -> None:
+        # The book suggests starting at one and falling towards nothing.
+        agent = a_sigma(0.0)
+        agent.sigma = lambda steps: 1.0 if steps < 2 else 0.0  # type: ignore[assignment]
+        agent.steps = 0
+        assert agent.current_sigma() == 1.0
+        agent.steps = 5
+        assert agent.current_sigma() == 0.0
+
+    def test_a_sigma_outside_nothing_to_one_is_refused(self) -> None:
+        agent = a_sigma(0.0)
+        agent.sigma = lambda steps: 1.5  # type: ignore[assignment]
+        with pytest.raises(ValueError, match="share of a sample"):
+            agent.current_sigma()
+
+
+class TestItLearnsTheCliffWalk:
+    @pytest.mark.parametrize("sigma", [0.0, 0.5, 1.0])
+    def test_the_greedy_policy_reaches_the_goal(self, sigma: float) -> None:
+        env = cliff_walk(Rng(1).stream("env"))
+        agent = QSigma(
+            Rng(1).stream("agent"),
+            env.action_space,
+            n=3,
+            sigma=sigma,
+            step_size=0.2,
+            discount=1.0,
+            epsilon=0.1,
+        )
+        train(env, agent, 400, discount=1.0)
+        policy = [agent.greedy(state) for state in range(env.observation_space.n)]
+        report = evaluate_policy(env, policy, discount=1.0)
+        assert report.reaches_end, sigma
+        assert report.start_value >= -20.0, sigma
+
+
+class TestTheRegistryEntry:
+    def test_it_is_registered_off_policy(self) -> None:
+        from rel.agents import AGENTS
+
+        assert set(AGENTS["q-sigma"].tags) == {"tabular", "off-policy"}
+
+    def test_the_settings_can_be_reached_from_the_command_line(self) -> None:
+        from rel.agents import AGENTS
+
+        env = cliff_walk(Rng(1).stream("env"))
+        agent = AGENTS.make(
+            "q-sigma", Rng(1).stream("agent"), env, n=5, sigma=0.25, target="policy"
+        )
+        assert isinstance(agent, QSigma)
+        assert (agent.n, agent.current_sigma(), agent.target) == (5, 0.25, "policy")
+
+    def test_it_says_its_sigma(self) -> None:
+        assert "sigma=0.5" in repr(a_sigma(0.5))

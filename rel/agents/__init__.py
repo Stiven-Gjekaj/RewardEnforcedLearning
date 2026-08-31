@@ -77,7 +77,7 @@ from rel.agents.sweeping import PrioritisedSweeping
 from rel.agents.td import DoubleQ, ExpectedSarsa, NStepSarsa, QLearning, Sarsa
 from rel.agents.tiles import TileCoder
 from rel.agents.traces import Kind, SarsaLambda, WatkinsQLambda
-from rel.agents.tree import Target, TreeBackup
+from rel.agents.tree import QSigma, Target, TreeBackup
 from rel.agents.value_network import DeepQ
 from rel.core import Env, TabularEnv
 from rel.options import Option, hallway_options, primitives
@@ -243,6 +243,32 @@ def _tree_backup(
         rng,
         _whole_numbers(env),
         n=n,
+        target=target,
+        step_size=step_size,
+        discount=discount,
+        epsilon=epsilon,
+        explore=as_rule(explore, epsilon),
+        optimism=optimism,
+    )
+
+
+def _q_sigma(
+    rng: Rng,
+    env: Env[Any, Any],
+    n: int = 3,
+    sigma: float | Schedule = 0.5,
+    target: Target = "greedy",
+    step_size: float | Schedule = 0.2,
+    discount: float = 1.0,
+    epsilon: float | Schedule = 0.1,
+    explore: str = "epsilon-greedy",
+    optimism: float = 0.0,
+) -> Agent[Any, Any]:
+    return QSigma(
+        rng,
+        _whole_numbers(env),
+        n=n,
+        sigma=sigma,
         target=target,
         step_size=step_size,
         discount=discount,
@@ -1038,6 +1064,12 @@ AGENTS: Registry[Agent[Any, Any]] = Registry(
             "off-policy-mc",
             "Learns the greedy policy from episodes an exploring one collected.",
             _off_policy,
+            tags=("tabular", "off-policy"),
+        ),
+        Entry(
+            "q-sigma",
+            "Part sample and part expectation, with tree backup at one end.",
+            _q_sigma,
             tags=("tabular", "off-policy"),
         ),
         Entry(
