@@ -505,10 +505,10 @@ buffer. Putting one on this critic is the test that is still not run.
   measure nothing, one drawing the readme banner and one running the gate that
   continuous integration runs, and every other one that no test loads is here.
   So they are: `measure_control.py`, `measure_engine.py`,
-  `measure_intra_option.py`, `measure_lost_seed.py`, `measure_pressure.py` and
-  `measure_tiling_offsets.py`. They are named rather than counted, because the
-  first version of this entry said eleven untested in one sentence and twelve
-  in the next and neither was right.
+  `measure_intra_option.py`, `measure_lost_seed.py` and `measure_pressure.py`.
+  They are named rather than counted, because the first version of this entry
+  said eleven untested in one sentence and twelve in the next and neither was
+  right.
 
   `measure_sweeping.py` gained its first tests when the check went looking
   for the command behind a table, and writing them turned up something worth
