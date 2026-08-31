@@ -35,7 +35,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from rel.agents.dp import Solution, value_iteration
+from rel.agents.dp import TOLERANCE, Solution, value_iteration
 from rel.envs.rental import CarRental
 from rel.rng import Rng
 from rel.ui.table import table
@@ -50,6 +50,17 @@ DISCOUNT = 0.9
 def solve(capacity: int, van: int, cost: float) -> tuple[CarRental, Solution]:
     env = CarRental(Rng(1).stream("env"), capacity=capacity, van=van, move_cost=cost)
     return env, value_iteration(env, discount=DISCOUNT)
+
+
+def settled(gap: float) -> str:
+    """A gap, or nothing at all where the sweep cannot tell it from nothing.
+
+    A van priced past what it is worth is never used, so the value it reaches
+    is the value with no van. The two sweeps land about 1e-10 apart, which is
+    the sweep's own arithmetic and not a loss the van causes, and printing it
+    as a small negative number would say the van cost something.
+    """
+    return "0.000" if abs(gap) < TOLERANCE else f"{gap:+.3f}"
 
 
 def moving_states(env: CarRental, solved: Solution) -> int:
@@ -101,8 +112,8 @@ def price_section(capacity: int, van: int, costs: tuple[float, ...]) -> None:
             [
                 f"{cost:g}",
                 f"{solved.start_value:.3f}",
-                f"{gain:+.3f}",
-                f"{gain * (1.0 - DISCOUNT):+.3f}",
+                settled(gain),
+                settled(gain * (1.0 - DISCOUNT)),
                 str(moving_states(env, solved)),
                 str(largest_move(env, solved)),
             ]
@@ -127,7 +138,8 @@ def price_section(capacity: int, van: int, costs: tuple[float, ...]) -> None:
         "nothing, out\n  of "
         f"{(capacity + 1) ** 2}"
         ". It falls with the price and reaches nothing when the van is\n"
-        "  worth less than it charges."
+        "  worth less than it charges. A gap the sweep cannot tell from "
+        f"nothing at\n  its tolerance of {TOLERANCE:g} is printed as nothing."
     )
 
 

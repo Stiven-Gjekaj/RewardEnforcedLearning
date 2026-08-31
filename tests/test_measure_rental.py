@@ -99,6 +99,33 @@ class TestTheCountOfStatesThatMove:
         assert script.largest_move(env, solved) <= env.van
 
 
+class TestAGapTheSweepCannotSee:
+    """A van priced past what it is worth is never used.
+
+    So it reaches the value that no van reaches, and the two sweeps land
+    about 1e-10 apart. Printing that as a small negative number would say the
+    van cost something, which is a claim the sweep cannot support.
+    """
+
+    def test_a_gap_below_the_tolerance_is_nothing(self, script: ModuleType) -> None:
+        assert script.settled(-1.2e-10) == "0.000"
+        assert script.settled(0.0) == "0.000"
+
+    def test_a_gap_above_it_keeps_its_sign(self, script: ModuleType) -> None:
+        assert script.settled(2.5) == "+2.500"
+        assert script.settled(-2.5) == "-2.500"
+
+    def test_the_threshold_is_the_solver_s_own_tolerance(
+        self, script: ModuleType
+    ) -> None:
+        # Read from `rel.agents.dp` rather than written here, so a change to
+        # the solver's tolerance moves this with it.
+        from rel.agents.dp import TOLERANCE
+
+        assert script.settled(TOLERANCE * 2) != "0.000"
+        assert script.settled(TOLERANCE / 2) == "0.000"
+
+
 class TestThePriceTable:
     @staticmethod
     def _run(script: ModuleType, monkeypatch: pytest.MonkeyPatch, *extra: str) -> None:
@@ -156,14 +183,14 @@ class TestThePriceTable:
         ]
         assert values[0] > values[1]
 
-    def test_a_price_nobody_pays_gains_exactly_nothing(
+    def test_a_price_nobody_pays_gains_nothing(
         self,
         script: ModuleType,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        # Exactly, rather than nearly. A van that is never used leaves the
-        # value where a van that cannot move a car leaves it.
+        # A van that is never used leaves the value where a van that cannot
+        # move a car leaves it, and the two sweeps land about 1e-10 apart.
         self._run(script, monkeypatch, "--costs", "200")
         row = [
             line
@@ -171,7 +198,8 @@ class TestThePriceTable:
             if line.strip().startswith("200")
         ]
         assert len(row) == 1
-        assert "+0.000" in row[0]
+        assert " 0.000 " in row[0]
+        assert "-0.000" not in row[0]
 
     def test_the_day_column_is_the_gap_undiscounted(
         self,
