@@ -45,6 +45,7 @@ from rel.envs.classic import (
 )
 from rel.envs.continuing import two_loops
 from rel.envs.control import CartPole, MountainCar
+from rel.envs.gambler import Gambler
 from rel.envs.gaming import (
     BoatRace,
     Thermostat,
@@ -127,6 +128,18 @@ ENVIRONMENTS: Registry[Env[Any, Any]] = Registry(
             "long-walk",
             "A thousand cells in a line, a hundred of them covered by a step.",
             long_walk,
+            tags=("tabular",),
+        ),
+        Entry(
+            "gambler",
+            "Stake part of a capital on a coin. Reaching 100 pays 1.",
+            Gambler,
+            tags=("tabular",),
+        ),
+        Entry(
+            "fair-gambler",
+            "The same bet on a fair coin, where every stake is as good.",
+            lambda rng: Gambler(rng, heads=0.5),
             tags=("tabular",),
         ),
         Entry(
