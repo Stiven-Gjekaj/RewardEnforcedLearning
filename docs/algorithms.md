@@ -1343,6 +1343,130 @@ built to find that out.
 
 ---
 
+## A picture that is mostly the solver
+
+```console
+$ python scripts/measure_gambler.py
+$ rel solve --env gambler
+$ rel solve --env fair-gambler
+```
+
+A gambler stakes part of a capital on a coin. Heads pays the stake, tails takes
+it, reaching 100 pays 1 and reaching nothing pays nothing. This is Sutton and
+Barto's example 4.3, and it is usually drawn twice: the value of each capital,
+and the stake to make at it. The second picture is a jagged staircase and it is
+the one people remember.
+
+### The fair coin has a closed form
+
+A fair game stopped at either end is worth the same however it is played, so
+the value of a capital is that capital over the goal.
+
+| capital | closed form | swept |
+| ---: | ---: | ---: |
+| 1 | 0.010000 | 0.010000 |
+| 25 | 0.250000 | 0.250000 |
+| 50 | 0.500000 | 0.500000 |
+| 99 | 0.990000 | 0.990000 |
+
+The worst gap over all ninety nine capitals is **1.6e-12**. That is a check
+against arithmetic rather than against another sweep, and the random walk was
+the only environment here that offered one.
+
+### How much of the staircase survives a change that cannot change the answer
+
+Two things are varied and neither is part of the problem: how tightly the sweep
+is run, and which of the two solvers runs it. The values agree to the tolerance
+every time.
+
+| heads | value at the start | widest gap between stakes | capitals with one best stake | moved by the tolerance | moved by the solver |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 0.25 | 0.250000 | 0.115 | 25 | 26 | 36 |
+| 0.4 | 0.400000 | 0.0632 | 25 | 7 | 36 |
+| 0.5 | 0.500000 | **8.05e-13** | **0** | 60 | 72 |
+| 0.55 | 0.999956 | 0.45 | 86 | **0** | **0** |
+
+*Tolerances 1e-6 and 1e-9, and the two solvers at 1e-9. A capital counts as
+decided when one stake beats the rest by more than the tolerance.*
+
+**At a fair coin nothing is decided at all.** Every stake is exactly as good,
+so the largest gap between the best stake and the worst over all ninety nine
+capitals is 8e-13, which is the sweep's own rounding. Seventy two of the ninety
+nine stakes change when the solver does. Whatever a solver draws there is its
+arithmetic and nothing about gambling.
+
+**At an unfavourable coin a quarter of it is real.** Twenty five capitals have
+a best stake, and thirty six of the ninety nine still change with the solver.
+The jaggedness in the picture is partly the problem and mostly not.
+
+**At a favourable coin all of it is real.** Stake one everywhere, eighty six
+capitals decided, and nothing moves at all. The value at the start is 0.999956
+rather than one, because a gambler betting a pound at a time can still lose a
+hundred in a row.
+
+### Staking nothing is not an action, and that was measured
+
+The problem as stated lets the gambler stake nothing. It is a loop of one
+state, so at a discount of one it is worth exactly what the state is worth and
+ties with the best real stake everywhere. Built that way, value iteration
+staked nothing at **35 of the 99 capitals** and `evaluate_policy` scored the
+resulting policy at minus infinity, because a gambler following it never
+reaches an ending.
+
+Tie breaking is a property of the solver rather than of this problem, so the
+fix belongs in the environment: the action that is never useful and always
+ties is the one to leave out. `TestStakingNothingIsNotAnAction` in
+`tests/test_gambler.py` drives the version with it back in and holds the
+finding.
+
+---
+
+## What the van is worth
+
+```console
+$ python scripts/measure_rental.py
+$ rel solve --env rental --discount 0.9
+```
+
+Two car parks holding twenty cars each. Renting a car pays 10 and needs a car
+to be there, cars come back the next day, and overnight a van moves up to five
+cars between the locations at 2 each. Requests and returns are Poisson, so this
+is the one environment here whose model is a distribution rather than a handful
+of branches written out.
+
+Sutton and Barto's example 4.2 is usually run once and drawn once. These are
+the two questions it sets up and does not answer.
+
+| a car costs | value at the start | over no van | a day | states that move | largest move |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| no van | 550.749 | - | - | 0 | 0 |
+| 0 | 590.930 | +40.181 | +4.018 | 400 | 5 |
+| 2 | 574.948 | +24.199 | **+2.420** | 171 | 5 |
+| 5 | 560.120 | +9.371 | +0.937 | 75 | 5 |
+| 10 | 550.749 | 0.000 | 0.000 | **0** | 0 |
+| 20 | 550.749 | 0.000 | 0.000 | **0** | 0 |
+
+*A discount of 0.9, so a gain of `g` a day is worth `g` over one tenth. Every
+row is a sweep of the model and no seed appears anywhere. `states that move`
+is out of 441.*
+
+**At the book's price the van is worth 2.42 a day.** It moves cars in 171 of
+the 441 states, and the most it ever moves is the five it holds.
+
+**A free van is worth 4.02 a day and uses almost the whole board.** Four
+hundred of the 441 states move a car when moving is free, so most of the
+restraint at a price of 2 is the price rather than the layout.
+
+**At 10 a car it is never used.** The value falls back exactly onto the row
+with no van, and nothing moves anywhere. Somewhere between 5 and 10 the van
+stops being worth its own cost, and the count of states that move is what says
+so: it is 75 at a price of 5 and nothing at 10.
+
+The control row is a van that holds nothing, which leaves one action that moves
+nothing. Without it every other row would be read against nothing.
+
+---
+
 ## The smallest approximation there is
 
 ```console
@@ -2815,6 +2939,8 @@ which is harmless and still worth spelling one way.
 | Decision time against background planning | `python scripts/measure_search.py --episodes 40 --runs 3` |
 | One rule at several dials | `python scripts/measure_exploration.py --rules count-bonus:0.1,count-bonus:2` |
 | The three things that are safe in pairs | `python scripts/measure_triad.py` |
+| A picture that is mostly the solver | `python scripts/measure_gambler.py` |
+| What the van is worth | `python scripts/measure_rental.py` |
 | An action that is a number | `python scripts/measure_levels.py` |
 | The smallest approximation there is | `python scripts/measure_aggregation.py` |
 
