@@ -1952,6 +1952,114 @@ published results come from far more compute than pure Python has.
 
 ---
 
+## An action that is a number
+
+```console
+$ python scripts/measure_levels.py
+$ rel train gaussian-actor-critic --env pendulum --episodes 200
+$ rel demo tile-q --env pendulum-levels --episodes 300
+```
+
+Everything above this point takes an action from a short list. That covers
+every environment on this page until now, and it leaves out half of control: a
+torque, a steering angle and a throttle are numbers, and the list they would be
+cut into is a choice somebody has to make.
+
+`pendulum` is a weight on a rod and a motor too weak to lift it. The action is
+a torque anywhere between minus two and two, nothing pays anything above zero,
+and the only way to the top is to swing. **Held at full power from the bottom
+the weight climbs to 0.659 of the way down and stops there**, which is the
+angle where the motor balances gravity, so a policy that only pushes hard one
+way cannot solve it. Full power in whichever direction the weight is already
+moving does solve it, in two hundred steps, and that is a policy of one line.
+
+### Cutting the box
+
+`pendulum-levels` is the same environment with the torque cut into a short
+list, so that every other agent here can run on it. Two levels is a switch,
+nine is the registry default, and the count is a setting.
+
+| levels | 300 episodes | 900 episodes |
+| ---: | ---: | ---: |
+| 2 | **-245.6** | -446.8 |
+| 3 | -295.2 | -290.2 |
+| 5 | -319.6 | -329.5 |
+| 9 | -410.3 | **-229.4** |
+| 17 | -816.2 | -335.3 |
+
+*`tile-q`, five seeds, the mean of ten greedy episodes. Doing nothing at all
+scores -1187 on this problem.*
+
+**The two columns disagree about which count is best, and that is the answer.**
+At three hundred episodes the switch wins and the ladder falls all the way to
+-816.2 at seventeen levels. At nine hundred the middle wins, and seventeen
+levels has come from -816.2 to -335.3 while the switch has gone the other way.
+
+Every extra level is another column of the weight table to learn, so a small
+budget is spent better on fewer of them. A large budget buys the finer control
+that a switch cannot express. Which count is right is a question about the
+budget rather than about the environment, and a page that gave one number here
+would be describing its own budget.
+
+Neither column is a settled number, and the switch going from -245.6 to -446.8
+with three times the training says so. A constant step size does not converge,
+it tracks, which this page says under prediction and which is as true of a
+control agent over a tile coder as it is of a table. These are two points on a
+curve that is still moving, not two answers.
+
+### What learns this problem at all
+
+| agent | actions | mean return |
+| --- | ---: | ---: |
+| random | 9 | -1190.5 |
+| tile-q | 9 | **-410.3** |
+| tile-sarsa | 9 | -624.1 |
+| deep-q | 9 | -696.2 |
+| actor-critic | 9 | -1384.8 |
+| gaussian-actor-critic | the box | -1284.3 |
+
+*Five seeds, three hundred episodes, the mean of ten greedy episodes. Every
+row but the last acts on the cut version and the last acts on the box itself.*
+
+The agents that keep a value and rank it learn this problem. The two that
+learn a policy directly do not, and **both of them are behind acting at
+random**: -1384.8 for the discrete actor critic on the cut version and -1284.3
+for the continuous one on the box, against -1190.5 for a policy that draws.
+
+That is worth reading carefully, because the obvious reading is wrong. The
+continuous agent is not behind because its actions are numbers. Its discrete
+sibling, on the same problem cut into nine levels, with the same engine and the
+same optimiser, is further behind still. What the two share is a target
+bootstrapped from a value network, and the values here run to several hundred
+while the difference one action makes is about one. The advantage is the
+difference of two large numbers that the critic is still wrong about.
+
+The same reading is already on this page under the cart pole, where the actor
+critic reaches 8 on two seeds of five and REINFORCE, which shares everything
+but the target, reaches five hundred on all five. This is the second
+environment to say it.
+
+### The policy that needs no list
+
+`gaussian-actor-critic` keeps no list. Its policy is a normal distribution for
+each dimension of the action: a mean from a network reading the observation,
+and a spread that is learned and the same everywhere. An action is a draw from
+it, and the gradient of the log of its density is what a policy gradient needs.
+
+The mean is squashed through a tanh onto the box. Without that it can walk out
+of the box, every draw then clips to the same bound, and the gradient of a
+clipped action keeps pushing it further out.
+
+**What holds the arithmetic is not the pendulum.** The pendulum has no known
+answer, so a run of it says nothing about whether the update is right.
+`tests/test_gaussian.py` builds a one step problem whose answer is a number
+written into the environment, and there the agent finds it to within 0.15 from
+either side of the box, narrows its spread to a quarter of what it started at,
+and its value network settles on minus the square of that spread, which is
+exactly what a policy aiming at the answer with that spread is worth.
+
+---
+
 ## The two agents that learn a policy directly
 
 Neither is as steady as anything tabular in this project, and both are far
@@ -2543,10 +2651,10 @@ was where its numbers came from, and it had that wrong in a dozen places.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **432 of this
-  page's numbers are in prose rather than in a cell**, against 1156 in cells.
+- **Any number written in a sentence.** It reads tables, and **444 of this
+  page's numbers are in prose rather than in a cell**, against 1184 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 432 are settings, seed counts and episode caps rather than anything a
+  those 444 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -2595,7 +2703,7 @@ written as a console block.
   what makes a second opinion cheap, and it writes down which commands ran out
   of time so a resumed run does not spend the budget on them again. With every
   command cached the whole page answers in a second.
-- **865 of 1156 numbers are checked.** The rest are in a table or a column that
+- **893 of 1184 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
@@ -2637,6 +2745,7 @@ which is harmless and still worth spelling one way.
 | Decision time against background planning | `python scripts/measure_search.py --episodes 40 --runs 3` |
 | One rule at several dials | `python scripts/measure_exploration.py --rules count-bonus:0.1,count-bonus:2` |
 | The three things that are safe in pairs | `python scripts/measure_triad.py` |
+| An action that is a number | `python scripts/measure_levels.py` |
 
 ### The commands that are behind no table
 
