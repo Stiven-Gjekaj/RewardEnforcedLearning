@@ -33,6 +33,7 @@ from typing import Any
 from rel.core import Env
 from rel.envs.baird import Baird, baird
 from rel.envs.bandit import KArmedBandit, drifting_bandit, stationary_bandit
+from rel.envs.blackjack import Blackjack
 from rel.envs.classic import (
     cliff_walk,
     corridor,
@@ -141,6 +142,12 @@ ENVIRONMENTS: Registry[Env[Any, Any]] = Registry(
             "fair-gambler",
             "The same bet on a fair coin, where every stake is as good.",
             lambda rng: Gambler(rng, heads=0.5),
+            tags=("tabular",),
+        ),
+        Entry(
+            "blackjack",
+            "Draw or stick against a dealer who draws while under 17.",
+            Blackjack,
             tags=("tabular",),
         ),
         Entry(
