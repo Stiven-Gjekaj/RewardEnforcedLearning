@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-2192_passing-427819?style=for-the-badge" alt="2192 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-2244_passing-427819?style=for-the-badge" alt="2244 tests passing"/>
 </p>
 
 <p align="center">
@@ -36,7 +36,7 @@ environments where the reward is not the point_
 **A reinforcement learning laboratory that runs in a terminal and needs
 nothing installed.**
 
-Fifteen environments, thirty two agents, a gradient engine, a dynamic
+Sixteen environments, thirty two agents, a gradient engine, a dynamic
 programming solver that says what the best possible policy is worth, and a
 command line that draws a learning curve out of braille dots.
 
@@ -340,7 +340,7 @@ an agent when it is fifty times too large.
 ```
 rel/core.py         the contract: what an environment is, what a step is
 rel/rng.py          PCG written out, with named independent streams
-rel/envs/           fifteen environments. Never import an agent.
+rel/envs/           sixteen environments. Never import an agent.
 rel/agents/         thirty four agents. Never import an environment.
   dp.py             value iteration, policy iteration, exact policy values
   td.py             SARSA, Q-learning, Expected SARSA, Double Q, n-step
@@ -401,7 +401,7 @@ import statements of every module:
 $ pytest
 ```
 
-2192 tests. Some of what they cover, and why each one is there rather than the
+2244 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A
@@ -450,7 +450,7 @@ what it was for.
 
 ## Status
 
-Alpha, and complete enough to be useful. Fifteen environments and thirty two
+Alpha, and complete enough to be useful. Sixteen environments and thirty two
 agents, all of them covered by a suite that runs in about eight minutes with no
 browser, no display and no network.
 

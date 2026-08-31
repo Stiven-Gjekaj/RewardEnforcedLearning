@@ -28,6 +28,7 @@ from __future__ import annotations
 from typing import Any
 
 from rel.core import Env
+from rel.envs.baird import Baird, baird
 from rel.envs.bandit import KArmedBandit, drifting_bandit, stationary_bandit
 from rel.envs.classic import (
     cliff_walk,
@@ -104,6 +105,13 @@ ENVIRONMENTS: Registry[Env[Any]] = Registry(
             tags=("tabular", "endless"),
         ),
         Entry(
+            "baird",
+            "Seven states that pay nothing, and features laid out so that "
+            "off-policy bootstrapping over them diverges.",
+            baird,
+            tags=("tabular", "endless"),
+        ),
+        Entry(
             "walk",
             "Five cells in a line between two endings. The right one pays 1.",
             random_walk,
@@ -150,6 +158,7 @@ ENVIRONMENTS: Registry[Env[Any]] = Registry(
 
 __all__ = [
     "ENVIRONMENTS",
+    "Baird",
     "BoatRace",
     "CartPole",
     "GridWorld",
