@@ -272,6 +272,10 @@ def test_the_milestones_name_the_scripts_that_have_no_test() -> None:
     A script counts as tested when some test loads it by its path, which is
     how `scripts/` is used from a test: it is not a package, so importing it
     as one would be a different arrangement than the one that runs.
+
+    The list is empty now, and the sentence says so in words. That is still
+    worth checking: a script added without a test makes the real list longer
+    than the written one, which is exactly what this catches.
     """
     root = PACKAGE.parent
     scripts = {found.name for found in (root / "scripts").glob("*.py")}

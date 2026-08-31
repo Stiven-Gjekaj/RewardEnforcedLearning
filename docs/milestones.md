@@ -292,6 +292,24 @@ thousand steps where `dyna-q` keeps making six a step forever. That is also its
 weakness, and one seed of ten settles two steps off the shortest route and
 never looks again.
 
+**A test for every measurement script.** Two scripts in `scripts/` measure
+nothing, one drawing the readme banner and one running the gate that continuous
+integration runs. Every other one is now loaded by a test. So they are: none.
+
+The entry this replaces named them rather than counting them, because its first
+version said eleven untested in one sentence and twelve in the next and neither
+was right. `test_layering.py` still holds the list against what is really
+there, and it now reads an empty list as the thing to check for.
+
+Writing them found four faults in the tests rather than in the scripts, which
+is the usual ratio here. A test that the two ways of shifting a tile coder
+answer differently asked at one point and failed, because they agree at about
+three points in ten. A test that a setting reaches an agent used the mountain
+car, where a few episodes never reach the flag at any setting, so it passed on
+a script that dropped the setting. And the updates per step of `options-q` are
+below one rather than above it, because an option that runs for three steps
+gives one update.
+
 **Options**, as `options-q`, on the four rooms grid the literature uses for
 them. The eight hallway options are read off the layout rather than written
 down, and the same construction finds none on the Dyna maze and none on the
@@ -500,20 +518,6 @@ buffer. Putting one on this critic is the test that is still not run.
 ---
 
 ## Things that would be nice and are not milestones
-
-- Tests for the measurement scripts that have none. Two scripts in `scripts/`
-  measure nothing, one drawing the readme banner and one running the gate that
-  continuous integration runs, and every other one that no test loads is here.
-  So they are: `measure_engine.py`, `measure_intra_option.py` and
-  `measure_lost_seed.py`.
-  They are named rather than counted, because the first version of this entry
-  said eleven untested in one sentence and twelve in the next and neither was
-  right.
-
-  `measure_sweeping.py` gained its first tests when the check went looking
-  for the command behind a table, and writing them turned up something worth
-  knowing about the episode cap. That is the argument for the other seven.
-  `test_layering.py` holds this list against what is really there.
 
 - A `--out` that writes a run to a file, and a `rel replay` that reads one.
 - Sweeping a setting from the command line, with the table falling out.
