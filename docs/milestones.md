@@ -504,8 +504,8 @@ buffer. Putting one on this critic is the test that is still not run.
 - Tests for the measurement scripts that have none. Two scripts in `scripts/`
   measure nothing, one drawing the readme banner and one running the gate that
   continuous integration runs, and every other one that no test loads is here.
-  So they are: `measure_control.py`, `measure_engine.py`,
-  `measure_intra_option.py`, `measure_lost_seed.py` and `measure_pressure.py`.
+  So they are: `measure_engine.py`, `measure_intra_option.py` and
+  `measure_lost_seed.py`.
   They are named rather than counted, because the first version of this entry
   said eleven untested in one sentence and twelve in the next and neither was
   right.
