@@ -1741,6 +1741,218 @@ its cart pole figure was 183.7 against the 267.6 the command really prints.
 
 ---
 
+## Learning against an answer that is known
+
+```console
+$ python scripts/measure_blackjack.py
+$ rel solve --env blackjack
+```
+
+Blackjack is where the book introduces Monte Carlo, because the dealer plays
+out his whole hand and that is awkward to write as a one step model. This
+project writes it out anyway: the dealer's ending is a recursion over the cards
+he draws while under seventeen and the deal is a recursion over the cards the
+player takes to reach twelve, both exact.
+
+**Which is the point of having it.** Solved, the optimal policy and the value
+of the deal are known before a card is dealt, so an agent that learns from
+episodes is scored against the answer rather than against another agent.
+
+The exact solution reproduces the book's figure square for square: stick on
+hard 17 against a seven or better, 13 against a two or three, 12 against a four
+to a six, and on soft 19 against a nine, a ten or an ace and 18 otherwise. That
+is the check that the model is right rather than merely self consistent,
+because a wrong model can add up to one everywhere.
+
+### What a fixed step size buys, and where it stops buying it
+
+`monte-carlo` takes a running average with no step size given and a fixed
+weight on the newest return with one. Its docstring claimed the fixed weight is
+what control needs even in a fixed environment, because the policy keeps
+changing. Here is that claim against an exact answer.
+
+| episodes | step size | what it learned is worth | squares apart | what those squares are worth |
+| ---: | ---: | ---: | ---: | ---: |
+| 50,000 | running average | -0.06258 | 31.0 | 6.54 |
+| 50,000 | 0.01 | -0.06557 | 30.2 | 6.65 |
+| 50,000 | 0.05 | **-0.05994** | 25.6 | 5.14 |
+| 50,000 | 0.1 | -0.06438 | 30.0 | 5.30 |
+| 200,000 | running average | **-0.05210** | 16.2 | 2.55 |
+| 200,000 | 0.01 | -0.05341 | 16.2 | 2.66 |
+| 200,000 | 0.05 | -0.05865 | 20.6 | 3.23 |
+| 200,000 | 0.1 | -0.06852 | 29.2 | 4.18 |
+| 500,000 | running average | **-0.04841** | 8.6 | 0.99 |
+| 500,000 | 0.01 | -0.05227 | 9.8 | 0.90 |
+| 500,000 | 0.05 | -0.06007 | 19.0 | 2.35 |
+| 500,000 | 0.1 | -0.06963 | 27.4 | 4.00 |
+
+*Five seeds, epsilon 0.1. Perfect play is worth -0.04656. `what it learned is
+worth` is the exact value of the greedy policy over the same model, not the
+return the agent collected.*
+
+**The claim holds early and fails later.** A fixed 0.05 wins at fifty thousand
+hands. By five hundred thousand the running average is ahead of every fixed
+step, and the larger the step the further behind it is, which is what a weight
+that never falls does with more data.
+
+The default stays a fixed 0.1, and the docstring says why: the grids this
+project measures on run for hundreds of episodes rather than hundreds of
+thousands, which is the end of that table where forgetting pays.
+
+**A count of mistakes is not their size.** At five hundred thousand hands the
+fixed 0.01 plays *more* squares differently from the optimum than the running
+average does, 9.8 against 8.6, and gives up *less* value doing it, 0.90 against
+0.99. The squares an agent gets wrong are the ones it rarely reaches, so both
+columns are printed.
+
+**Blackjack decides nearly every square, which is why counting them means
+something here.** The smallest gap between the two actions anywhere on the
+board is 0.0025 and the middle one is 0.32. The gambler's problem above decides
+none of its capitals, and a count of squares there would be a count of a
+tie breaking rule.
+
+### Where it is weak
+
+- **A natural pays nothing extra.** The book pays 21 on the first two cards
+  before the hand is played. Here it is a hand of 21 like any other, which
+  changes what the deal is worth and not what to do, because the only move at
+  21 is to stick either way.
+- **One agent.** `monte-carlo` only. Whether a temporal difference agent gets
+  closer on the same hands is not measured here.
+- **Five seeds.** Enough to order the rows and not enough for a p below
+  0.0625.
+
+---
+
+## Part sample and part expectation
+
+```console
+$ python scripts/measure_sigma.py
+$ rel train q-sigma --env cliff --set sigma=0.5
+```
+
+`tree-backup` takes the expectation over the target policy at every step of its
+window and n step SARSA takes the one action really taken and corrects for
+having taken it. `q-sigma` is the family between them: sigma of nothing is tree
+backup exactly, sigma of one is the sample with a control variate, and the book
+raises the middle as a question and leaves it open.
+
+| sigma | at step | greedy, exactly | over tree backup | 95 percent interval | p |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 0.05 | **-13.800** | - | - | - |
+| 0.25 | 0.05 | -14.400 | -0.600 | [-1.600, +0.400] | 0.453 |
+| 0.5 | 0.05 | -14.400 | -0.600 | [-1.400, +0.400] | 0.453 |
+| 0.75 | 0.05 | -15.400 | -1.600 | [-2.400, -0.800] | 0.016 |
+| 1 | 0.1 | -14.800 | -1.000 | [-1.600, -0.400] | 0.062 |
+| 1 falling to 0 | 0.05 | -14.400 | -0.600 | [-1.400, +0.200] | 0.375 |
+
+*Cliff walk, 400 episodes, ten seeds, n of 3, epsilon 0.1. Every sigma is swept
+over four step sizes and read at its own best. The best possible return is
+-13.*
+
+**The middle does not beat the ends here. The end this project already had
+does.** Tree backup is ahead of every other row, and the two rows furthest from
+it are the two clear of zero.
+
+The schedule the book suggests, sigma falling from one to nothing over the run,
+lands with the middle rather than with either end.
+
+**The collapse to tree backup is exact and is tested.** Against a greedy target
+the two agents agree bit for bit, because a greedy target has shares of one and
+nothing so nothing is rearranged between the two ways of writing the step.
+Against an averaged target they agree to the last bits: one sums the actions
+not taken and adds the taken one separately, the other sums all of them and
+subtracts the taken one back out, and float addition is not associative.
+
+That collapse is also what caught a fault. The first version asked the target
+policy for its shares three times inside one update, and a greedy target breaks
+ties by drawing, so the three answers could disagree and each spent randomness.
+It did not reproduce tree backup at sigma of nothing, which is how that was
+found.
+
+### Where it is weak
+
+- **One grid and one budget.** The cliff walk at 400 episodes. The maze is not
+  measured here.
+- **The score is coarse.** A cliff walk policy is worth -13 along the edge, -15
+  one row up and -17 two rows up and little else, so a mean over ten seeds moves
+  in steps of a fifth. That is why the interval is printed rather than the mean
+  alone.
+- **One n.** Three steps. Whether sigma matters more at a longer window is not
+  measured.
+
+---
+
+## Waves over the whole box
+
+```console
+$ python scripts/measure_fourier.py --runs 10 --step-sizes 0.02 0.05 0.1 0.2 0.5 1.0 2.0
+$ rel train fourier-sarsa --env mountaincar --set order=5
+```
+
+A tile coder cuts the box into cells and a radial basis puts bumps at places.
+Both are local: a point lights the features near it and nothing else. A Fourier
+basis is the opposite. Every feature is a cosine wave over the whole box, and
+what tells them apart is how fast each one waves.
+
+It costs `(order + 1)` to the power of the dimensions, which is the growth a
+radial basis has and worse than a tile coder's. What it does not need is
+anything else: no bins, no widths, no centres, no offsets between grids. **An
+order is the whole design**, and that is the reason to have it beside two
+encoders whose settings a reader has to get right.
+
+### The one setting the literature attaches, measured both ways
+
+A wave that crosses the box eight times moves the value eight times as often
+for the same change to its weight, so the usual advice is to divide the step
+size for each feature by the length of its own coefficient. That is the only
+thing said about this basis that is not the basis itself.
+
+| order | features | scaled | at step | flat | at step | scaled minus flat | 95 percent interval | p |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 4 | -147.0 | 0.05 | **-137.6** | 0.1 | -9.4 | [-13.0, -5.6] | 0.004 |
+| 3 | 16 | **-124.4** | 0.02 | -170.3 | 0.5 | +46.0 | [+25.9, +67.0] | 0.004 |
+| 5 | 36 | -154.4 | 0.5 | **-134.7** | 0.5 | -19.7 | [-31.3, -9.6] | 0.006 |
+| 7 | 64 | **-131.2** | 0.1 | -140.1 | 1 | +8.9 | [-5.2, +20.5] | 0.213 |
+
+*Mountain car, ten seeds, 200 episodes, greedy return afterwards. Both sides
+swept over seven step sizes and each read at its own best.*
+
+**The sign flips.** Scaling loses at order one, wins at order three, loses at
+order five and is not told apart at order seven. Three of those four intervals
+are clear of zero at a p of about 0.005, so each is a real difference on this
+problem, and no rule that says "divide the step for each feature" survives all
+four rows.
+
+**Both sides have to be swept or the answer is the other question.** Every
+scale a Fourier basis asks for is at most one, so scaling makes each step
+smaller as well as uneven. The first probe of this ran both at one step size,
+found the scaled side far ahead at order five, and would have reported smaller
+steps as uneven steps. Swept, the flat side is ahead there by 19.7.
+
+The two sides want very different step sizes. At order three the scaled side is
+best at 0.02 and the flat side at 0.5, twenty five times apart, which is what
+the scaling does and why a shared step size cannot compare them.
+
+**One row is a floor rather than a best.** At order three the scaled side wants
+the smallest step the sweep offered, so its 46.0 is what scaling bought inside
+the range rather than what it can buy. The script names such rows rather than
+letting them read as findings.
+
+### Where it is weak
+
+- **One environment.** The mountain car only. Whether the sign still flips on
+  the cart pole is not measured here.
+- **Two hundred episodes.** This is early learning, as the encoder comparison
+  above it is.
+- **Four orders.** The sign flips twice across four rows, which is enough to
+  say the rule does not hold and not enough to say what does.
+- **The order is the whole design and it is not swept against the others.**
+  Which of the three encoders is best on this problem is a different question
+  and this table does not answer it.
+
+---
+
 ## The two control problems
 
 Neither has a table of states and neither has a model, so there is no exact
@@ -2838,10 +3050,10 @@ was where its numbers came from, and it had that wrong in a dozen places.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **481 of this
-  page's numbers are in prose rather than in a cell**, against 1275 in cells.
+- **Any number written in a sentence.** It reads tables, and **516 of this
+  page's numbers are in prose rather than in a cell**, against 1413 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 481 are settings, seed counts and episode caps rather than anything a
+  those 516 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -2897,7 +3109,7 @@ written as a console block.
   numbers have moved, and the difference is one line further down the report,
   which names the command and the budget it wanted. `--timeout` is what to
   reach for before believing the first reading.
-- **984 of 1275 numbers are checked.** The rest are in a table or a column that
+- **1122 of 1413 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
@@ -2943,6 +3155,9 @@ which is harmless and still worth spelling one way.
 | What the van is worth | `python scripts/measure_rental.py` |
 | An action that is a number | `python scripts/measure_levels.py` |
 | The smallest approximation there is | `python scripts/measure_aggregation.py` |
+| Waves over the whole box | `python scripts/measure_fourier.py --runs 10 --step-sizes 0.02 0.05 0.1 0.2 0.5 1.0 2.0` |
+| Learning against an answer that is known | `python scripts/measure_blackjack.py` |
+| Part sample and part expectation | `python scripts/measure_sigma.py` |
 
 ### The commands that are behind no table
 
