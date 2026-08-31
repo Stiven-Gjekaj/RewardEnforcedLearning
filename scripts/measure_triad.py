@@ -52,7 +52,7 @@ from rel.agents.linear_prediction import (
     fixed,
 )
 from rel.agents.lookup import Lookup
-from rel.envs.baird import STARTING_WEIGHTS, Baird
+from rel.envs.baird import Baird
 from rel.rng import Rng
 from rel.training import train
 from rel.ui.table import table
@@ -91,64 +91,6 @@ EXPECTED_STEPS = 4000
 #: from answering it.
 RATE_STEPS = 3000
 RUNNING_AWAY = 1e-3
-
-
-def a_predictor(
-    which: str, env: Baird, seed: int, discount: float, step_size: float
-) -> LinearPredictor[int]:
-    """One of the two agents, started from the weights the figure starts from."""
-    kind = {"linear-td": SemiGradientTD, "gradient-td": GradientTD}[which]
-    agent: LinearPredictor[int] = kind(
-        Rng(seed).stream("agent"),
-        env.action_space,
-        Lookup(env.feature_rows),
-        fixed(env.behaviour_shares),
-        fixed(env.target_shares),
-        step_size=step_size,
-        discount=discount,
-    )
-    agent.weights[:] = list(STARTING_WEIGHTS)
-    return agent
-
-
-def one_run(
-    which: str,
-    seed: int,
-    discount: float = DISCOUNT,
-    step_size: float = STEP_SIZE,
-    episodes: int = EPISODES,
-) -> float:
-    """The root mean square value error after a run.
-
-    The true value is zero at every state, under either policy, because
-    nothing in this environment pays anything. So this number is the size of
-    what the agent believes, and every bit of it is error.
-    """
-    env = Baird(Rng(seed).stream("env"))
-    agent = a_predictor(which, env, seed, discount, step_size)
-    train(env, agent, episodes, discount=discount)
-    return agent.error_against(dict.fromkeys(range(env.observation_space.n), 0.0))
-
-
-def visits(env: Baird) -> list[float]:
-    """How often the behaviour policy is in each state, by power iteration.
-
-    On this environment the answer is even over all of them, and it is worked
-    out rather than written down so that the expected update below is the
-    update for the environment rather than for one the reader has to trust is
-    the same.
-    """
-    states = env.observation_space.n
-    spread = [1.0 / states] * states
-    for _ in range(500):
-        ahead = [0.0] * states
-        for state, share in enumerate(spread):
-            for action in env.action_space:
-                taken = share * env.behaviour_shares[action - env.action_space.start]
-                for outcome in env.transitions(state, action):
-                    ahead[outcome.observation] += taken * outcome.probability
-        spread = ahead
-    return spread
 
 
 def starting_weights(env: Baird) -> list[float]:
@@ -203,6 +145,68 @@ def expected_change(
                     change[index] += weight * error * value
 
     return change
+
+
+def a_predictor(
+    which: str, env: Baird, seed: int, discount: float, step_size: float
+) -> LinearPredictor[int]:
+    """One of the two agents, started from the weights the figure starts from."""
+    kind = {"linear-td": SemiGradientTD, "gradient-td": GradientTD}[which]
+    agent: LinearPredictor[int] = kind(
+        Rng(seed).stream("agent"),
+        env.action_space,
+        Lookup(env.feature_rows),
+        fixed(env.behaviour_shares),
+        fixed(env.target_shares),
+        step_size=step_size,
+        discount=discount,
+    )
+    # `starting_weights` rather than the constant, which is the right length
+    # at six upper states and at no other. Assigning a slice would resize the
+    # list rather than complain, so a run at another size would have carried
+    # eight weights over a coder that wanted seven.
+    agent.weights[:] = starting_weights(env)
+    return agent
+
+
+def one_run(
+    which: str,
+    seed: int,
+    discount: float = DISCOUNT,
+    step_size: float = STEP_SIZE,
+    episodes: int = EPISODES,
+) -> float:
+    """The root mean square value error after a run.
+
+    The true value is zero at every state, under either policy, because
+    nothing in this environment pays anything. So this number is the size of
+    what the agent believes, and every bit of it is error.
+    """
+    env = Baird(Rng(seed).stream("env"))
+    agent = a_predictor(which, env, seed, discount, step_size)
+    train(env, agent, episodes, discount=discount)
+    return agent.error_against(dict.fromkeys(range(env.observation_space.n), 0.0))
+
+
+def visits(env: Baird) -> list[float]:
+    """How often the behaviour policy is in each state, by power iteration.
+
+    On this environment the answer is even over all of them, and it is worked
+    out rather than written down so that the expected update below is the
+    update for the environment rather than for one the reader has to trust is
+    the same.
+    """
+    states = env.observation_space.n
+    spread = [1.0 / states] * states
+    for _ in range(500):
+        ahead = [0.0] * states
+        for state, share in enumerate(spread):
+            for action in env.action_space:
+                taken = share * env.behaviour_shares[action - env.action_space.start]
+                for outcome in env.transitions(state, action):
+                    ahead[outcome.observation] += taken * outcome.probability
+        spread = ahead
+    return spread
 
 
 def expected_size(env: Baird, discount: float, step: float, steps: int) -> float:

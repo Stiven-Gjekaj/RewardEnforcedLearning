@@ -40,6 +40,20 @@ def an_environment(upper: int = 6) -> Baird:
     return Baird(Rng(1).stream("env"), upper=upper)
 
 
+def body_of(name: str) -> str:
+    """One function of the script, as text, found by name rather than by slice.
+
+    The first version of this cut the source between one `def` and the next,
+    which held until a function moved and then quietly compared an empty
+    string against everything it was asked about.
+    """
+    tree = ast.parse(SCRIPT.read_text())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == name:
+            return ast.unparse(node)
+    raise AssertionError(f"{name} is not in the script")
+
+
 class TestWhereTheAgentIs:
     def test_the_behaviour_policy_is_everywhere_equally(
         self, script: ModuleType
@@ -55,10 +69,20 @@ class TestWhereTheAgentIs:
     ) -> None:
         # A hard coded even spread would be right on this environment and
         # would stop being right the moment anything about it moved.
-        source = SCRIPT.read_text()
-        body = source[source.index("def visits(") : source.index("def starting_")]
+        body = body_of("visits")
         assert "transitions" in body
         assert "behaviour_shares" in body
+
+
+class TestReadingTheScriptItself:
+    def test_the_helper_finds_a_function_that_is_there(self) -> None:
+        assert "def visits" in body_of("visits")
+
+    def test_it_says_so_rather_than_returning_nothing(self) -> None:
+        # The fault the first version of these tests had: a slice that found
+        # nothing compared an empty string against everything.
+        with pytest.raises(AssertionError, match="is not in the script"):
+            body_of("no_such_function")
 
 
 class TestTheStartItRunsFrom:
@@ -112,9 +136,7 @@ class TestTheExpectedUpdate:
         The weights begin with a ten on one of them, which is a transient of
         its own, and a rate averaged over the whole run would carry it.
         """
-        source = SCRIPT.read_text()
-        body = source[source.index("def growth_rate(") : source.index("def runs_away(")]
-        assert "steps // 2" in body
+        assert "steps // 2" in body_of("growth_rate")
 
 
 class TestTheCrossingAgreesWithTheArithmetic:
