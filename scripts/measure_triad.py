@@ -13,8 +13,10 @@ what anybody has proved.
 Four things are measured.
 
 **The run away.** `linear-td` and `gradient-td` on the same problem, from the
-same weights, with the same features and the same two policies. One of them
-reaches a value error past what a float can hold and the other stays near two.
+same weights, with the same features and the same two policies. At the
+discount the literature uses, one of them reaches a value error past what a
+float can hold and the other stays near two. At half that discount both reach
+the answer, and nothing else about the run is different.
 
 **It is not the step size.** Every step size runs away, and a smaller one only
 takes longer. A reader who has seen a divergence blamed on a step size once
@@ -55,8 +57,11 @@ from rel.rng import Rng
 from rel.training import train
 from rel.ui.table import table
 
-#: The discount the literature runs this at, which is above the crossing.
+#: The discount the literature runs this at, which is above the crossing, and
+#: one below it. The second pair of rows in the first table is what makes the
+#: point that the discount is the whole of the difference.
 DISCOUNT = 0.99
+DISCOUNTS: tuple[float, ...] = (0.99, 0.5)
 STEP_SIZE = 0.05
 #: An episode of the counterexample is a thousand steps, because nothing in it
 #: ever ends and the environment's step limit is what stops an episode.
@@ -277,31 +282,34 @@ def crossing(upper: int, step: float, steps: int, rounds: int = 22) -> float:
     return (low + high) / 2.0
 
 
-def run_away_section(runs: int, episodes: int) -> None:
+def run_away_section(runs: int, episodes: int, discounts: tuple[float, ...]) -> None:
     print(
         f"Baird's counterexample. Every reward is zero, so every state is "
         f"worth zero,\nand eight weights of zero say so exactly. "
         f"{runs} seeds, {episodes * STEPS_EACH} steps each,\n"
-        f"discount {DISCOUNT:g}, step size {STEP_SIZE:g}.\n"
+        f"step size {STEP_SIZE:g}.\n"
     )
 
     rows: list[list[str]] = []
-    for which in ("linear-td", "gradient-td"):
-        errors = [
-            one_run(which, seed, episodes=episodes) for seed in range(1, runs + 1)
-        ]
-        rows.append(
-            [
-                which,
-                f"{statistics.median(errors):.4g}",
-                " ".join(f"{error:.3g}" for error in errors),
+    for discount in discounts:
+        for which in ("linear-td", "gradient-td"):
+            errors = [
+                one_run(which, seed, discount=discount, episodes=episodes)
+                for seed in range(1, runs + 1)
             ]
-        )
+            rows.append(
+                [
+                    which,
+                    f"{discount:g}",
+                    f"{statistics.median(errors):.4g}",
+                    " ".join(f"{error:.3g}" for error in errors),
+                ]
+            )
 
     for line in table(
-        ["agent", "median value error", "every seed"],
+        ["agent", "discount", "median value error", "every seed"],
         rows,
-        align=["left", "right", "left"],
+        align=["left", "right", "right", "left"],
     ):
         print(f"  {line}")
 
@@ -381,6 +389,7 @@ def main() -> int:
     parser.add_argument("--runs", type=int, default=5, help="seeds per agent")
     parser.add_argument("--episodes", type=int, default=EPISODES)
     parser.add_argument("--sizes", type=int, nargs="+", default=list(UPPER))
+    parser.add_argument("--discounts", type=float, nargs="+", default=list(DISCOUNTS))
     parser.add_argument("--step-sizes", type=float, nargs="+", default=list(SIZES))
     parser.add_argument("--expected-step", type=float, default=EXPECTED_STEP)
     parser.add_argument("--expected-steps", type=int, default=EXPECTED_STEPS)
@@ -388,16 +397,16 @@ def main() -> int:
     args = parser.parse_args()
 
     started = time.perf_counter()
-    run_away_section(args.runs, args.episodes)
+    run_away_section(args.runs, args.episodes, tuple(args.discounts))
     step_size_section(args.runs, args.episodes, tuple(args.step_sizes))
     crossing_section(args.expected_step, args.expected_steps, args.rate_steps)
     size_section(tuple(args.sizes), args.expected_step, args.rate_steps)
 
     print(
-        "\nThe correction does not merely stay bounded. At a discount of a half "
-        "it\nreaches the answer. At 0.99 the last direction it has to remove "
-        "decays at a\nrate that goes with one minus the discount, so the same "
-        "run is still at 1.9\nafter two hundred thousand steps."
+        "\nWhat is left at 0.99 is one direction, in which every state's estimate "
+        "is\nthe same number. A constant estimate creates an error of one minus "
+        "the\ndiscount times that constant, so at 0.99 the last direction goes a "
+        "hundred\ntimes more slowly than at 0.5. --episodes 200 leaves it at 1.85."
     )
     print(f"\nTook {time.perf_counter() - started:.0f}s.")
     return 0

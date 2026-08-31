@@ -207,6 +207,33 @@ class TestTheReport:
         assert "The crossing" in printed
         assert "closed form" in printed
 
+    def test_the_first_table_runs_both_sides_of_the_crossing(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # The point of the second pair of rows is that nothing but the
+        # discount is different, so a report with only the first pair would
+        # leave the reader to take that on trust.
+        self._run(script, monkeypatch, "--sizes", "6")
+        first = capsys.readouterr().out.split("It is not the step size")[0]
+        assert first.count("linear-td") == 2
+        assert first.count("gradient-td") == 2
+        assert "0.99" in first
+        assert "0.5" in first
+
+    def test_the_discounts_it_was_given_are_the_ones_it_runs(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self._run(script, monkeypatch, "--sizes", "6", "--discounts", "0.7")
+        first = capsys.readouterr().out.split("It is not the step size")[0]
+        assert first.count("linear-td") == 1
+        assert "0.7" in first
+
     def test_the_step_sizes_it_was_given_are_the_ones_it_sweeps(
         self,
         script: ModuleType,
