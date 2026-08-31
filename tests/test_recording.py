@@ -14,10 +14,13 @@ import pytest
 
 from rel.agents.base import Transition
 from rel.agents.td import QLearning
+from rel.core import encoded
 from rel.envs.classic import cliff_walk
+from rel.envs.pendulum import Pendulum
 from rel.recording import (
     FORMAT,
     Recorder,
+    Recording,
     RecordingError,
     parse,
     read_run,
@@ -82,7 +85,7 @@ class TestReadingItBack:
     def test_every_step_comes_back(self) -> None:
         got = parse(a_file())
         assert len(got.steps) == len(WALK)
-        assert got.steps[0].action == 0
+        assert got.steps[0].action == "0"
         assert got.steps[2].reward == -100.0
         assert got.steps[3].terminated
 
@@ -226,3 +229,61 @@ class TestFiles:
         path.write_bytes(b"\x1f\x8b" + b"not really")
         with pytest.raises(RecordingError, match="not readable gzip"):
             read_run(path)
+
+
+class TestAnActionThatIsANumber:
+    """A recording of the one environment whose action is a point in a box.
+
+    Writing worked and reading did not. The action went into the file through
+    an f-string, so a tuple of floats was written the way Python prints one,
+    and reading it back called `int` on `(-0.56594900867572,)`. The file was
+    made by the command that offers to make it and no command could read it.
+    """
+
+    @staticmethod
+    def _recorded() -> tuple[Recording, list[tuple[float, ...]]]:
+        env = Pendulum(Rng(1).stream("env"))
+        recorder = Recorder()
+        taken: list[tuple[float, ...]] = []
+        observation = env.reset()
+        policy = Rng(2).stream("policy")
+        for _ in range(5):
+            action = env.action_space.sample(policy)
+            taken.append(action)
+            outcome = env.step(action)
+            recorder.add(
+                Transition(
+                    observation,
+                    action,
+                    outcome.reward,
+                    outcome.observation,
+                    outcome.terminated,
+                    outcome.truncated,
+                )
+            )
+            observation = outcome.observation
+        return parse(write(recorder, environment="pendulum")), taken
+
+    def test_it_reads_back(self) -> None:
+        found, taken = self._recorded()
+        assert len(found.steps) == len(taken) == 5
+
+    def test_every_action_is_the_one_that_was_taken(self) -> None:
+        found, taken = self._recorded()
+        for step, action in zip(found.steps, taken, strict=True):
+            assert step.action == encoded(action)
+            assert float(step.action) == pytest.approx(action[0], rel=1e-11)
+
+    def test_it_is_written_the_way_everything_else_is(self) -> None:
+        # Python prints a float to seventeen digits and `encoded` gives the
+        # twelve a digest uses, so a file that kept seventeen would hold a
+        # spelling nothing else in the project uses.
+        found, taken = self._recorded()
+        assert found.steps[0].action != str(taken[0])
+        assert len(found.steps[0].action) < len(str(taken[0]))
+
+    def test_a_whole_number_still_spells_as_itself(self) -> None:
+        # Which is why no digest of any run made before this moved.
+        assert encoded(3) == "3"
+        assert encoded(0) == "0"
+        assert encoded(-2) == "-2"

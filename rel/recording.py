@@ -88,7 +88,7 @@ class Recorder(Digest):
         super().__init__()
         self._kept: list[str] = []
 
-    def add(self, transition: Transition[Any, int]) -> None:
+    def add(self, transition: Transition[Any, Any]) -> None:
         super().add(transition)
         self._kept.append(
             digest_line(transition).rstrip("\n")
@@ -103,10 +103,16 @@ class Recorder(Digest):
 
 @dataclass(frozen=True, slots=True)
 class RecordedStep:
-    """One step of a recording. The observations are the text they were written as."""
+    """One step of a recording, as the text it was written as.
+
+    The action is text for the same reason the observations are. It is a whole
+    number on every environment here but one, and a tuple of floats on that
+    one, and reading it back as either would be a second spelling of what the
+    file holds.
+    """
 
     observation: str
-    action: int
+    action: str
     reward: float
     terminated: bool
     truncated: bool
@@ -210,7 +216,7 @@ def _step(line: str, number: int, where: str) -> RecordedStep:
     try:
         return RecordedStep(
             observation=observation,
-            action=int(action),
+            action=action,
             reward=float(reward),
             terminated=flags[0] == "1",
             truncated=flags[1] == "1",
@@ -311,7 +317,7 @@ def read_run(path: str | Path, *, check: bool = True) -> Recording:
     return parse(raw.decode("utf-8"), where=str(found), check=check)
 
 
-def watched(steps: Iterable[Transition[Any, int]]) -> Recorder:
+def watched(steps: Iterable[Transition[Any, Any]]) -> Recorder:
     """A recorder that has already seen these steps. For tests and for replay."""
     recorder = Recorder()
     for step in steps:

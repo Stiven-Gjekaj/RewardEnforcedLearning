@@ -41,17 +41,23 @@ from rel.core import DIGEST_FIGURES, Env, encoded
 from rel.metrics import Summary, last_mean, summarise
 
 
-def digest_line(transition: Transition[Any, int]) -> str:
+def digest_line(transition: Transition[Any, Any]) -> str:
     """The one line of text that stands for a transition.
 
     This is what the digest hashes, and `rel.recording` writes a file whose
     step lines are built from the same pieces. Two ways of spelling one
     transition would be two digests, and the file would be checkable against
     only one of them.
+
+    The action goes through `encoded` for the same reason the observations do.
+    A whole number spells the same either way, so no digest of a run made
+    before this moves. A point in a box does not: Python writes a tuple of
+    floats to seventeen digits each, and `rel.recording` could write a file
+    that it could not read back.
     """
     return (
         f"{encoded(transition.observation)}"
-        f"|{transition.action}"
+        f"|{encoded(transition.action)}"
         f"|{transition.reward:.{DIGEST_FIGURES}g}"
         f"|{int(transition.terminated)}{int(transition.truncated)}\n"
     )
@@ -66,7 +72,7 @@ class Digest:
         self._hash = hashlib.blake2b(digest_size=8)
         self._steps = 0
 
-    def add(self, transition: Transition[Any, int]) -> None:
+    def add(self, transition: Transition[Any, Any]) -> None:
         self._steps += 1
         self._hash.update(digest_line(transition).encode("ascii"))
 
