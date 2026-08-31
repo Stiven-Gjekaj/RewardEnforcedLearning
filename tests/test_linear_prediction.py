@@ -5,9 +5,8 @@ table of one hot rows a linear predictor is a tabular one, exactly, and if the
 two ever disagree then the semi-gradient update is wrong and every number
 measured from it is wrong with it.
 
-`TestTheTriad` is the point of the module. It runs the agent on Baird's
-counterexample and reads what happens to its weights, above the discount that
-makes the problem hard and below it.
+`TestTheTriad` is the point of the module. It runs the two agents on the same
+problem from the same start and reads what happens to their weights.
 """
 
 from __future__ import annotations
@@ -17,7 +16,12 @@ from functools import cache
 import pytest
 
 from rel.agents.base import Transition
-from rel.agents.linear_prediction import LinearPredictor, SemiGradientTD, fixed
+from rel.agents.linear_prediction import (
+    GradientTD,
+    LinearPredictor,
+    SemiGradientTD,
+    fixed,
+)
 from rel.agents.lookup import Lookup
 from rel.agents.prediction import TemporalDifference
 from rel.envs.baird import STARTING_WEIGHTS, Baird
@@ -266,6 +270,80 @@ class TestTheSemiGradientUpdate:
         assert corrected.value(0) == pytest.approx(2.0 * alone.value(0))
 
 
+class TestTheGradientCorrection:
+    def test_the_helper_starts_at_nothing(self) -> None:
+        agent = GradientTD(Rng(1).stream("agent"), TWO, Lookup(ONE_HOT), EVEN)
+        assert agent.helper == [0.0, 0.0, 0.0]
+
+    def test_a_negative_helper_step_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="not negative"):
+            GradientTD(
+                Rng(1).stream("agent"),
+                TWO,
+                Lookup(ONE_HOT),
+                EVEN,
+                helper_step=-0.1,
+            )
+
+    def test_with_no_helper_step_it_is_the_semi_gradient_update(self) -> None:
+        # The helper never moves off zero, so the correction it supplies is
+        # zero, so the first update is the one the other agent makes.
+        held = GradientTD(
+            Rng(1).stream("agent"),
+            TWO,
+            Lookup(ONE_HOT),
+            EVEN,
+            helper_step=0.0,
+            step_size=0.4,
+            discount=0.8,
+        )
+        plain = a_predictor(step_size=0.4, discount=0.8)
+        for transition in [step(0, 0, 1.0, 1), step(1, 1, 2.0, 2)] * 3:
+            held.observe(transition)
+            plain.observe(transition)
+        assert held.helper == [0.0, 0.0, 0.0]
+        assert held.weights == plain.weights
+
+    def test_the_helper_moves_towards_the_error(self) -> None:
+        agent = GradientTD(
+            Rng(1).stream("agent"),
+            TWO,
+            Lookup(ONE_HOT),
+            EVEN,
+            helper_step=0.5,
+            step_size=0.0,
+        )
+        # No step size on the weights, so the error stays at the reward and
+        # only the helper moves. Half of the gap, on a feature of one.
+        agent.observe(step(0, 0, 4.0, 1))
+        assert agent.helper == pytest.approx([2.0, 0.0, 0.0])
+        agent.observe(step(0, 0, 4.0, 1))
+        assert agent.helper == pytest.approx([3.0, 0.0, 0.0])
+
+    def test_the_correction_lands_on_the_next_states_features(self) -> None:
+        # This is the whole difference between the two methods, so it is
+        # checked by putting a helper in by hand and reading where it lands.
+        agent = GradientTD(
+            Rng(1).stream("agent"),
+            TWO,
+            Lookup(ONE_HOT),
+            EVEN,
+            helper_step=0.0,
+            step_size=0.5,
+            discount=0.6,
+        )
+        agent.helper[:] = [2.0, 0.0, 0.0]
+        agent.observe(step(0, 0, 0.0, 1))
+        assert agent.weights[0] == pytest.approx(0.0)
+        assert agent.weights[1] == pytest.approx(-0.5 * 0.6 * 2.0)
+
+    def test_what_it_learned_names_both_vectors(self) -> None:
+        agent = GradientTD(Rng(1).stream("agent"), TWO, Lookup(ONE_HOT), EVEN)
+        agent.weights[:] = [1.0, 0.0, 0.0]
+        agent.helper[:] = [0.0, 2.0, 0.0]
+        assert list(agent.learned()) == ["weights|1,0,0", "helper|0,2,0"]
+
+
 @cache
 def on_baird(
     which: str, episodes: int, discount: float = 0.99, seed: int = 1
@@ -278,7 +356,7 @@ def on_baird(
     """
     env = Baird(Rng(seed).stream("env"))
     coder = Lookup(env.feature_rows)
-    cls = {"semi-gradient": SemiGradientTD}[which]
+    cls = {"semi-gradient": SemiGradientTD, "gradient": GradientTD}[which]
     agent: LinearPredictor[int] = cls(
         Rng(seed).stream("agent"),
         env.action_space,
@@ -304,9 +382,17 @@ class TestTheTriad:
         late = on_baird("semi-gradient", 20)[0]
         assert late > early * 1e6
 
+    def test_the_correction_stops_it(self) -> None:
+        assert on_baird("gradient", 20)[0] < 10.0
+
     def test_the_two_start_from_the_same_place(self) -> None:
         # Nothing about the start explains the difference between them.
         assert max(STARTING_WEIGHTS) == 10.0
+
+    def test_the_answer_is_zero_and_the_correction_moves_towards_it(self) -> None:
+        # At a discount of a half the last slow direction is not slow, so the
+        # value error reaches nothing rather than merely staying bounded.
+        assert on_baird("gradient", 20, discount=0.5)[1] < 1e-6
 
     def test_the_semi_gradient_agent_settles_below_the_threshold(self) -> None:
         # The same three ingredients, the same features, the same start. Only
@@ -339,3 +425,4 @@ class TestTheTriad:
     def test_the_divergence_is_not_one_seed(self) -> None:
         for seed in (1, 2, 3):
             assert on_baird("semi-gradient", 10, seed=seed)[0] > 1e8, seed
+            assert on_baird("gradient", 10, seed=seed)[0] < 10.0, seed

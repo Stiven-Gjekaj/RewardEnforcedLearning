@@ -15,8 +15,8 @@ it takes are known:
 
 Any two of the three are safe. All three together are the **deadly triad**, and
 `rel.envs.baird` is seven states that pay nothing on which `SemiGradientTD`
-below diverges: its weights grow without limit on a problem whose answer is
-zero and whose answer it can represent exactly.
+below diverges. `GradientTD` is the same problem with one term added, and it
+does not.
 
 ## The step size means the same thing here as everywhere else
 
@@ -257,7 +257,94 @@ class SemiGradientTD(LinearPredictor[ObsT]):
             self.weights[index] += change * value
 
 
+class GradientTD(LinearPredictor[ObsT]):
+    """The same update with the missing term put back. Called TDC.
+
+    Semi-gradient TD follows the gradient of half the squared error and drops
+    the part of it that runs through the next state's value. Off-policy that
+    dropped part is what stops the correction coming back, and the fix is to
+    estimate it and subtract it.
+
+        w <- w + step * rho * (error * x - discount * x' * (x . helper))
+        helper <- helper + helper_step * rho * (error - x . helper) * x
+
+    `helper` is a second weight vector the same length as the first. It is a
+    running estimate of the error as a linear function of the features, and it
+    is the only new state this method carries.
+
+    The cost is one more vector and one more step size. What it buys is
+    convergence off-policy, on the same problem, from the same start, and
+    `docs/algorithms.md` measures both.
+    """
+
+    def __init__(
+        self,
+        rng: Rng,
+        actions: Discrete,
+        coder: Coder[ObsT],
+        behaviour: Policy[ObsT],
+        target: Policy[ObsT] | None = None,
+        *,
+        helper_step: float = 0.25,
+        step_size: float | Schedule = 0.05,
+        discount: float = 1.0,
+        start_value: float = 0.0,
+    ) -> None:
+        super().__init__(
+            rng,
+            actions,
+            coder,
+            behaviour,
+            target,
+            step_size=step_size,
+            discount=discount,
+            start_value=start_value,
+        )
+
+        if helper_step < 0.0:
+            raise ValueError("The helper step size is not negative.")
+
+        self.helper_step = helper_step
+        self.helper: list[float] = [0.0] * self.coder.features
+
+    def learned(self) -> Iterator[str]:
+        # Both vectors, and each says which it is. Run together, an agent that
+        # had learned a thing in one would match one that learned it in the
+        # other.
+        yield from rows_of({"weights": self.weights})
+        yield from rows_of({"helper": self.helper})
+
+    def _learn(self, here: Encoded, ahead: Encoded, rho: float, error: float) -> None:
+        indices, values = here
+        step = self.current_step_size(values)
+
+        # How much of the error the helper already explains at this state. It
+        # is read before either vector moves, because both updates use it.
+        explained = sum(
+            self.helper[index] * value
+            for index, value in zip(indices, values, strict=True)
+        )
+
+        for index, value in zip(indices, values, strict=True):
+            self.weights[index] += step * rho * error * value
+
+        # The correction, which lands on the features of the next state rather
+        # than this one. That is the whole difference between the two methods.
+        pull = step * rho * self.discount * explained
+        for index, value in zip(*ahead, strict=True):
+            self.weights[index] -= pull * value
+
+        # Divided by the same squared length as the other step size, so both
+        # settings mean a share of what they move rather than a number whose
+        # right size depends on the coder. They are otherwise independent:
+        # neither one is a multiple of the other.
+        change = self.shared_out(self.helper_step, values) * rho * (error - explained)
+        for index, value in zip(indices, values, strict=True):
+            self.helper[index] += change * value
+
+
 __all__ = [
+    "GradientTD",
     "LinearPredictor",
     "Policy",
     "SemiGradientTD",
