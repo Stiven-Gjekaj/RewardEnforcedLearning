@@ -11,13 +11,42 @@ questions. Everything here that has a number behind it says what was measured.
 
 ## Not built yet
 
-| | What it would add | Why it is not here |
-| --- | --- | --- |
-| Continuous actions | Half of control, and everything about robotics | The whole action interface here is `Discrete`. This is a large change and it should be a large change |
+Nothing, for the first time since this page was written. The one entry that
+was here was continuous actions, and it is below.
+
+That is a statement about this table rather than about the subject. Plenty is
+missing: a policy gradient method that works on a hard problem, an
+environment with images, a replay buffer that samples by priority. None of
+those is written here, because a list of everything not built is a list of
+the subject.
 
 ---
 
 ## Built since that table was written
+
+**Continuous actions**, as `pendulum`, `pendulum-levels` and
+`gaussian-actor-critic`. The entry above said the whole action interface was
+`Discrete` and that changing it should be a large change. It was: `Env` and
+`Agent` both carry a second type parameter now, `DiscreteEnv` and
+`DiscreteAgent` are those classes with it filled in, and every one of the
+thirty six agents that came before is one of the second kind.
+
+What the track measured is not what it set out to. The plan was that cutting a
+box into levels costs something and the question was how much. It costs
+nothing at a large budget and it costs a great deal at a small one, in both
+directions: at three hundred episodes a switch beats seventeen levels by 570
+return and at nine hundred nine levels beats the switch by 217.
+
+The continuous agent does not solve the pendulum. Neither does the discrete
+actor critic on the same problem cut into levels, and both are behind acting
+at random, while the agents that keep a value and rank it learn it. That is
+the second environment on which the reading is the same, and the first is
+already on the algorithms page under the cart pole.
+
+Two faults came out of building it. A recording of a continuous run could be
+written and not read back, because the action went into the file through an f
+string and came out through `int`. And a demonstration printed a torque to
+seventeen digits, which pushes the reward off a narrow terminal.
 
 **The deadly triad**, as `baird`, `linear-td` and `gradient-td`. Function
 approximation, bootstrapping and off-policy learning were all here separately
