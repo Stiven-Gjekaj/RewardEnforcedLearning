@@ -96,11 +96,15 @@ RUNNING_AWAY = 1e-3
 def starting_weights(env: Baird) -> list[float]:
     """Ones everywhere, with a ten on the lower state's own weight.
 
-    `STARTING_WEIGHTS` is this at six upper states, and this is what it means
-    at any other number, so the run at another size starts from the same shape
-    rather than from the first few numbers of a vector written for six.
+    `rel.envs.baird.STARTING_WEIGHTS` is this at six upper states, and this is
+    what it means at any other number, so a run at another size starts from
+    the same shape rather than from the first few numbers of a vector written
+    for six.
+
+    The length comes from the table rather than from the number of states,
+    because the table is what the weights are for.
     """
-    weights = [1.0] * (env.upper + 2)
+    weights = [1.0] * len(env.feature_rows[0])
     weights[env.lower] = 10.0
     return weights
 
@@ -243,7 +247,11 @@ def growth_rate(env: Baird, discount: float, step: float, steps: int) -> float:
     weights = starting_weights(env)
     spread = visits(env)
 
-    counted = steps // 2
+    # At least one step is counted however few were asked for, because a run
+    # of one step halves to none and the rate would be divided by nothing.
+    counted = max(1, steps // 2)
+    first = steps - counted
+
     grown = 0.0
     for number in range(steps):
         change = expected_change(env, coder, spread, weights, discount)
@@ -251,7 +259,12 @@ def growth_rate(env: Baird, discount: float, step: float, steps: int) -> float:
             weight + step * moved for weight, moved in zip(weights, change, strict=True)
         ]
         largest = max(abs(weight) for weight in weights)
-        if number >= counted:
+        if largest == 0.0:
+            # Every weight is exactly zero, which is the opposite of running
+            # away and is as far from it as a run can get. Nothing can be
+            # scaled back to a largest of one from here.
+            return -math.inf
+        if number >= first:
             grown += math.log(largest)
         weights = [weight / largest for weight in weights]
 

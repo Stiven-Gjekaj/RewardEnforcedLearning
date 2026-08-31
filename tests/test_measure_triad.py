@@ -139,6 +139,29 @@ class TestTheExpectedUpdate:
         assert "steps // 2" in body_of("growth_rate")
 
 
+class TestTheRateWhenThereIsLittleToRead:
+    def test_a_single_step_is_still_a_rate(self, script: ModuleType) -> None:
+        # One step halves to none, and a rate divided by no steps at all
+        # would be a crash rather than an answer.
+        rate = script.growth_rate(an_environment(), 0.99, script.EXPECTED_STEP, 1)
+        assert rate == pytest.approx(rate)
+
+    def test_weights_that_are_all_zero_are_the_opposite_of_running_away(
+        self, script: ModuleType, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A vector of zeros cannot be scaled back to a largest of one.
+
+        Nothing reaches it from the start this script uses, and the rate is
+        read by scaling the weights after every step, so the one input that
+        cannot be scaled is worth an answer rather than a division by zero.
+        """
+        monkeypatch.setattr(
+            script, "starting_weights", lambda env: [0.0] * len(env.feature_rows[0])
+        )
+        rate = script.growth_rate(an_environment(), 0.99, script.EXPECTED_STEP, 4)
+        assert rate == float("-inf")
+
+
 class TestTheCrossingAgreesWithTheArithmetic:
     @pytest.mark.parametrize("upper", [5, 6, 10])
     def test_the_measured_crossing_matches_the_closed_form(
