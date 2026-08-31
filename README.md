@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-3067_passing-427819?style=for-the-badge" alt="3067 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-3071_passing-427819?style=for-the-badge" alt="3071 tests passing"/>
 </p>
 
 <p align="center">
@@ -206,11 +206,12 @@ the path digest rather than trusting it.
 - **A random walk.** One of two environments here whose values are arithmetic
   rather than another computation, which is what makes a prediction checkable
   against the answer.
-- **A bet on a coin.** The other one. A fair coin makes it a fair game, so a
-  capital is worth that capital over the goal however it is staked, and the
-  sweep agrees to 1.6e-12. At a fair coin every stake is as good as every
-  other, so the famous picture of its policy is a picture of a tie breaking
-  rule.
+- **A bet on a coin.** The other one, and it has two. A fair coin makes it a
+  fair game, so a capital is worth that capital over the goal however it is
+  staked. A favourable coin makes staking one at a time the best play, so it
+  is the gambler's ruin formula. The sweep agrees with both. At a fair coin
+  every stake is as good as every other, so the famous picture of its policy
+  is a picture of a tie breaking rule.
 - **Two car parks and a van.** The one model here that is a distribution
   rather than a handful of branches written out. Requests and returns are
   Poisson, and the two questions it answers exactly are what the van buys and
@@ -393,15 +394,15 @@ $ python scripts/lines.py
 | Area | Files | Lines |
 | --- | ---: | ---: |
 | Core | 5 | 937 |
-| Environments | 14 | 4057 |
-| Agents | 28 | 8811 |
+| Environments | 14 | 4082 |
+| Agents | 28 | 8826 |
 | Network | 4 | 782 |
 | Running | 6 | 1301 |
 | Interface | 6 | 1022 |
 | Command line | 3 | 1674 |
-| **Total** | **66** | **18584** |
+| **Total** | **66** | **18624** |
 
-Not counting 24553 lines of tests and 6349 of measurement scripts. The command
+Not counting 24593 lines of tests and 6349 of measurement scripts. The command
 above prints all of it, and `python scripts/check_numbers.py --doc README.md`
 says whether this table still holds what that command prints.
 
@@ -423,7 +424,7 @@ import statements of every module:
 $ pytest
 ```
 
-3067 tests. Some of what they cover, and why each one is there rather than the
+3071 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A

@@ -7,11 +7,16 @@ reaching the goal from it.
 
 It is here for two reasons.
 
-**It has a closed form, and only at one setting.** A fair coin makes this a
-fair game, so the chance of reaching the goal from a capital is that capital
-over the goal whatever the gambler stakes. That is a check against arithmetic
-rather than against another computation, which is a stronger thing to have, and
-`RandomWalk` is the only other environment here that offers one.
+**It has a closed form, and not at every setting.** A coin that lands heads at
+least half the time gives one. A fair coin makes this a fair game, so the
+chance of reaching the goal is the capital over the goal whatever is staked. A
+favourable coin makes staking one at a time the best play, and the chance of
+reaching the goal that way is the gambler's ruin formula. Below a half neither
+holds: the best play there is bold, and a stake that jumps has no such form.
+
+That is a check against arithmetic rather than against another computation,
+which is a stronger thing to have, and `RandomWalk` is the only other
+environment here that offers one.
 
 **Its famous picture is mostly an artefact.** The optimal policy of this
 problem is drawn in the literature as a jagged staircase, and the jaggedness is
@@ -98,22 +103,42 @@ class Gambler(TabularEnv):
     def true_values(self) -> tuple[float, ...]:
         """The chance of reaching the goal from each capital, played well.
 
-        Worked out rather than swept, and only for a fair coin. A fair game
-        stopped at either end is worth the same however it is played: the
-        chance of reaching the goal from a capital is that capital over the
-        goal, for every stake that is not nothing.
+        Worked out rather than swept, for a coin that lands heads at least half
+        the time.
 
-        A biased coin has no such form. The value there is the fixed point of
-        the Bellman equation and nothing simpler, so this refuses rather than
-        answering a little wrongly. `rel.agents.dp.value_iteration` gives it.
+        A fair game stopped at either end is worth the same however it is
+        played, so the chance is the capital over the goal for every stake that
+        is not nothing.
+
+        A favourable coin is the gambler's ruin formula. Staking one at a time
+        is the best play when the odds are with the gambler, so the value of
+        the best play is the value of that, which is
+
+            (1 - r^k) / (1 - r^N)   with r the odds against over the odds for.
+
+        The sweep says the same to about 1e-10 at a coin of 0.55, and says the
+        best stake really is one at every capital, which is what makes this the
+        value of the best play rather than the value of one policy.
+
+        Below a half there is no such form. The best play there is bold, a
+        stake that jumps rather than steps, and the value is the fixed point of
+        the Bellman equation and nothing simpler. This refuses rather than
+        answering a little wrongly, and `rel.agents.dp.value_iteration` gives
+        it.
         """
-        if self.heads != 0.5:
+        if self.heads < 0.5:
             raise ValueError(
-                f"The closed form is for a fair coin and this one lands heads "
-                f"{self.heads:g} of the time. `rel.agents.dp.value_iteration` "
-                f"gives the values from the model instead."
+                f"The closed form is for a coin that lands heads at least half "
+                f"the time and this one lands heads {self.heads:g} of the time. "
+                f"`rel.agents.dp.value_iteration` gives the values from the "
+                f"model instead."
             )
-        return tuple(state / self.goal for state in range(self.goal + 1))
+        if self.heads == 0.5:
+            return tuple(state / self.goal for state in range(self.goal + 1))
+
+        odds = (1.0 - self.heads) / self.heads
+        bottom = 1.0 - odds**self.goal
+        return tuple((1.0 - odds**state) / bottom for state in range(self.goal + 1))
 
     def values_to_score(self) -> dict[int, float]:
         """The true values of the capitals a gambler can actually hold.

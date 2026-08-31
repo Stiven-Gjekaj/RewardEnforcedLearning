@@ -185,9 +185,49 @@ class TestTheClosedForm:
         )
         assert worst < 1e-9
 
-    def test_a_biased_coin_is_refused_rather_than_answered_wrongly(self) -> None:
-        with pytest.raises(ValueError, match="fair coin"):
+    def test_an_unfavourable_coin_is_refused_rather_than_answered_wrongly(
+        self,
+    ) -> None:
+        # The best play below a half is bold, a stake that jumps rather than
+        # steps, and there is no such form for it.
+        with pytest.raises(ValueError, match="at least half"):
             a_gambler(heads=0.4).true_values()
+
+    def test_a_favourable_coin_is_the_gamblers_ruin_formula(self) -> None:
+        env = a_gambler(goal=100, heads=0.55)
+        odds = 0.45 / 0.55
+        want = [(1.0 - odds**capital) / (1.0 - odds**100) for capital in range(101)]
+        assert env.true_values() == pytest.approx(want)
+
+    def test_the_sweep_agrees_with_it_there_too(self) -> None:
+        env = a_gambler(goal=100, heads=0.55)
+        solved = value_iteration(env, discount=1.0, tolerance=1e-12)
+        truth = env.true_values()
+        worst = max(
+            abs(solved.values[capital] - truth[capital]) for capital in range(1, 100)
+        )
+        assert worst < 1e-8
+
+    def test_the_best_stake_there_really_is_one(self) -> None:
+        """Which is what makes the formula the value of the best play.
+
+        The formula is the value of staking one at a time. It is the value of
+        the best play only if staking one is the best play, and that is
+        measured here rather than assumed: the sweep says the best stake is
+        one at every capital of a hundred.
+        """
+        env = a_gambler(goal=100, heads=0.55)
+        solved = value_iteration(env, discount=1.0, tolerance=1e-12)
+        assert all(
+            env.stake(capital, solved.policy[capital]) == 1 for capital in range(1, 100)
+        )
+
+    def test_the_two_forms_meet_at_a_fair_coin(self) -> None:
+        # The ruin formula has a zero over zero at exactly a half, which is
+        # why the fair case is written out rather than reached by a limit.
+        nearly = a_gambler(goal=100, heads=0.5 + 1e-9).true_values()
+        fair = a_gambler(goal=100, heads=0.5).true_values()
+        assert nearly == pytest.approx(fair, abs=1e-6)
 
     def test_the_endings_are_left_out_of_the_scoring(self) -> None:
         env = a_gambler(goal=20, heads=0.5)
