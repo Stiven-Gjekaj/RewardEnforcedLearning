@@ -11,6 +11,9 @@ runs, and the table in the documentation.
   the best possible return rather than with a number somebody remembered.
 - `continuous` says the observation is real numbers. A table does not fit, and
   an agent needs a tile coder or a network.
+- `continuous-actions` says the action is real numbers as well. Every agent
+  here but one ranks a short list of actions and cannot, and the builder says
+  so rather than failing on a missing attribute.
 - `bandit` says there is one state. The whole problem is which lever to pull.
 - `gaming` says the reward the environment pays is not the thing it wants. Each
   one carries a `reward` or a penalty setting that switches between the
@@ -50,6 +53,7 @@ from rel.envs.gaming import (
     vase_room,
 )
 from rel.envs.gridworld import GridWorld
+from rel.envs.pendulum import Pendulum, pendulum
 from rel.registry import Entry, Registry
 
 ENVIRONMENTS: Registry[Env[Any, Any]] = Registry(
@@ -136,6 +140,12 @@ ENVIRONMENTS: Registry[Env[Any, Any]] = Registry(
             tags=("continuous",),
         ),
         Entry(
+            "pendulum",
+            "A weight on a rod and a motor too weak to lift it in one go.",
+            pendulum,
+            tags=("continuous", "continuous-actions", "endless"),
+        ),
+        Entry(
             "boatrace",
             "A boat paid for touching checkpoints, two of which sit side by side.",
             boat_race,
@@ -164,6 +174,7 @@ __all__ = [
     "GridWorld",
     "KArmedBandit",
     "MountainCar",
+    "Pendulum",
     "Thermostat",
     "VaseRoom",
 ]

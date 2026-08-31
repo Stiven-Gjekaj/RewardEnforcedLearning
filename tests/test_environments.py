@@ -23,15 +23,42 @@ from rel.core import Env, TabularEnv
 from rel.envs import ENVIRONMENTS
 from rel.envs.gridworld import GridWorld
 from rel.rng import Rng
-from rel.spaces import Box, Discrete
+from rel.spaces import Box, Discrete, Space
 from rel.training import train
 
 NAMES = ENVIRONMENTS.names()
-KNOWN_TAGS = frozenset({"bandit", "continuous", "endless", "gaming", "grid", "tabular"})
+KNOWN_TAGS = frozenset(
+    {
+        "bandit",
+        "continuous",
+        "continuous-actions",
+        "endless",
+        "gaming",
+        "grid",
+        "tabular",
+    }
+)
 
 
 def build(name: str, seed: int = 1) -> Env[Any, Any]:
     return ENVIRONMENTS.make(name, Rng(seed).stream("env"))
+
+
+def _every_action(space: Space[Any]) -> list[Any]:
+    """Actions to try, which for a box is its corners and its middle.
+
+    A discrete space is small enough to walk. A box is not, and its edges are
+    where an environment that clamps or divides by a bound goes wrong, so the
+    corners are worth more than any number of samples from the inside.
+    """
+    if isinstance(space, Discrete):
+        return list(space)
+
+    assert isinstance(space, Box)
+    middle = [
+        (low + high) / 2.0 for low, high in zip(space.low, space.high, strict=True)
+    ]
+    return [tuple(space.low), tuple(space.high), tuple(middle)]
 
 
 def walk(env: Env[Any, Any], policy: Rng, steps: int) -> list[tuple[Any, float]]:
@@ -39,7 +66,7 @@ def walk(env: Env[Any, Any], policy: Rng, steps: int) -> list[tuple[Any, float]]
     path: list[tuple[Any, float]] = []
     env.reset()
     for _ in range(steps):
-        outcome = env.step(policy.below(env.action_space.n))
+        outcome = env.step(env.action_space.sample(policy))
         path.append((outcome.observation, outcome.reward))
         if outcome.done:
             env.reset()
@@ -88,7 +115,11 @@ class TestEveryEnvironment:
     def test_it_builds_from_a_seeded_stream(self, name: str) -> None:
         env = build(name)
         assert env.spec.name
-        assert env.action_space.n >= 2
+        if isinstance(env.action_space, Discrete):
+            assert env.action_space.n >= 2
+        else:
+            assert isinstance(env.action_space, Box)
+            assert env.action_space.dimensions >= 1
 
     def test_the_first_observation_is_inside_the_space(self, name: str) -> None:
         env = build(name)
@@ -112,7 +143,7 @@ class TestEveryEnvironment:
 
     def test_every_action_is_accepted(self, name: str) -> None:
         env = build(name)
-        for action in env.action_space:
+        for action in _every_action(env.action_space):
             env.reset()
             env.step(action)
 
@@ -127,7 +158,7 @@ class TestEveryEnvironment:
         ended = False
         env.reset()
         for _ in range(20_000):
-            outcome = env.step(policy.below(env.action_space.n))
+            outcome = env.step(env.action_space.sample(policy))
             if outcome.terminated:
                 ended = True
                 break
@@ -175,10 +206,11 @@ class TestEveryEnvironment:
 
     def test_an_episode_can_be_started_again(self, name: str) -> None:
         env = build(name)
+        first = _every_action(env.action_space)[0]
         env.reset()
-        env.step(0)
+        env.step(first)
         env.reset()
-        env.step(0)
+        env.step(first)
 
 
 @pytest.mark.parametrize(
