@@ -57,6 +57,7 @@ from rel.envs.gaming import (
 from rel.envs.gridworld import GridWorld
 from rel.envs.levels import Levels, levelled_pendulum
 from rel.envs.pendulum import Pendulum, pendulum
+from rel.envs.rental import CarRental
 from rel.registry import Entry, Registry
 
 ENVIRONMENTS: Registry[Env[Any, Any]] = Registry(
@@ -141,6 +142,12 @@ ENVIRONMENTS: Registry[Env[Any, Any]] = Registry(
             "The same bet on a fair coin, where every stake is as good.",
             lambda rng: Gambler(rng, heads=0.5),
             tags=("tabular",),
+        ),
+        Entry(
+            "rental",
+            "Two car parks and a van. Requests and returns are Poisson.",
+            CarRental,
+            tags=("tabular", "endless"),
         ),
         Entry(
             "lake",
