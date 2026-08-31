@@ -36,7 +36,7 @@ environments where the reward is not the point_
 **A reinforcement learning laboratory that runs in a terminal and needs
 nothing installed.**
 
-Sixteen environments, thirty two agents, a gradient engine, a dynamic
+Sixteen environments, thirty six agents, a gradient engine, a dynamic
 programming solver that says what the best possible policy is worth, and a
 command line that draws a learning curve out of braille dots.
 
@@ -450,7 +450,7 @@ what it was for.
 
 ## Status
 
-Alpha, and complete enough to be useful. Sixteen environments and thirty two
+Alpha, and complete enough to be useful. Sixteen environments and thirty six
 agents, all of them covered by a suite that runs in about eight minutes with no
 browser, no display and no network.
 

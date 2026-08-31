@@ -199,13 +199,36 @@ def test_the_speller_writes_what_the_readme_writes() -> None:
     ]
 
 
+def counts_of(text: str, noun: str) -> set[str]:
+    """Every count this text gives for this noun, written in words.
+
+    Ten and above only. A smaller number before a plural is usually English
+    rather than a count of a registry: "a difference between two agents" is
+    not a claim about how many agents there are, and "thirty two agents" is.
+    """
+    words = {spelled(number) for number in range(10, 100)}
+    # Every run of whitespace becomes one space first. A count that a line
+    # break falls inside of is still a count, and the readme had one: "thirty
+    # two" ended a line and "agents" began the next.
+    flat = " ".join(text.lower().split())
+    found = set()
+    for match in re.finditer(rf"([a-z]+(?: [a-z]+)?) {noun}\b", flat):
+        if match.group(1) in words:
+            found.add(match.group(1))
+    return found
+
+
 def test_the_readme_counts_the_agents_and_the_environments() -> None:
     """Two more numbers written in words beside a registry that can count.
 
-    They are right today and nothing was holding them. Every other count
-    about this repository has gone stale at least once: the readme said 2083
-    tests where the suite collects 2119, and the untested scripts were
-    eleven in one sentence and twelve in the next.
+    Every count about this repository has gone stale at least once: the readme
+    said 2083 tests where the suite collects 2119, and the untested scripts
+    were eleven in one sentence and twelve in the next.
+
+    **Every place the readme says the count has to agree**, rather than one of
+    them. The first version of this test asked whether the right number
+    appeared anywhere, and under it the readme said thirty two agents in two
+    places and thirty four in a third, and passed.
 
     The registries are imported here rather than at the top of the file,
     because every other test in it reads the source with the parser instead
@@ -216,8 +239,9 @@ def test_the_readme_counts_the_agents_and_the_environments() -> None:
     from rel.envs import ENVIRONMENTS
 
     readme = (PACKAGE.parent / "README.md").read_text()
-    assert f"{spelled(len(ENVIRONMENTS))} environments" in readme, len(ENVIRONMENTS)
-    assert f"{spelled(len(AGENTS))} agents" in readme, len(AGENTS)
+    for noun, size in (("agents", len(AGENTS)), ("environments", len(ENVIRONMENTS))):
+        said = counts_of(readme, noun)
+        assert said == {spelled(size)}, (noun, sorted(said), size)
 
 
 def test_both_documents_count_the_networks() -> None:
