@@ -52,6 +52,7 @@ from rel.agents.dp import FixedPolicyAgent, value_iteration
 from rel.agents.dyna import DynaQ, DynaQPlus
 from rel.agents.explore import as_rule
 from rel.agents.features import encoder_for
+from rel.agents.fourier import FlatSteps, FourierBasis
 from rel.agents.gaussian import GaussianActorCritic
 from rel.agents.linear import SemiGradientQ, SemiGradientSarsa
 from rel.agents.linear_prediction import (
@@ -853,6 +854,46 @@ def _gradient_td(
     )
 
 
+def _fourier(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder:
+    """SARSA or Q-learning over cosine waves.
+
+    There is no `optimism` here, unlike its two neighbours. A Fourier basis
+    has no single weight that makes every point worth the same, so the setting
+    is left off rather than offered and refused: a reader who cannot find it
+    learns what it would have meant, and one who sets it to a number that is
+    then rejected learns only that something went wrong.
+    """
+
+    def build(
+        rng: Rng,
+        env: Env[Any, Any],
+        order: int = 3,
+        scaled_steps: bool = True,
+        step_size: float | Schedule = 0.5,
+        discount: float = 1.0,
+        epsilon: float | Schedule = 0.05,
+    ) -> Agent[Any, Any]:
+        box = getattr(env, "tiling_space", env.observation_space)
+        if not isinstance(box, Box):
+            raise TypeError(
+                f"{env.spec.name} has a {type(box).__name__} observation, and "
+                f"a Fourier basis waves over a Box. This agent needs an "
+                f"environment tagged 'continuous'."
+            )
+        return cls(
+            rng,
+            _whole_numbers(env),
+            FourierBasis(box, order=order)
+            if scaled_steps
+            else FlatSteps(box, order=order),
+            step_size=step_size,
+            discount=discount,
+            epsilon=epsilon,
+        )
+
+    return build
+
+
 def _radial(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder:
     def build(
         rng: Rng,
@@ -1093,6 +1134,18 @@ AGENTS: Registry[Agent[Any, Any]] = Registry(
             "rbf-q",
             "Q-learning over radial basis features.",
             _radial(SemiGradientQ),
+            tags=("linear", "off-policy"),
+        ),
+        Entry(
+            "fourier-sarsa",
+            "SARSA over cosine waves, which need an order and nothing else.",
+            _fourier(SemiGradientSarsa),
+            tags=("linear", "on-policy"),
+        ),
+        Entry(
+            "fourier-q",
+            "Q-learning over cosine waves.",
+            _fourier(SemiGradientQ),
             tags=("linear", "off-policy"),
         ),
         Entry(

@@ -15,12 +15,15 @@ from itertools import pairwise
 
 import pytest
 
+from rel.agents import AGENTS
 from rel.agents.base import Transition
 from rel.agents.fourier import FlatSteps, FourierBasis
 from rel.agents.linear import SemiGradientQ
 from rel.agents.linear_prediction import SemiGradientTD, fixed
+from rel.envs import ENVIRONMENTS
 from rel.rng import Rng
 from rel.spaces import Box, Discrete
+from rel.training import evaluate, train
 
 UNIT = Box([0.0], [1.0])
 SQUARE = Box([0.0, 0.0], [1.0, 1.0])
@@ -323,3 +326,70 @@ class TestItWorksAsACoder:
         # ends of it. That is a fact about the basis rather than about the
         # learning, so it is stated here rather than hidden in a loose bound.
         assert worst_of(4) > 3.0 * fitted(4)
+
+
+class TestTheRegistryEntries:
+    """`fourier-sarsa` and `fourier-q`, beside the tile and radial pairs.
+
+    Added rather than swapped in, as the radial pair was. The point of having
+    three encoders is to compare them, which needs all three to be reachable
+    from the same command.
+    """
+
+    def test_both_are_registered_and_tagged_like_their_neighbours(self) -> None:
+        for name, expected in (
+            ("fourier-sarsa", "on-policy"),
+            ("fourier-q", "off-policy"),
+        ):
+            entry = AGENTS[name]
+            assert set(entry.tags) == {"linear", expected}
+
+    def test_they_build_the_basis_over_the_tiling_space(self) -> None:
+        # The mountain car reports a velocity that can leave its own bounds by
+        # a hair, so it offers a wider box for an encoder to work over.
+        env = ENVIRONMENTS.make("mountaincar", Rng(1).stream("env"))
+        agent = AGENTS.make("fourier-sarsa", Rng(1).stream("agent"), env)
+        assert isinstance(agent.coder, FourierBasis)
+        assert agent.coder.box is env.tiling_space
+
+    def test_the_scaled_steps_are_the_default(self) -> None:
+        # The literature's setting, which `scripts/measure_fourier.py` runs
+        # both ways. A default is a claim about which is better, and that
+        # script is what backs it.
+        env = ENVIRONMENTS.make("mountaincar", Rng(1).stream("env"))
+        agent = AGENTS.make("fourier-sarsa", Rng(1).stream("agent"), env)
+        assert not isinstance(agent.coder, FlatSteps)
+
+    def test_the_settings_can_be_reached_from_the_command_line(self) -> None:
+        env = ENVIRONMENTS.make("mountaincar", Rng(1).stream("env"))
+        agent = AGENTS.make(
+            "fourier-q", Rng(1).stream("agent"), env, order=5, scaled_steps=False
+        )
+        assert isinstance(agent.coder, FlatSteps)
+        assert agent.coder.order == 5
+
+    def test_there_is_no_optimism_to_set(self) -> None:
+        # Its two neighbours have one. A Fourier basis has no single weight
+        # that makes every point worth the same, so the setting is left off
+        # rather than offered and then refused.
+        env = ENVIRONMENTS.make("mountaincar", Rng(1).stream("env"))
+        with pytest.raises(TypeError, match="no setting named 'optimism'"):
+            AGENTS.make("fourier-sarsa", Rng(1).stream("agent"), env, optimism=1.0)
+
+    def test_a_table_of_states_is_refused_rather_than_encoded(self) -> None:
+        env = ENVIRONMENTS.make("cliff", Rng(1).stream("env"))
+        with pytest.raises(TypeError, match="Fourier basis waves over a Box"):
+            AGENTS.make("fourier-sarsa", Rng(1).stream("agent"), env)
+
+    def test_the_mountain_car_gets_out_over_the_waves(self) -> None:
+        # The same bar the other two encoders clear, on the environment all
+        # three are documented against.
+        root = Rng(4)
+        env = ENVIRONMENTS.make("mountaincar", root.stream("env"))
+        agent = AGENTS.make("fourier-sarsa", root.stream("agent"), env, step_size=0.1)
+        train(env, agent, 60, discount=env.spec.suggested_discount)
+
+        watched = evaluate(
+            ENVIRONMENTS.make("mountaincar", Rng(12).stream("env")), agent, 10
+        )
+        assert watched.final() > -400.0
