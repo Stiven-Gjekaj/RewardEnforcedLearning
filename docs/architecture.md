@@ -318,5 +318,7 @@ negative, an untouched entry of zero is the highest number in the table.
 | The one step learners | [`rel/agents/td.py`](../rel/agents/td.py) |
 | The gradient engine | [`rel/nn/autograd.py`](../rel/nn/autograd.py) |
 | A point in a box turned into features | [`rel/agents/tiles.py`](../rel/agents/tiles.py) and [`rel/agents/basis.py`](../rel/agents/basis.py) |
+| A state turned into features, from a table | [`rel/agents/lookup.py`](../rel/agents/lookup.py) |
+| Where the deadly triad diverges | [`rel/envs/baird.py`](../rel/envs/baird.py) and [`rel/agents/linear_prediction.py`](../rel/agents/linear_prediction.py) |
 | The rules about layering | [`tests/test_layering.py`](../tests/test_layering.py) |
 | Whether the documentation still says what the code does | [`scripts/check_numbers.py`](../scripts/check_numbers.py) |

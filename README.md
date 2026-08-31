@@ -346,6 +346,8 @@ rel/agents/         thirty six agents. Never import an environment.
   td.py             SARSA, Q-learning, Expected SARSA, Double Q, n-step
   tiles.py          tile coding, worked out exactly rather than hashed
   basis.py          radial basis features, which have no boundaries
+  lookup.py         features handed in as a table, one row per state
+  linear_prediction.py  prediction over features, and the deadly triad
   explore.py        how an agent picks an action from what it knows
   policy.py         REINFORCE and an actor critic
   average.py        learning with no discount, by subtracting the rate
@@ -371,15 +373,15 @@ $ python scripts/lines.py
 | Area | Files | Lines |
 | --- | ---: | ---: |
 | Core | 5 | 910 |
-| Environments | 8 | 2489 |
-| Agents | 24 | 7062 |
+| Environments | 9 | 2766 |
+| Agents | 26 | 7655 |
 | Network | 4 | 782 |
 | Running | 6 | 1289 |
 | Interface | 6 | 1022 |
 | Command line | 3 | 1658 |
-| **Total** | **56** | **15212** |
+| **Total** | **59** | **16082** |
 
-Not counting 16866 lines of tests and 4450 of measurement scripts. The command
+Not counting 18075 lines of tests and 4881 of measurement scripts. The command
 above prints all of it, and `python scripts/check_numbers.py --doc README.md`
 says whether this table still holds what that command prints.
 

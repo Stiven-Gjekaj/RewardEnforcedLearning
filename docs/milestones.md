@@ -19,6 +19,27 @@ questions. Everything here that has a number behind it says what was measured.
 
 ## Built since that table was written
 
+**The deadly triad**, as `baird`, `linear-td` and `gradient-td`. Function
+approximation, bootstrapping and off-policy learning were all here separately
+and nothing said what happens when they meet. Baird's counterexample is seven
+states that pay nothing, whose answer is zero and whose approximation can say
+zero exactly, and on it `linear-td` reaches a value error of 1e22 in twenty
+thousand steps while `gradient-td` stays at 1.9.
+
+The result worth having is not the divergence, which is in every textbook. It
+is that **the divergence has a discount below which it does not happen**, at
+fifteen seventeenths, and that the number falls as the counterexample grows
+and is above one for four upper states or fewer. `scripts/measure_triad.py`
+finds it by bisecting on a run and `rel.envs.baird` derives the same number
+from the trace of a three by three matrix, and neither reads the other.
+
+Two faults came out of building it. The behaviour policy was a constant of six
+sevenths, which is right at six upper states and leaves the agent three times
+more often in one state than another at twenty, so the closed form described a
+different problem than the run. And the readme said thirty two agents in two
+places and thirty four in a third, because the test that held the count asked
+whether the right number appeared anywhere in the file.
+
 **A command that checks the numbers on the algorithms page.** It runs every
 command that page names, then puts each of its fifty one tables against every
 output and attributes it to the command that accounts for most of its numbers.
