@@ -19,6 +19,46 @@ jobs:
       - name: Check that every relative link resolves
         run: bash scripts/check-links.sh
 
+  numbers:
+    name: Check a subset of the documented numbers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v7
+
+      - name: Install Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      # Every number in docs/algorithms.md comes from a command on the page,
+      # and `scripts/check_numbers.py --all` runs all of them, which is about
+      # three hours. This runs seven of the fast ones, which is about twenty
+      # seconds of work and three tables.
+      #
+      # The subset is named rather than derived, because a rule for "the fast
+      # ones" would have to run everything to apply it. It is also narrower
+      # than "every fast command": a table whose numbers come partly from a
+      # slow command reads as unaccounted for when only the fast half of its
+      # block runs, so the options tables are left to the full run.
+      #
+      # A pattern that matches no command on the page fails the run rather
+      # than quietly checking less, and `tests/test_layering.py` holds these
+      # patterns against the page too, so a renamed script fails locally
+      # before it reaches here.
+      #
+      # `--strict` is what makes this a gate. Without it the script reports a
+      # stale number and exits zero, which is right for a person reading the
+      # report and wrong for a job whose only output is a tick.
+      - name: Run the fast commands and check the tables under them
+        run: |
+          python scripts/check_numbers.py --strict --timeout 300 --only \
+            "rel train dyna-q --env maze" \
+            "rel train td --env walk" \
+            "rel train differential-q" \
+            "measure_prediction.py" \
+            "measure_gambler.py"
+
   gate:
     name: Lint, type check and test on Python ${{ matrix.python }}
     runs-on: ubuntu-latest

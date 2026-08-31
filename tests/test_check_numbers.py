@@ -1988,3 +1988,162 @@ class TestThePageSaysHowMuchOfItselfIsChecked:
         _, claims = script.read(write(tmp_path, page))
         assert claims[0].skipped == []
         assert claims[0].numbers == ["9"]
+
+
+class TestSeveralPatternsAtOnce:
+    """`--only` takes a list, because continuous integration runs a subset.
+
+    One pattern at a time would mean one job per command, and each of those
+    would re-read the page and re-run nothing else. The list is what lets a
+    named handful of fast commands be one run.
+    """
+
+    PAGE = (
+        "```console\n"
+        '$ python -c "print(1.5)"\n'
+        "```\n\n| a |\n| --- |\n| 1.5 |\n\n"
+        "```console\n"
+        '$ python -c "print(2.5)"\n'
+        "```\n\n| b |\n| --- |\n| 2.5 |\n\n"
+        "```console\n"
+        '$ python -c "print(3.5)"\n'
+        "```\n\n| c |\n| --- |\n| 3.5 |\n"
+    )
+
+    def run_with(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        *rest: str,
+    ) -> int:
+        page = tmp_path / "page.md"
+        page.write_text(self.PAGE)
+        monkeypatch.setattr(sys, "argv", ["check_numbers", "--doc", str(page), *rest])
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        return int(script.main())
+
+    def test_one_pattern_runs_one_command(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self.run_with(script, monkeypatch, tmp_path, "--only", "1.5")
+        assert "1 of 1 tables" in capsys.readouterr().out
+
+    def test_two_patterns_run_two(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self.run_with(script, monkeypatch, tmp_path, "--only", "1.5", "3.5")
+        assert "2 of 2 tables" in capsys.readouterr().out
+
+    def test_a_pattern_that_matches_nothing_is_an_error(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Rather than a run that quietly checks less than it was asked to.
+
+        A job that names a subset of the page and one of those names stops
+        matching would keep passing while covering nothing, which is the one
+        way a check like this fails without saying so.
+        """
+        got = self.run_with(script, monkeypatch, tmp_path, "--only", "1.5", "nope")
+        assert got == 1
+        assert "match no command" in capsys.readouterr().out
+
+    def test_every_pattern_matching_is_not_an_error(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        assert self.run_with(script, monkeypatch, tmp_path, "--only", "1.5") == 0
+
+
+class TestStrictFailsOnAStaleNumber:
+    """What makes this script a gate rather than a report.
+
+    Without `--strict` a table nothing accounts for is printed and the run
+    exits zero, which is right for a person reading it and wrong for a job
+    whose whole output is a tick.
+    """
+
+    def run_with(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        page: str,
+        *rest: str,
+    ) -> int:
+        written = tmp_path / "page.md"
+        written.write_text(page)
+        monkeypatch.setattr(
+            sys, "argv", ["check_numbers", "--doc", str(written), "--all", *rest]
+        )
+        monkeypatch.setattr(script, "ROOT", written.parent)
+        return int(script.main())
+
+    RIGHT = '```console\n$ python -c "print(1.5)"\n```\n\n| a |\n| --- |\n| 1.5 |\n'
+    STALE = '```console\n$ python -c "print(1.5)"\n```\n\n| a |\n| --- |\n| 2.5 |\n'
+
+    def test_a_page_that_holds_passes(
+        self, script: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        assert self.run_with(script, monkeypatch, tmp_path, self.RIGHT, "--strict") == 0
+
+    def test_a_stale_number_fails(
+        self, script: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        assert self.run_with(script, monkeypatch, tmp_path, self.STALE, "--strict") == 1
+
+    def test_without_strict_the_same_page_passes(
+        self, script: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        # Which is the behaviour a person wants and a job does not.
+        assert self.run_with(script, monkeypatch, tmp_path, self.STALE) == 0
+
+    def test_a_command_that_ran_out_of_time_fails_it_too(
+        self, script: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        # A subset that cannot finish inside its budget is a subset that
+        # checked nothing, and a job cannot tell that from a tick.
+        slow = (
+            "```console\n"
+            '$ python -c "import time; time.sleep(5); print(1.5)"\n'
+            "```\n\n| a |\n| --- |\n| 1.5 |\n"
+        )
+        got = self.run_with(
+            script, monkeypatch, tmp_path, slow, "--strict", "--timeout", "0.5"
+        )
+        assert got == 1
+
+    def test_it_says_which_of_the_three_went_wrong(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self.run_with(script, monkeypatch, tmp_path, self.STALE, "--strict")
+        printed = capsys.readouterr().out
+        assert "Strict: 1 tables are not wholly accounted for" in printed
+
+    def test_a_page_that_holds_says_so(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self.run_with(script, monkeypatch, tmp_path, self.RIGHT, "--strict")
+        assert "Strict: all 1 tables are accounted for" in capsys.readouterr().out

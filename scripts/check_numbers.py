@@ -636,10 +636,12 @@ def main() -> int:
     parser.add_argument("--doc", default="docs/algorithms.md")
     parser.add_argument(
         "--only",
-        default="",
+        nargs="+",
+        default=[],
+        metavar="TEXT",
         help=(
-            "run only the commands containing this, and report only the "
-            "tables written under one of them. A table whose numbers come "
+            "run only the commands containing one of these, and report only "
+            "the tables written under one of them. A table whose numbers come "
             "from a command elsewhere on the page reads as unaccounted for, "
             "because the command that accounts for it was not run"
         ),
@@ -650,6 +652,18 @@ def main() -> int:
         help="run every command, which takes about three hours",
     )
     parser.add_argument("--list", action="store_true", help="say what would run")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help=(
+            "exit non-zero when a table is not wholly accounted for, or when "
+            "a command runs out of its budget. Without it only a command that "
+            "will not run at all is an error, because a whole run of this page "
+            "is three hours and a person reading the report can tell a stale "
+            "number from a budget that was too small. Continuous integration "
+            "cannot, so the job that runs a subset of the page passes this"
+        ),
+    )
     parser.add_argument("--timeout", type=float, default=900.0)
     parser.add_argument(
         "--cache",
@@ -698,12 +712,31 @@ def main() -> int:
         print()
 
     if args.only:
-        commands = [command for command in commands if args.only in command]
+        wanted = list(args.only)
+        commands = [
+            command for command in commands if any(text in command for text in wanted)
+        ]
         claims = [
             claim
             for claim in claims
-            if any(args.only in command for command in claim.near)
+            if any(text in command for text in wanted for command in claim.near)
         ]
+
+        # A pattern that matches nothing is a pattern nobody meant to write.
+        # Continuous integration runs a named subset of this page, and a
+        # renamed script would otherwise leave the job checking less than it
+        # says without saying so.
+        missed = [
+            text for text in wanted if not any(text in command for command in commands)
+        ]
+        if missed:
+            print(
+                f"{len(missed)} of the {len(wanted)} patterns match no command "
+                f"on this page:"
+            )
+            for text in missed:
+                print(f"  {text!r}")
+            return 1
 
     if args.list or not (args.only or args.all):
         stated = sum(len(claim.numbers) for claim in claims if not claim.exempt)
@@ -894,13 +927,27 @@ def main() -> int:
 
     if broken:
         # A documented command that will not run is a defect whatever the
-        # numbers say, so this is the one thing here worth an exit code. A
-        # command that ran out of time is not: that is this script's budget
-        # rather than anything about the page.
+        # numbers say, so this is the one thing here that is always an error.
+        # A command that ran out of time is not, unless the caller asked for
+        # `--strict`: that is this script's budget rather than anything about
+        # the page, and a person reading the report can see which it was.
         print(f"\n{len(broken)} commands would not run at all:")
         for command in broken:
             print(f"  {command}")
-    return 1 if broken else 0
+
+    if not args.strict:
+        return 1 if broken else 0
+
+    stale = checked - clean
+    if stale or slow or broken:
+        print(
+            f"\nStrict: {stale} tables are not wholly accounted for, "
+            f"{len(slow)} commands\nran out of their budget, and "
+            f"{len(broken)} would not run."
+        )
+        return 1
+    print(f"\nStrict: all {clean} tables are accounted for.")
+    return 0
 
 
 if __name__ == "__main__":

@@ -302,6 +302,40 @@ def test_the_milestones_name_the_scripts_that_have_no_test() -> None:
     assert said == scripts - tested - apart, sorted(said ^ (scripts - tested - apart))
 
 
+def test_continuous_integration_checks_numbers_that_are_really_there() -> None:
+    """The subset the numbers job runs is named rather than derived.
+
+    A rule for "the fast commands" would have to run everything to apply it,
+    so the job names seven patterns instead. A pattern that stops matching,
+    because a script was renamed or a console block was edited, would leave
+    the job checking less than it says while still passing.
+
+    `check_numbers.py` fails a run whose pattern matches nothing, so the job
+    itself catches this too. This catches it here, in a second, rather than
+    after a push.
+    """
+    root = PACKAGE.parent
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text()
+
+    block = workflow.split("--only", 1)
+    assert len(block) == 2, "the numbers job no longer narrows the run"
+    patterns = re.findall(r'"([^"]+)"', block[1].split("gate:")[0])
+    assert patterns, "the numbers job names no commands"
+
+    path = root / "scripts" / "check_numbers.py"
+    spec = importlib.util.spec_from_file_location("check_numbers", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    # Registered before it runs, because the script holds dataclasses and
+    # `@dataclass` looks its own module up by name while the class is built.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+
+    commands, _ = module.read(root / "docs" / "algorithms.md")
+    for pattern in patterns:
+        assert any(pattern in command for command in commands), pattern
+
+
 def test_every_module_is_counted_in_the_size_table() -> None:
     """`scripts/lines.py` is what the readme table is copied from.
 
