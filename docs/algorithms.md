@@ -2703,6 +2703,13 @@ written as a console block.
   what makes a second opinion cheap, and it writes down which commands ran out
   of time so a resumed run does not spend the budget on them again. With every
   command cached the whole page answers in a second.
+- **A command can outrun the default budget.** `python
+  scripts/measure_levels.py` takes about fifteen minutes on its own and longer
+  beside anything else, so the first check of its two tables reported them as
+  accounted for by nothing at all. That reads exactly like a table whose
+  numbers have moved, and the difference is one line further down the report,
+  which names the command and the budget it wanted. `--timeout` is what to
+  reach for before believing the first reading.
 - **893 of 1184 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
