@@ -33,15 +33,16 @@ Eight weights for seven states, laid out so the rows overlap:
     upper state i   worth 2 * w[i] + w[7]
     lower state     worth w[6] + 2 * w[7]
 
-Every state shares `w[7]` with every other, and the lower state leans on it
-twice as hard as any upper one. An update that lowers an upper state's estimate
-pulls `w[7]` down, which lowers the lower state's estimate by twice as much,
-which raises the error that the next update is trying to fix.
+Every state's estimate is made partly of `w[7]`, and the lower state leans on
+it twice as hard as any upper state does. The target of every update is the
+lower state's value, because the target policy always goes there, so an update
+at an upper state moves the target it was aiming at.
 
-That is the whole mechanism. On-policy it does not happen, because the states
-an update reaches are the states the data comes from and the pull comes back.
-Off-policy the data comes from the upper states and the target is about the
-lower one, and nothing comes back.
+That is the whole mechanism. On-policy it does not matter, because the states
+an update reaches are the states the next data comes from, so a target that
+was moved is a target that gets measured again. Off-policy the data is nearly
+all upper states and the target is about the lower one, and nothing comes
+back. `scripts/measure_triad.py` says what it costs.
 
 ## Why the environment carries the features and the policies
 

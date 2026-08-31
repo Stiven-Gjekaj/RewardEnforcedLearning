@@ -1720,10 +1720,15 @@ limitation here.** The behaviour policy dashes six times out of seven and the
 target policy always goes solid, so the data is nearly all about the upper
 states and the question is about the lower one.
 
-That mismatch is the third leg. Every state shares `w[7]`, and the lower state
-leans on it twice as hard as any upper one, so an update that lowers an upper
-state's estimate lowers `w[7]`, which lowers the lower state's estimate by
-twice as much, which raises the error the next update is trying to fix.
+That mismatch is the third leg. Every state's estimate is made partly of one
+shared weight, `w[7]`, and the lower state leans on it twice as hard as any
+upper state does. The target of every update is the lower state's value, so an
+update at an upper state moves the target it was aiming at.
+
+On-policy that is not a problem: the states an update reaches are the states
+the next data comes from, so the target being moved is a target that gets
+measured again. Off-policy the data is nearly all upper states and the target
+is about the lower one, and the correction never arrives.
 
 ### What that does
 

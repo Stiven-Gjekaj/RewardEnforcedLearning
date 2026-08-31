@@ -205,8 +205,9 @@ class LinearPredictor(Agent[ObsT]):
         rho = self.correction(transition)
         if rho == 0.0:
             # The target policy would never have taken this action, so the
-            # step is no evidence about it. Nothing here is an optimisation:
-            # every term of the update carries the ratio.
+            # step is no evidence about it. Every term of the update carries
+            # the ratio, so returning here changes no number and saves the six
+            # steps in seven that Baird's behaviour policy spends dashing.
             return
 
         here = self.coder.encode(transition.observation)
