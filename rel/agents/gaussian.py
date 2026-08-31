@@ -50,10 +50,21 @@ episodes, and none of them is a claim about anything else.
     step size 0.02, spread step 0.01     -1356
     step size 0.01, spread step 0.01     -1424
 
-An entropy bonus does not help here. At 0.01 it is level, at 0.05 it is worse,
-and at 0.2 the spread runs away to thirteen on a box four wide. So the default
-is none, and the setting stays because the discrete actor critic needs one on
-the cart pole and the reason is the same.
+An entropy bonus does not help here, over the same three seeds:
+
+    none      -1092    spread ends between 0.37 and 0.96
+    0.01      -1414    spread ends between 0.55 and 1.06
+    0.05      -1394    spread ends between 1.14 and 1.76
+    0.2       -1378    spread ends between 10.2 and 17.2
+
+Every setting of it is worse than none, and at 0.2 the spread ends past ten on
+a box four wide, which is a policy drawing torques it can never use. So the
+default is none, and the setting stays because the discrete actor critic needs
+one on the cart pole and the reason there is the same one.
+
+**The first reading of that sweep was one seed and it said 0.01 was level.**
+Three seeds say it costs 322 return. One seed of a run whose spread ends
+anywhere between 0.37 and 0.96 is not a measurement.
 
 **None of those numbers is a policy that solved anything.** Doing nothing at
 all scores -1187 on this problem. `docs/algorithms.md` has what does work on

@@ -375,12 +375,12 @@ $ python scripts/lines.py
 | --- | ---: | ---: |
 | Core | 5 | 937 |
 | Environments | 11 | 3124 |
-| Agents | 27 | 8105 |
+| Agents | 27 | 8116 |
 | Network | 4 | 782 |
 | Running | 6 | 1301 |
 | Interface | 6 | 1022 |
 | Command line | 3 | 1674 |
-| **Total** | **62** | **16945** |
+| **Total** | **62** | **16956** |
 
 Not counting 19319 lines of tests and 5075 of measurement scripts. The command
 above prints all of it, and `python scripts/check_numbers.py --doc README.md`
