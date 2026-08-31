@@ -95,6 +95,26 @@ with it. The second has a habit of turning into an agent that looks broken.
 
 ---
 
+## What an action is, is a parameter
+
+`Env` and `Agent` both carry two of them: what is handed back, and what is
+accepted. Almost everything here accepts a whole number and says so by
+subclassing `DiscreteEnv` or `DiscreteAgent`, which are the same classes with
+the second parameter filled in.
+
+That is where the narrowing lives. Everything written against `Env` and
+`Agent` is written without knowing what an action is, and everything that
+counts the actions or subtracts the start of their space inherits the right to
+from one of those two.
+
+The pendulum is the one environment whose action is a point in a box, and
+`rel/agents/gaussian.py` is the one agent that can take it. Any other agent
+asked for it is refused in the builder, where the message can name the
+environment and say what kind of agent it needs, rather than deeper in where
+it would be an attribute error.
+
+---
+
 ## An environment can describe itself
 
 `TabularEnv` adds one method: `transitions(state, action)`, giving every branch
@@ -313,6 +333,8 @@ negative, an untouched entry of zero is the highest number in the table.
 | A grid, and the presets built from one | [`rel/envs/gridworld.py`](../rel/envs/gridworld.py) |
 | A grid written in a text file | [`rel/envs/gridfile.py`](../rel/envs/gridfile.py) |
 | An action that lasts several steps | [`rel/options.py`](../rel/options.py) |
+| An action that is a number rather than a choice | [`rel/envs/pendulum.py`](../rel/envs/pendulum.py) and [`rel/agents/gaussian.py`](../rel/agents/gaussian.py) |
+| A box of actions cut into a short list | [`rel/envs/levels.py`](../rel/envs/levels.py) |
 | A run written down and read back | [`rel/recording.py`](../rel/recording.py) |
 | Solving exactly | [`rel/agents/dp.py`](../rel/agents/dp.py) |
 | The one step learners | [`rel/agents/td.py`](../rel/agents/td.py) |
