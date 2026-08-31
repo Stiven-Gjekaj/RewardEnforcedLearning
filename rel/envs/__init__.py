@@ -53,6 +53,7 @@ from rel.envs.gaming import (
     vase_room,
 )
 from rel.envs.gridworld import GridWorld
+from rel.envs.levels import Levels, levelled_pendulum
 from rel.envs.pendulum import Pendulum, pendulum
 from rel.registry import Entry, Registry
 
@@ -146,6 +147,12 @@ ENVIRONMENTS: Registry[Env[Any, Any]] = Registry(
             tags=("continuous", "continuous-actions", "endless"),
         ),
         Entry(
+            "pendulum-levels",
+            "The same weight on a rod, with its torque cut into a short list.",
+            levelled_pendulum,
+            tags=("continuous", "endless"),
+        ),
+        Entry(
             "boatrace",
             "A boat paid for touching checkpoints, two of which sit side by side.",
             boat_race,
@@ -173,6 +180,7 @@ __all__ = [
     "CartPole",
     "GridWorld",
     "KArmedBandit",
+    "Levels",
     "MountainCar",
     "Pendulum",
     "Thermostat",

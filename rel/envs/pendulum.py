@@ -22,8 +22,14 @@ boundary across and a network would have to learn its way around.
 ## Why it cannot be lifted in one go
 
 The motor at full torque cannot hold the weight up from horizontal, let alone
-raise it. The only way to the top is to swing: drive one way, let it fall back,
-drive the other way, and add a little energy each time.
+raise it. **Held at full power from the bottom it climbs to 0.659 of the way
+down and stops there**, whichever way it is held and however long: that is the
+angle where the motor exactly balances gravity.
+
+The only way to the top is to swing. Drive one way, let it fall back, drive the
+other way, and add a little energy each time. Full power in whichever direction
+the weight is already moving reaches the top in two hundred steps, and that is
+a policy of one line rather than anything learned.
 
 That makes it the same shape of problem as the mountain car, and a greedy step
 by step reading of it fails for the same reason. What it adds is that the
