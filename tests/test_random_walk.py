@@ -10,6 +10,12 @@ from __future__ import annotations
 
 import pytest
 
+from rel.agents.dp import (
+    evaluate_policy,
+    evaluate_shares,
+    uniform_shares,
+    value_iteration,
+)
 from rel.envs.classic import RandomWalk, long_walk, random_walk
 from rel.rng import Rng
 
@@ -217,3 +223,38 @@ class TestAStepLongerThanOneCell:
             lengths.append(length)
         assert max(lengths) < walk.spec.max_episode_steps
         assert sum(lengths) / len(lengths) < 1000
+
+
+class TestTheWalkOfOneCell:
+    """The smallest walk there is, and the one the default model reads wrongly.
+
+    `TabularEnv.terminal_states` calls a state terminal when every branch out
+    of it says so. A walk of one cell has one cell and both of its branches
+    reach an ending, so the default called the cell an ending too. Dynamic
+    programming then never swept it and reported it worth nothing, where a
+    policy that always goes right from it is worth one.
+    """
+
+    def test_only_the_two_endings_are_endings(self) -> None:
+        walk = RandomWalk(Rng(1).stream("env"), size=1)
+        assert walk.terminal_states() == frozenset({0, 2})
+
+    def test_the_cell_is_worth_a_half_under_the_uniform_policy(self) -> None:
+        walk = RandomWalk(Rng(1).stream("env"), size=1)
+        assert walk.true_values() == pytest.approx((0.0, 0.5, 0.0))
+        assert evaluate_shares(walk, uniform_shares(walk)) == pytest.approx(
+            (0.0, 0.5, 0.0), abs=1e-6
+        )
+
+    def test_always_going_right_from_it_is_worth_one(self) -> None:
+        walk = RandomWalk(Rng(1).stream("env"), size=1)
+        assert evaluate_policy(walk, [1, 1, 1]).values[1] == pytest.approx(1.0)
+
+    def test_the_best_possible_policy_reaches_the_right_ending(self) -> None:
+        walk = RandomWalk(Rng(1).stream("env"), size=1)
+        assert value_iteration(walk).start_value == pytest.approx(1.0)
+
+    def test_every_size_reads_only_its_endings(self) -> None:
+        for size in (1, 2, 3, 9):
+            walk = RandomWalk(Rng(1).stream("env"), size=size)
+            assert walk.terminal_states() == frozenset({0, size + 1}), size

@@ -352,6 +352,22 @@ class RandomWalk(TabularEnv):
     def is_ending(self, state: int) -> bool:
         return state in (0, self.size + 1)
 
+    def terminal_states(self) -> frozenset[int]:
+        """The two endings, and nothing else, whatever the model looks like.
+
+        The default reads the model and calls a state terminal when every
+        branch out of it says so. That is right everywhere but here: a walk of
+        one cell has one cell, both of its branches reach an ending, and the
+        default therefore calls the cell an ending too. Dynamic programming
+        then never sweeps it and reports it worth nothing, where a policy that
+        always goes right from it is worth one.
+
+        A walk of one cell is a small thing to get wrong and it is the
+        smallest walk there is, so it is the one a test of every size reaches
+        first.
+        """
+        return frozenset({0, self.size + 1})
+
     # -- The contract -------------------------------------------------------
 
     def _reset(self) -> int:
