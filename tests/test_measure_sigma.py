@@ -216,7 +216,18 @@ class TestTheSchedule:
         # The book's suggestion: sample early and average late.
         falling = script.falling(100)
         assert falling(0) == pytest.approx(1.0)
-        assert falling(100 * 20) == pytest.approx(0.0)
+        assert falling(100 * script.STEPS_AN_EPISODE) == pytest.approx(0.0)
+
+    def test_it_arrives_before_the_run_ends(self, script: ModuleType) -> None:
+        """On purpose, and the docstring says so.
+
+        The schedule is written in episodes and read on steps, and a cliff
+        walk episode is longer than the estimate. So sigma reaches nothing
+        about half way and the rest of the run is tree backup, which is the
+        suggestion rather than a slower sigma of a half.
+        """
+        falling = script.falling(400)
+        assert falling(14948) == 0.0
 
     def test_it_falls_in_a_straight_line(self, script: ModuleType) -> None:
         falling = script.falling(100)

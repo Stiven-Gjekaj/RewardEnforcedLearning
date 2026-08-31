@@ -71,14 +71,26 @@ def best_possible(grid: str) -> tuple[float, float]:
     return value_iteration(env, discount=discount).start_value, discount
 
 
+#: How many steps an episode of the cliff walk takes, near enough. The sigma
+#: schedule is read on steps and written in episodes, so it needs one, and
+#: `linear` clamps at its end rather than running past it.
+STEPS_AN_EPISODE = 20
+
+
 def falling(episodes: int) -> Schedule:
     """Sigma from one to nothing over the run, which is the book's suggestion.
 
     Read on steps rather than episodes, because that is what `current_sigma`
-    is given, so the length is an estimate of how many steps the run takes
-    rather than how many episodes it has.
+    is given, so the length is an estimate rather than the run.
+
+    It is a low estimate on purpose. Four hundred episodes of the cliff walk
+    at this step size takes about fifteen thousand steps and the schedule is
+    eight thousand long, so sigma reaches nothing about half way through and
+    the second half is tree backup. The alternative is a schedule that never
+    arrives, which would make the row a slower sigma of a half rather than the
+    suggestion it is meant to be.
     """
-    return linear(1.0, 0.0, episodes * 20)
+    return linear(1.0, 0.0, episodes * STEPS_AN_EPISODE)
 
 
 def one_run(
