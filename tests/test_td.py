@@ -14,7 +14,7 @@ import pytest
 
 from rel.agents.base import RandomAgent, Transition
 from rel.agents.td import DoubleQ, ExpectedSarsa, NStepSarsa, QLearning, Sarsa
-from rel.core import Env, EnvSpec, Step
+from rel.core import DiscreteEnv, EnvSpec, Step
 from rel.envs.classic import cliff_walk
 from rel.envs.gridworld import GridWorld
 from rel.rng import Rng
@@ -195,7 +195,7 @@ class TestDoubleQ:
         # the better move, and a maximum taken over ten noisy estimates is
         # above zero for a long time, so Q-learning goes left far more often
         # than it should.
-        class Biased(Env[int]):
+        class Biased(DiscreteEnv[int]):
             def __init__(self, rng: Rng) -> None:
                 super().__init__(rng)
                 self.observation_space = Discrete(3)

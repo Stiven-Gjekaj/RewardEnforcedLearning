@@ -233,7 +233,7 @@ class Record:
 
 
 def run_episode(
-    env: Env[Any],
+    env: Env[Any, Any],
     agent: Agent[Any, Any],
     *,
     learn: bool = True,
@@ -303,7 +303,7 @@ def run_episode(
 
 
 def train(
-    env: Env[Any],
+    env: Env[Any, Any],
     agent: Agent[Any, Any],
     episodes: int,
     *,
@@ -337,7 +337,7 @@ def train(
 
 
 def evaluate(
-    env: Env[Any],
+    env: Env[Any, Any],
     agent: Agent[Any, Any],
     episodes: int,
     *,

@@ -27,14 +27,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from rel.core import Env, EnvSpec, Step
+from rel.core import DiscreteEnv, EnvSpec, Step
 from rel.rng import Rng
 from rel.spaces import Discrete
 
 ONE_STATE = 0
 
 
-class KArmedBandit(Env[int]):
+class KArmedBandit(DiscreteEnv[int]):
     """`arms` levers. Each pays a noisy reward around its own true value."""
 
     def __init__(

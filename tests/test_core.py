@@ -12,12 +12,12 @@ from collections.abc import Mapping, Sequence
 
 import pytest
 
-from rel.core import Env, EnvSpec, Outcome, Step, TabularEnv
+from rel.core import DiscreteEnv, Env, EnvSpec, Outcome, Step, TabularEnv
 from rel.rng import Rng
 from rel.spaces import Discrete
 
 
-class Counter(Env[int]):
+class Counter(DiscreteEnv[int]):
     """Counts up. Action 1 ends the episode, action 0 does not."""
 
     def __init__(self, rng: Rng, limit: int | None = None) -> None:

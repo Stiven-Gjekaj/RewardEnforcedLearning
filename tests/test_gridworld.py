@@ -406,7 +406,7 @@ class TestEveryPreset:
 
     @pytest.mark.parametrize("name", sorted(PRESETS))
     def test_it_obeys_the_environment_contract(self, name: str) -> None:
-        grid: Env[int] = PRESETS[name](Rng(1))
+        grid: Env[int, int] = PRESETS[name](Rng(1))
         assert grid.spec.name
         assert grid.spec.summary.endswith(".")
         with pytest.raises(RuntimeError):

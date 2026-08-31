@@ -30,11 +30,11 @@ NAMES = ENVIRONMENTS.names()
 KNOWN_TAGS = frozenset({"bandit", "continuous", "endless", "gaming", "grid", "tabular"})
 
 
-def build(name: str, seed: int = 1) -> Env[Any]:
+def build(name: str, seed: int = 1) -> Env[Any, Any]:
     return ENVIRONMENTS.make(name, Rng(seed).stream("env"))
 
 
-def walk(env: Env[Any], policy: Rng, steps: int) -> list[tuple[Any, float]]:
+def walk(env: Env[Any, Any], policy: Rng, steps: int) -> list[tuple[Any, float]]:
     """Drive the environment with a random policy and record what came back."""
     path: list[tuple[Any, float]] = []
     env.reset()

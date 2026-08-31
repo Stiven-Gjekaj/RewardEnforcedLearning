@@ -150,14 +150,20 @@ class Outcome:
     terminated: bool
 
 
-class Env(ABC, Generic[ObsT]):
-    """An environment that an agent can act in."""
+class Env(ABC, Generic[ObsT, ActT]):
+    """An environment that an agent can act in.
+
+    Two parameters: what it hands back and what it accepts. Almost every
+    environment here accepts a whole number and says so by subclassing
+    `DiscreteEnv` below, which is the same class with the second parameter
+    already filled in.
+    """
 
     #: The values `reset` and `step` return.
     observation_space: Space[ObsT]
 
-    #: The values `step` accepts. Every environment here has a discrete one.
-    action_space: Discrete
+    #: The values `step` accepts.
+    action_space: Space[ActT]
 
     spec: EnvSpec
 
@@ -174,7 +180,7 @@ class Env(ABC, Generic[ObsT]):
         self._started = True
         return self._reset()
 
-    def step(self, action: int) -> Step[ObsT]:
+    def step(self, action: ActT) -> Step[ObsT]:
         """Take one action and report what happened."""
         if not self._started:
             raise RuntimeError("Call reset() before step().")
@@ -204,7 +210,7 @@ class Env(ABC, Generic[ObsT]):
         """Put the environment into a start state and give the observation."""
 
     @abstractmethod
-    def _step(self, action: int) -> Step[ObsT]:
+    def _step(self, action: ActT) -> Step[ObsT]:
         """Apply one action. Never set `truncated`; the base class does that."""
 
     # -- What the reward does not say ---------------------------------------
@@ -243,7 +249,18 @@ class Env(ABC, Generic[ObsT]):
         return f"{type(self).__name__}(seed={self.rng.seed})"
 
 
-class TabularEnv(Env[int], ABC):
+class DiscreteEnv(Env[ObsT, int], ABC):
+    """An environment whose actions are whole numbers, which is all but one.
+
+    Everything above this line is written without knowing what an action is.
+    Everything below it counts the actions or walks them, which only a discrete
+    space can do, so the narrowing is written down once here.
+    """
+
+    action_space: Discrete
+
+
+class TabularEnv(DiscreteEnv[int], ABC):
     """An environment with a finite state set that can describe its own model.
 
     This is what dynamic programming needs, and it is what makes a claim like
@@ -292,6 +309,7 @@ class TabularEnv(Env[int], ABC):
 __all__ = [
     "DIGEST_FIGURES",
     "NO_INFO",
+    "DiscreteEnv",
     "Env",
     "EnvSpec",
     "ObsT",

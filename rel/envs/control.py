@@ -24,14 +24,14 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 
-from rel.core import Env, EnvSpec, Step
+from rel.core import DiscreteEnv, EnvSpec, Step
 from rel.rng import Rng
 from rel.spaces import Box, Discrete
 
 Observation = tuple[float, ...]
 
 
-class CartPole(Env[Observation]):
+class CartPole(DiscreteEnv[Observation]):
     """A pole hinged on a cart. Push the cart left or right to keep it up.
 
     The state is the position and speed of the cart and the angle and angular
@@ -203,7 +203,7 @@ class CartPole(Env[Observation]):
         )
 
 
-class MountainCar(Env[Observation]):
+class MountainCar(DiscreteEnv[Observation]):
     """An underpowered car in a valley. Rock back and forth to climb out.
 
     The engine cannot climb the hill directly. The only way up is to drive

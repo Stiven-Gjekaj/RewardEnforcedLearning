@@ -69,7 +69,7 @@ def model_steps(agent: object) -> int:
     return 0
 
 
-def exact(env: Env[object], agent: object, discount: float) -> float | None:
+def exact(env: Env[object, object], agent: object, discount: float) -> float | None:
     """What the greedy policy is worth from the model, or `None` if it loops."""
     from rel.agents.base import Agent
 

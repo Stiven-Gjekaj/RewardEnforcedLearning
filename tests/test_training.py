@@ -344,7 +344,7 @@ def test_the_loop_hands_the_agent_the_action_it_returned() -> None:
         def observe(self, transition: Transition[int, int]) -> None:
             assert transition.action == taken[-1]
 
-    env: Env[int] = Corridor(Rng(1))
+    env: Env[int, int] = Corridor(Rng(1))
     run_episode(env, Recording(Rng(1), Discrete(2)))
     assert taken == [1, 1]
 

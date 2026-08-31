@@ -52,7 +52,7 @@ from rel.envs.gaming import (
 from rel.envs.gridworld import GridWorld
 from rel.registry import Entry, Registry
 
-ENVIRONMENTS: Registry[Env[Any]] = Registry(
+ENVIRONMENTS: Registry[Env[Any, Any]] = Registry(
     "environment",
     [
         Entry(

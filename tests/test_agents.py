@@ -63,7 +63,7 @@ DEFAULT_ENVIRONMENT = "cliff"
 INSTEAD = {"mcts": "maze", "linear-td": "baird", "gradient-td": "baird"}
 
 
-def environment_for(name: str, seed: int = 1) -> Env[Any]:
+def environment_for(name: str, seed: int = 1) -> Env[Any, Any]:
     if name in INSTEAD:
         return ENVIRONMENTS.make(INSTEAD[name], Rng(seed).stream("env"))
     entry = AGENTS[name]
