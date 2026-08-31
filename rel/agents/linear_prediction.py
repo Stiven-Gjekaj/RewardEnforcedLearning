@@ -114,6 +114,12 @@ class LinearPredictor(DiscreteAgent[ObsT]):
             coder.starting_weight(start_value)
         ] * coder.features
 
+        #: Read once, and ones when the coder asks for no scaling, both as in
+        #: `rel.agents.linear`. Every coder a predictor here is given says
+        #: none, and the one that does not is a Fourier basis.
+        asked = coder.step_scales()
+        self._scales = (1.0,) * coder.features if asked is None else asked
+
     # -- What it believes ---------------------------------------------------
 
     def worth(self, encoded: Encoded) -> float:
@@ -261,8 +267,10 @@ class SemiGradientTD(LinearPredictor[ObsT]):
     def _learn(self, here: Encoded, ahead: Encoded, rho: float, error: float) -> None:
         indices, values = here
         change = self.current_step_size(values) * rho * error
+
+        scales = self._scales
         for index, value in zip(indices, values, strict=True):
-            self.weights[index] += change * value
+            self.weights[index] += change * value * scales[index]
 
 
 class GradientTD(LinearPredictor[ObsT]):
@@ -326,6 +334,8 @@ class GradientTD(LinearPredictor[ObsT]):
         indices, values = here
         step = self.current_step_size(values)
 
+        scales = self._scales
+
         # How much of the error the helper already explains at this state. It
         # is read before either vector moves, because both updates use it.
         explained = sum(
@@ -334,21 +344,25 @@ class GradientTD(LinearPredictor[ObsT]):
         )
 
         for index, value in zip(indices, values, strict=True):
-            self.weights[index] += step * rho * error * value
+            self.weights[index] += step * rho * error * value * scales[index]
 
         # The correction, which lands on the features of the next state rather
         # than this one. That is the whole difference between the two methods.
+        # Scaled by those features rather than this state's, because it is
+        # their weights it moves.
         pull = step * rho * self.discount * explained
         for index, value in zip(*ahead, strict=True):
-            self.weights[index] -= pull * value
+            self.weights[index] -= pull * value * scales[index]
 
         # Divided by the same squared length as the other step size, so both
         # settings mean a share of what they move rather than a number whose
         # right size depends on the coder. They are otherwise independent:
-        # neither one is a multiple of the other.
+        # neither one is a multiple of the other. Scaled the same way: the
+        # helper is a linear function of the same features, so a wave that
+        # takes a small step in one takes a small step in the other.
         change = self.shared_out(self.helper_step, values) * rho * (error - explained)
         for index, value in zip(indices, values, strict=True):
-            self.helper[index] += change * value
+            self.helper[index] += change * value * scales[index]
 
 
 __all__ = [

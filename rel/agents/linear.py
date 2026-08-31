@@ -93,6 +93,18 @@ class Coder(Protocol[Read]):
     def encode(self, observation: Read) -> Encoded:
         """Which features are on for this observation, and how strongly."""
 
+    def step_scales(self) -> Sequence[float] | None:
+        """A multiplier on the step size of each feature, or none at all.
+
+        `None` means one step for every feature, which is what a tile coder, a
+        radial basis and a lookup table all want: their features are alike, so
+        a step that suits one suits the rest.
+
+        A Fourier basis is the one that is not. Its features are waves and they
+        differ in how fast they wave, so a step that settles the slow ones makes
+        the fast ones swing, and it answers with one over the speed of each.
+        """
+
     def squared_length(self, values: Sequence[float]) -> float:
         """The features of a point dotted with themselves, for the step size."""
 
@@ -129,6 +141,14 @@ class LinearAgent(DiscreteAgent[Observation]):
         self.weights: list[list[float]] = [
             [share] * coder.features for _ in range(actions.n)
         ]
+
+        #: Read once. A coder's answer about its own features does not change,
+        #: and this is asked for on every step of every run. Ones when the
+        #: coder asks for no scaling, so an update is written once rather than
+        #: twice. Multiplying a float by one is exact, so every run this
+        #: project made before there were scales is the run it was.
+        asked = coder.step_scales()
+        self._scales = (1.0,) * coder.features if asked is None else asked
 
     def learned(self) -> Iterator[str]:
         # The weights, one line per action. There is no table of states here:
@@ -173,8 +193,10 @@ class LinearAgent(DiscreteAgent[Observation]):
         row = self.weights[action - self.actions.start]
         indices, values = encoded
         change = self.current_step_size(values) * error
+
+        scales = self._scales
         for index, value in zip(indices, values, strict=True):
-            row[index] += change * value
+            row[index] += change * value * scales[index]
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.coder!r})"

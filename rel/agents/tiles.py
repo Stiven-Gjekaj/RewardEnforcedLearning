@@ -174,6 +174,15 @@ class TileCoder:
         """
         return float(self.grids)
 
+    def step_scales(self) -> Sequence[float] | None:
+        """One step for every feature, which is what alike features want.
+
+        `rel.agents.linear.Coder` says what this is for. A Fourier basis is
+        the only coder here whose features differ in a way a step size has to
+        know about.
+        """
+        return None
+
     def starting_weight(self, optimism: float) -> float:
         """The weight that makes a state nothing is known about worth this.
 

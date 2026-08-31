@@ -411,3 +411,69 @@ class TestTheDigestIsNotStableAcrossPythons:
         agent = AGENTS.make("tile-sarsa", Rng(1).stream("agent"), env)
         train(env, agent, 20, discount=env.spec.suggested_discount)
         assert digest_of(agent) == "c721fa20534a5f44"
+
+
+class SlowedCoder(TileCoder):
+    """A tile coder that asks for a different step size on each feature.
+
+    Not something to use. It is here so the plumbing can be tested without a
+    Fourier basis, which is the only real coder that asks for scales: a test
+    that reads the basis to work out what it expects would pass if both were
+    wrong in the same way.
+    """
+
+    def step_scales(self) -> list[float]:
+        return [1.0 / (index + 1) for index in range(self.features)]
+
+
+class TestTheCoderCanScaleTheStep:
+    """A coder says how far a step moves each of its features.
+
+    The reason is a Fourier basis, whose features are waves of different
+    speeds. Every other coder here answers `None`, which means one step for
+    all of them, and the run it gives is the run it gave before there was an
+    answer to give at all.
+    """
+
+    def test_a_plain_coder_asks_for_nothing(self) -> None:
+        assert a_coder().step_scales() is None
+        assert RadialBasis(UNIT, bins=4).step_scales() is None
+
+    def test_asking_for_nothing_is_a_step_of_one_on_every_feature(self) -> None:
+        # The stand-in the agent keeps, rather than a branch on every update.
+        agent = SemiGradientQ(Rng(1), TWO, a_coder(grids=3))
+        assert list(agent._scales) == [1.0] * agent.coder.features
+
+    def test_a_scale_divides_the_change_to_that_weight(self) -> None:
+        plain = SemiGradientQ(Rng(1), TWO, a_coder(grids=3), step_size=0.5)
+        scaled = SemiGradientQ(
+            Rng(1), TWO, SlowedCoder(UNIT, bins=4, grids=3), step_size=0.5
+        )
+
+        plain.observe(ends(0.5, 0, 1.0, 0.5))
+        scaled.observe(ends(0.5, 0, 1.0, 0.5))
+
+        indices, _ = plain.coder.encode((0.5,))
+        assert len(indices) == 3
+        for index in indices:
+            moved = plain.weights[0][index]
+            assert moved != 0.0
+            assert scaled.weights[0][index] == pytest.approx(moved / (index + 1))
+
+    def test_it_reaches_a_whole_run(self) -> None:
+        # The unit above says one update honours the scales. This says the
+        # agent that trains does too, which is a different claim: an agent
+        # that read the scales once and then took a path of its own would
+        # pass the first and fail this.
+        env = ENVIRONMENTS.make("mountaincar", Rng(1).stream("env"))
+        box = env.observation_space
+        assert isinstance(box, Box)
+
+        plain = SemiGradientSarsa(Rng(1), env.action_space, TileCoder(box))
+        scaled = SemiGradientSarsa(Rng(1), env.action_space, SlowedCoder(box))
+
+        train(env, plain, 3, discount=1.0)
+        env = ENVIRONMENTS.make("mountaincar", Rng(1).stream("env"))
+        train(env, scaled, 3, discount=1.0)
+
+        assert digest_of(plain) != digest_of(scaled)

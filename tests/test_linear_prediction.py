@@ -389,6 +389,91 @@ class TestTheGradientCorrection:
         assert list(agent.learned()) == ["weights|1,0,0", "helper|0,2,0"]
 
 
+class ScaledLookup(Lookup):
+    """A table that asks for a different step size on each of its columns.
+
+    Not something to use, and no real coder here looks like it. A Fourier
+    basis is the one that asks for scales, and testing the plumbing against a
+    table means the expected numbers can be written down rather than read
+    back out of the thing under test.
+    """
+
+    def step_scales(self) -> list[float]:
+        return [1.0, 0.5, 0.25]
+
+
+class TestThePredictorsScaleTheStep:
+    """Both of them, which is the point.
+
+    `LinearPredictor` reads the coder's scales in its constructor, so a
+    subclass that forgets to apply them keeps a number it never uses and
+    quietly takes the wrong step. That is worth a test for each subclass
+    rather than one for the base.
+    """
+
+    def test_a_lookup_asks_for_nothing(self) -> None:
+        assert Lookup(ONE_HOT).step_scales() is None
+
+    def test_asking_for_nothing_is_a_step_of_one_on_every_feature(self) -> None:
+        agent = a_predictor()
+        assert list(agent._scales) == [1.0, 1.0, 1.0]
+
+    def test_the_semi_gradient_weights_move_by_the_scale(self) -> None:
+        plain = a_predictor(step_size=0.5)
+        scaled = SemiGradientTD(
+            Rng(1).stream("agent"), TWO, ScaledLookup(ONE_HOT), EVEN, step_size=0.5
+        )
+
+        for agent in (plain, scaled):
+            agent.observe(ends(1, 0, 4.0, 2))
+
+        assert plain.weights[1] == pytest.approx(2.0)
+        assert scaled.weights[1] == pytest.approx(1.0)
+
+    def test_the_gradient_weights_move_by_the_scale(self) -> None:
+        agent = GradientTD(
+            Rng(1).stream("agent"),
+            TWO,
+            ScaledLookup(ONE_HOT),
+            EVEN,
+            helper_step=0.0,
+            step_size=0.5,
+        )
+        agent.observe(ends(1, 0, 4.0, 2))
+        assert agent.weights[1] == pytest.approx(0.5 * 4.0 * 0.5)
+
+    def test_the_correction_takes_the_scale_of_where_it_lands(self) -> None:
+        # The correction moves the next state's weights, so it is that
+        # feature's scale that applies to it and not this state's.
+        agent = GradientTD(
+            Rng(1).stream("agent"),
+            TWO,
+            ScaledLookup(ONE_HOT),
+            EVEN,
+            helper_step=0.0,
+            step_size=0.5,
+            discount=0.6,
+        )
+        agent.helper[:] = [2.0, 0.0, 0.0]
+        agent.observe(step(0, 0, 0.0, 2))
+        assert agent.weights[0] == pytest.approx(0.0)
+        assert agent.weights[2] == pytest.approx(-0.5 * 0.6 * 2.0 * 0.25)
+
+    def test_the_helper_moves_by_the_scale_as_well(self) -> None:
+        # The helper is a linear function of the same features, so a feature
+        # that takes a small step in the weights takes one here too.
+        agent = GradientTD(
+            Rng(1).stream("agent"),
+            TWO,
+            ScaledLookup(ONE_HOT),
+            EVEN,
+            helper_step=0.5,
+            step_size=0.0,
+        )
+        agent.observe(step(1, 0, 4.0, 2))
+        assert agent.helper == pytest.approx([0.0, 1.0, 0.0])
+
+
 @cache
 def on_baird(
     which: str, episodes: int, discount: float = 0.99, seed: int = 1
