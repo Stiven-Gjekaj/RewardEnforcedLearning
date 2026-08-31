@@ -77,9 +77,12 @@ from rel.spaces import Discrete
 
 DASHED, SOLID = 0, 1
 
-#: How often the behaviour policy takes each action. Six sevenths dashed, which
-#: is what makes almost every step a step the target policy would not have
-#: taken.
+#: How often the behaviour policy takes each action, at six upper states. Six
+#: sevenths dashed, which is what makes almost every step a step the target
+#: policy would not have taken.
+#:
+#: `Baird.behaviour_shares` works this out from the number of upper states
+#: rather than reading it here. See that property for why.
 BEHAVIOUR: tuple[float, ...] = (6.0 / 7.0, 1.0 / 7.0)
 
 #: The policy being evaluated. Solid every time, so its importance ratio is
@@ -164,8 +167,10 @@ class Baird(TabularEnv):
 
         The expected update is `w <- w - a A w` with `A` the average over
         states of `x(s)` times `(x(s) - discount * x(lower))` transposed, since
-        the target policy always goes to the lower state. It runs away when an
-        eigenvalue of `A` has a negative real part.
+        the target policy always goes to the lower state. Each state carries
+        the same weight in that average, because `behaviour_shares` is chosen
+        so that they do. It runs away when an eigenvalue of `A` has a negative
+        real part.
 
         The six upper states are alike, so `A` splits. On the directions where
         their weights differ it is four sevenths times the identity, which is
@@ -188,8 +193,22 @@ class Baird(TabularEnv):
 
     @property
     def behaviour_shares(self) -> tuple[float, ...]:
-        """How often the policy that collects the data takes each action."""
-        return BEHAVIOUR
+        """How often the policy that collects the data takes each action.
+
+        Dashed `n` times out of `n + 1`, which at six upper states is the six
+        sevenths of the literature.
+
+        **The number follows the size, and it has to.** Dashed spreads over
+        the upper states and solid lands on the one below, so these shares are
+        what decides how often the agent is in each state. At `n` over `n + 1`
+        every state gets an even share whatever `n` is. At a fixed six
+        sevenths the upper states would share six sevenths between however
+        many of them there were, and a version with twenty upper states would
+        spend a seventh of its time in one state and a fraction of that in
+        each of the others. That is a different problem, and the discount
+        `runs_away_above` gives would be the answer to this one.
+        """
+        return (self.upper / (self.upper + 1.0), 1.0 / (self.upper + 1.0))
 
     @property
     def target_shares(self) -> tuple[float, ...]:

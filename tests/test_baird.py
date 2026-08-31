@@ -133,8 +133,45 @@ class TestTheFeatures:
 
 class TestThePolicies:
     def test_the_behaviour_policy_mostly_dashes(self) -> None:
-        assert build().behaviour_shares == BEHAVIOUR
+        assert build().behaviour_shares == pytest.approx(BEHAVIOUR)
         assert BEHAVIOUR[DASHED] == pytest.approx(6.0 / 7.0)
+
+    def test_the_shares_follow_the_number_of_upper_states(self) -> None:
+        assert build(upper=3).behaviour_shares == (0.75, 0.25)
+        assert build(upper=6).behaviour_shares == pytest.approx(BEHAVIOUR)
+
+    def test_the_behaviour_policy_lands_evenly_wherever_it_starts(self) -> None:
+        """Which is what makes every state carry the same weight.
+
+        The closed form in `runs_away_above` averages over states without
+        weighting them, so a behaviour policy that spent more time in one of
+        them would make that number the answer to a different problem.
+        """
+        for upper in (3, 6, 20):
+            env = build(upper=upper)
+            for state in range(env.observation_space.n):
+                landed = [0.0] * env.observation_space.n
+                for action in env.action_space:
+                    share = env.behaviour_shares[action]
+                    for outcome in env.transitions(state, action):
+                        landed[outcome.observation] += share * outcome.probability
+                assert max(landed) - min(landed) < 1e-12, (upper, state)
+
+    def test_a_fixed_six_sevenths_would_not_land_evenly(self) -> None:
+        """The fault the property above exists to avoid, written out.
+
+        The shares were a constant of six sevenths and a seventh. At six upper
+        states that is right and at twenty it is not: the upper states would
+        share six sevenths between twenty of them while the one below took a
+        seventh, so the agent would spend three times as long in the lower
+        state as in any other and the closed form would not describe the run.
+        """
+        env = build(upper=20)
+        landed = [0.0] * env.observation_space.n
+        for action in env.action_space:
+            for outcome in env.transitions(0, action):
+                landed[outcome.observation] += BEHAVIOUR[action] * outcome.probability
+        assert max(landed) - min(landed) > 0.09
 
     def test_the_target_policy_never_dashes(self) -> None:
         assert build().target_shares == TARGET
@@ -148,11 +185,12 @@ class TestThePolicies:
         # Coverage is the one assumption importance sampling cannot do
         # without. An action the target policy might take has to be one the
         # behaviour policy sometimes takes.
-        for share, wanted in zip(BEHAVIOUR, TARGET, strict=True):
+        for share, wanted in zip(build().behaviour_shares, TARGET, strict=True):
             assert share > 0.0 or wanted == 0.0
 
     def test_the_ratio_on_a_solid_step_is_seven(self) -> None:
-        assert TARGET[SOLID] / BEHAVIOUR[SOLID] == pytest.approx(7.0)
+        shares = build().behaviour_shares
+        assert TARGET[SOLID] / shares[SOLID] == pytest.approx(7.0)
 
     def test_the_ratio_on_a_dashed_step_is_zero(self) -> None:
         assert TARGET[DASHED] / BEHAVIOUR[DASHED] == 0.0
