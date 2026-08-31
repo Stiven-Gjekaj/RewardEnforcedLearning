@@ -85,8 +85,11 @@ class TestWhatItAimsAt:
         for tensor in agent.means.parameters():
             tensor.data[:] = [value + 50.0 for value in tensor.data]
         aimed = agent.greedy((0.0,))[0]
-        assert -2.0 <= aimed <= 2.0
-        assert aimed == pytest.approx(2.0, abs=1e-6)
+        assert agent.box.contains((aimed,))
+        # Exactly the bound, because the tanh has saturated, and the box takes
+        # its own bounds. Nothing clips this: a mean that needed clipping
+        # would be a mean the box refused, and `Env.step` says so loudly.
+        assert aimed == 2.0
 
     def test_every_action_it_draws_is_inside_the_box(self) -> None:
         agent = an_agent(Aim(Rng(1).stream("env")), spread=5.0)

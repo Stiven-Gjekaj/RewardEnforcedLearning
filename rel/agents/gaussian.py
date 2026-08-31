@@ -158,10 +158,11 @@ class GaussianActorCritic(Agent[ObsT, Torque]):
         return self.box.clip(drawn)
 
     def greedy(self, observation: ObsT) -> Torque:
-        # The mean with no draw, which is what an evaluation run wants. It is
-        # already inside the box, and clipping it is a no operation that says
-        # so rather than a step that does anything.
-        return self.box.clip(self.mean(self.encoder(observation)).data)
+        # The mean with no draw, which is what an evaluation run wants. Not
+        # clipped: a tanh is between minus one and one, so the mean is between
+        # the bounds and lands on one of them only where the tanh has
+        # saturated, which the box accepts.
+        return tuple(self.mean(self.encoder(observation)).data)
 
     #: A box has no list of actions to be worth anything, so there is nothing
     #: for a renderer to rank.
