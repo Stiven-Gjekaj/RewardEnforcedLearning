@@ -12,7 +12,35 @@ from pathlib import Path
 
 import pytest
 
-from rel.cli import main, parse_over, parse_settings, parse_value, sweep_settings
+from rel.cli import (
+    main,
+    parse_over,
+    parse_settings,
+    parse_value,
+    spelled_action,
+    sweep_settings,
+)
+
+
+class TestAnActionInADemonstration:
+    """A tuple of floats printed raw is seventeen digits for each of them.
+
+    On a narrow terminal that pushes the reward and the total off the end, and
+    a demonstration is the one place where the line has to fit.
+    """
+
+    def test_a_whole_number_prints_as_itself(self) -> None:
+        assert spelled_action(3) == "3"
+
+    def test_a_point_in_a_box_is_cut_to_three_decimals(self) -> None:
+        assert spelled_action((1.3980212353239614,)) == "(1.398)"
+
+    def test_a_point_of_several_dimensions_keeps_them_all(self) -> None:
+        assert spelled_action((0.5, -1.25)) == "(0.500, -1.250)"
+
+    def test_it_is_shorter_than_what_python_prints(self) -> None:
+        drawn = (1.3980212353239614, -0.7071067811865476)
+        assert len(spelled_action(drawn)) < len(str(drawn))
 
 
 class TestParsingASetting:

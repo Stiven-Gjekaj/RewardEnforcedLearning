@@ -375,6 +375,20 @@ def command_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def spelled_action(action: object) -> str:
+    """An action as a line of a running demonstration.
+
+    A whole number prints as itself. A point in a box is a tuple of floats,
+    and Python prints those to seventeen digits, which pushes the reward and
+    the total off the end of a narrow terminal and says nothing a reader of a
+    demonstration wants. Three decimals is finer than any environment here
+    reads.
+    """
+    if isinstance(action, tuple):
+        return "(" + ", ".join(f"{value:.3f}" for value in action) + ")"
+    return str(action)
+
+
 def resolve_discount(args: argparse.Namespace, env: Env[Any, Any]) -> float:
     """The discount to use: the one asked for, or the one the environment wants."""
     if args.discount is not None:
@@ -965,7 +979,7 @@ def command_demo(args: argparse.Namespace) -> int:
                     "bold",
                 ),
                 *watch_env.render().splitlines(),
-                f"step {step + 1}   action {action}   "
+                f"step {step + 1}   action {spelled_action(action)}   "
                 f"reward {outcome.reward:+.2f}   total {total:+.2f}",
             ]
             live.update(frame, force=True)
