@@ -18,16 +18,20 @@ from rel.agents.dp import (
     FixedPolicyAgent,
     average_reward,
     evaluate_policy,
+    evaluate_shares,
     policy_iteration,
     reaches_end,
+    uniform_shares,
     value_iteration,
 )
 from rel.core import EnvSpec, Outcome, Step, TabularEnv
 from rel.envs.classic import (
+    RandomWalk,
     cliff_walk,
     dyna_maze,
     four_rooms,
     frozen_lake,
+    long_walk,
     windy_grid,
 )
 from rel.envs.continuing import LONG, SHORT, two_loops
@@ -383,3 +387,128 @@ class TestTheAverageRewardOfAPolicy:
         env = frozen_lake(Rng(1))
         policy = [0] * env.observation_space.n
         assert average_reward(env, policy) is None
+
+
+class TestEvaluatingAPolicyOfShares:
+    """The exact reference for a policy that is not one action anywhere.
+
+    `evaluate_policy` takes one action for each state, which covers every
+    policy an agent here learns. It does not cover the policy the prediction
+    agents are handed, and a walk that goes each way half the time is the
+    oldest problem in the subject.
+    """
+
+    def test_it_agrees_with_the_closed_form_on_the_walk(self) -> None:
+        # The check that says the sweep is the arithmetic rather than
+        # something near it.
+        walk = RandomWalk(Rng(1).stream("env"), size=5)
+        assert evaluate_shares(walk, uniform_shares(walk)) == pytest.approx(
+            walk.true_values(), abs=1e-6
+        )
+
+    @pytest.mark.parametrize("size", [1, 3, 9, 19])
+    def test_it_agrees_at_every_size(self, size: int) -> None:
+        walk = RandomWalk(Rng(1).stream("env"), size=size)
+        assert evaluate_shares(walk, uniform_shares(walk)) == pytest.approx(
+            walk.true_values(), abs=1e-6
+        )
+
+    def test_a_tighter_tolerance_gets_closer(self) -> None:
+        """What the tolerance is, which is not what is left over.
+
+        The sweep stops when a whole pass moves the values by less than the
+        tolerance. What is left is larger than that, by more the longer the
+        walk is: at nineteen cells and the default it is off by about a
+        hundredth of a millionth, which is ten times the tolerance it stopped
+        at. Asking for less leaves less.
+        """
+        walk = RandomWalk(Rng(1).stream("env"), size=19)
+        exact = walk.true_values()
+
+        loose = evaluate_shares(walk, uniform_shares(walk), tolerance=1e-6)
+        tight = evaluate_shares(walk, uniform_shares(walk), tolerance=1e-12)
+
+        def furthest(values: tuple[float, ...]) -> float:
+            return max(abs(got - want) for got, want in zip(values, exact, strict=True))
+
+        assert furthest(tight) < furthest(loose)
+        assert furthest(tight) < 1e-9
+
+    def test_shares_of_one_action_are_that_action(self) -> None:
+        # A deterministic policy written as shares has to give what the
+        # deterministic evaluation gives, or the two are different methods.
+        env = cliff_walk(Rng(1).stream("env"))
+        policy = value_iteration(env).policy
+        shares = [
+            [1.0 if action == policy[state] else 0.0 for action in env.action_space]
+            for state in range(env.observation_space.n)
+        ]
+        got = evaluate_shares(env, shares)
+        want = evaluate_policy(env, policy).values
+        for state in range(env.observation_space.n):
+            if math.isnan(want[state]):
+                continue
+            assert got[state] == pytest.approx(want[state], abs=1e-6), state
+
+    def test_uniform_shares_add_up_in_every_state(self) -> None:
+        env = cliff_walk(Rng(1).stream("env"))
+        rows = uniform_shares(env)
+        assert len(rows) == env.observation_space.n
+        for row in rows:
+            assert sum(row) == pytest.approx(1.0)
+            assert len(row) == env.action_space.n
+
+    def test_the_wrong_number_of_rows_is_refused(self) -> None:
+        walk = RandomWalk(Rng(1).stream("env"), size=5)
+        with pytest.raises(ValueError, match="rows of shares"):
+            evaluate_shares(walk, uniform_shares(walk)[:-1])
+
+    def test_a_policy_that_never_ends_says_so(self) -> None:
+        # Undiscounted, on an environment with no ending, the sweep runs away.
+        env = two_loops(Rng(1).stream("env"))
+        with pytest.raises(DidNotSettleError, match="probably never ends"):
+            evaluate_shares(env, uniform_shares(env), discount=1.0)
+
+    def test_a_discount_makes_the_endless_one_answer(self) -> None:
+        env = two_loops(Rng(1).stream("env"))
+        values = evaluate_shares(env, uniform_shares(env), discount=0.9)
+        assert all(value > 0.0 for value in values)
+
+
+class TestTheLongWalkUnderTheUniformPolicy:
+    """What state aggregation is measured against, and why it is not a line.
+
+    A step of one cell lands on the ending. A step of a hundred passes it, and
+    the overshoot is worth nothing extra, so the states near an ending are
+    worth less than a straight line through the middle would say.
+    """
+
+    @staticmethod
+    def _values() -> tuple[float, ...]:
+        walk = long_walk(Rng(1).stream("env"))
+        return evaluate_shares(walk, uniform_shares(walk))
+
+    def test_it_rises_from_one_end_to_the_other(self) -> None:
+        values = self._values()
+        walk = list(values[1:1001])
+        assert walk == sorted(walk)
+
+    def test_the_middle_is_a_half(self) -> None:
+        # By symmetry, whatever the stride does at the ends.
+        assert self._values()[500] == pytest.approx(0.5, abs=0.005)
+
+    def test_the_ends_are_pulled_in_by_the_overshoot(self) -> None:
+        """Which is the whole reason the closed form refuses a longer stride.
+
+        A straight line would put cell 1000 at 0.999. The walk says less,
+        because a step from there passes the ending more often than not and
+        the overshoot pays nothing extra.
+        """
+        values = self._values()
+        assert values[1000] < 0.999
+        assert values[1] > 1.0 / 1001.0
+
+    def test_it_is_symmetric_about_the_middle(self) -> None:
+        values = self._values()
+        for state in (1, 50, 200, 499):
+            assert values[state] + values[1001 - state] == pytest.approx(1.0, abs=1e-6)

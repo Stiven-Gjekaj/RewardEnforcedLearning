@@ -232,6 +232,70 @@ def evaluate_policy(
     )
 
 
+def uniform_shares(env: TabularEnv) -> tuple[tuple[float, ...], ...]:
+    """A policy that takes every action as often, in every state."""
+    row = (1.0 / env.action_space.n,) * env.action_space.n
+    return (row,) * env.observation_space.n
+
+
+def evaluate_shares(
+    env: TabularEnv,
+    shares: Sequence[Sequence[float]],
+    discount: float = 1.0,
+    tolerance: float = TOLERANCE,
+    max_sweeps: int = MAX_SWEEPS,
+) -> tuple[float, ...]:
+    """What a policy given as action shares is worth in every state.
+
+    `evaluate_policy` above takes one action for each state. That covers every
+    policy an agent here learns, because a greedy policy is one action, and it
+    does not cover the policy the prediction agents are handed: a walk that
+    goes each way half the time is not one action anywhere.
+
+    So this is the same sweep with the shares folded in, and it is the exact
+    reference an approximation is measured against. On the small walk it comes
+    out equal to the closed form, which is the check that says the sweep is
+    the arithmetic and not something near it.
+
+    Every state is swept rather than the ones a policy can reach, because a
+    policy with a share on every action can reach anywhere the environment
+    lets it. A policy that never ends makes the sweep run away, and this
+    raises rather than returning what it had got to.
+    """
+    if len(shares) != env.observation_space.n:
+        raise ValueError(
+            f"{env.spec.name} has {env.observation_space.n} states and "
+            f"{len(shares)} rows of shares were given."
+        )
+
+    terminal = env.terminal_states()
+    values = [0.0] * env.observation_space.n
+    sweeping = [
+        state for state in range(env.observation_space.n) if state not in terminal
+    ]
+
+    for _ in range(max_sweeps):
+        largest = 0.0
+        for state in sweeping:
+            updated = sum(
+                share * _backup(env, values, state, action, discount)
+                for action, share in zip(env.action_space, shares[state], strict=True)
+                if share > 0.0
+            )
+            largest = max(largest, abs(updated - values[state]))
+            values[state] = updated
+        if largest < tolerance:
+            break
+    else:
+        raise DidNotSettleError(
+            f"Evaluating a policy of shares ran {max_sweeps} sweeps and the "
+            f"values were still moving by {largest:g}. The policy probably "
+            f"never ends."
+        )
+
+    return tuple(values)
+
+
 def average_reward(env: TabularEnv, policy: Sequence[int]) -> float | None:
     """The reward per step of following this policy for ever.
 
@@ -526,7 +590,9 @@ __all__ = [
     "Solution",
     "average_reward",
     "evaluate_policy",
+    "evaluate_shares",
     "policy_iteration",
     "reaches_end",
+    "uniform_shares",
     "value_iteration",
 ]
