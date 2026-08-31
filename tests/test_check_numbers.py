@@ -1907,6 +1907,23 @@ class TestThePageSaysHowMuchOfItselfIsChecked:
         assert found is not None, "the page no longer says how many are in prose"
         assert int(found[1]) == prose_numbers(script, page)
 
+    def test_the_count_it_is_measured_against_matches_too(
+        self, script: ModuleType
+    ) -> None:
+        """The third number in the same sentence, which nothing was holding.
+
+        It said 1074 in cells where the parsing found 1067, and the two moved
+        apart again the moment a section was added. Two of the three numbers
+        in that paragraph were held and the third was not, which is how a
+        sentence about counts going stale ends up with one that has.
+        """
+        page = script.ROOT / "docs" / "algorithms.md"
+        found = re.search(r"against (\d+) in cells", page.read_text())
+        assert found is not None, "the page no longer says how many are in cells"
+
+        _, claims = script.read(page)
+        assert int(found[1]) == sum(len(claim.numbers) for claim in claims)
+
     def test_it_counts_neither_tables_nor_fences_as_prose(
         self, script: ModuleType, tmp_path: Path
     ) -> None:

@@ -2543,10 +2543,10 @@ was where its numbers came from, and it had that wrong in a dozen places.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **407 of this
-  page's numbers are in prose rather than in a cell**, against 1074 in cells.
+- **Any number written in a sentence.** It reads tables, and **432 of this
+  page's numbers are in prose rather than in a cell**, against 1156 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 407 are settings, seed counts and episode caps rather than anything a
+  those 432 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -2595,7 +2595,7 @@ written as a console block.
   what makes a second opinion cheap, and it writes down which commands ran out
   of time so a resumed run does not spend the budget on them again. With every
   command cached the whole page answers in a second.
-- **776 of 1067 numbers are checked.** The rest are in a table or a column that
+- **865 of 1156 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
