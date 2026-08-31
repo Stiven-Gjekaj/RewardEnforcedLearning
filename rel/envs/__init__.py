@@ -106,8 +106,8 @@ ENVIRONMENTS: Registry[Env[Any]] = Registry(
         ),
         Entry(
             "baird",
-            "Seven states that pay nothing, and features laid out so that "
-            "off-policy bootstrapping over them diverges.",
+            "A counterexample where nothing pays and off-policy bootstrapping "
+            "over its features diverges.",
             baird,
             tags=("tabular", "endless"),
         ),

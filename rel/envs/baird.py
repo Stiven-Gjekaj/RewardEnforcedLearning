@@ -115,9 +115,12 @@ class Baird(TabularEnv):
         self.action_space = Discrete(2)
         self.spec = EnvSpec(
             name="baird",
+            #: No count of states in it, on purpose. The number of them is a
+            #: setting, and a summary that said seven would say seven at
+            #: twenty as well.
             summary=(
-                "Seven states that pay nothing, and features laid out so that "
-                "off-policy bootstrapping over them diverges."
+                "A counterexample where nothing pays and off-policy "
+                "bootstrapping over its features diverges."
             ),
             max_episode_steps=steps,
             ends=False,
