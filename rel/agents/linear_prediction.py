@@ -210,6 +210,13 @@ class LinearPredictor(Agent[ObsT]):
             return
 
         here = self.coder.encode(transition.observation)
+        if not here[0]:
+            # No feature is on here, so this state's value is pinned at zero
+            # whatever the weights are and the gradient of it is zero as well.
+            # There is nothing to move, and the step size would be divided by
+            # a squared length of zero to find out.
+            return
+
         current = self.worth(here)
 
         if transition.terminated:

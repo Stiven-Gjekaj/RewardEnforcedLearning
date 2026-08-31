@@ -12,6 +12,7 @@ problem from the same start and reads what happens to their weights.
 from __future__ import annotations
 
 from functools import cache
+from typing import ClassVar
 
 import pytest
 
@@ -268,6 +269,50 @@ class TestTheSemiGradientUpdate:
         )
         corrected.observe(step(0, 1, 1.0, 1))
         assert corrected.value(0) == pytest.approx(2.0 * alone.value(0))
+
+
+class TestAStateWithNoFeatures:
+    """A row of zeros pins a state's value at zero, which is a fair thing to
+    want: it is what a terminal state looks like in a linear representation.
+
+    The update at such a state has to be skipped rather than made, because
+    the step size is divided by the features of the state dotted with
+    themselves and that is zero here.
+    """
+
+    ROWS: ClassVar[list[list[float]]] = [[1.0, 0.0], [0.0, 0.0]]
+
+    @pytest.mark.parametrize("cls", [SemiGradientTD, GradientTD])
+    def test_a_step_from_it_moves_nothing_rather_than_raising(
+        self, cls: type[LinearPredictor[int]]
+    ) -> None:
+        agent = a_predictor(cls, rows=self.ROWS, step_size=0.5)
+        agent.observe(step(1, 0, 100.0, 0))
+        assert agent.weights == [0.0, 0.0]
+
+    def test_the_helper_does_not_move_either(self) -> None:
+        agent = GradientTD(
+            Rng(1).stream("agent"),
+            TWO,
+            Lookup(self.ROWS),
+            EVEN,
+            helper_step=0.5,
+            step_size=0.5,
+        )
+        agent.observe(step(1, 0, 100.0, 0))
+        assert agent.helper == [0.0, 0.0]
+
+    def test_a_step_into_it_is_still_made(self) -> None:
+        # The state with no features is where this one lands, not where it
+        # stands, so the value ahead is zero and the update is the reward.
+        agent = a_predictor(rows=self.ROWS, step_size=0.5, discount=0.9)
+        agent.observe(step(0, 0, 2.0, 1))
+        assert agent.weights == pytest.approx([1.0, 0.0])
+
+    def test_its_value_is_zero_whatever_the_weights_are(self) -> None:
+        agent = a_predictor(rows=self.ROWS)
+        agent.weights[:] = [5.0, 7.0]
+        assert agent.value(1) == 0.0
 
 
 class TestTheGradientCorrection:

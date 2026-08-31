@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-2341_passing-427819?style=for-the-badge" alt="2341 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-2346_passing-427819?style=for-the-badge" alt="2346 tests passing"/>
 </p>
 
 <p align="center">
@@ -403,7 +403,7 @@ import statements of every module:
 $ pytest
 ```
 
-2341 tests. Some of what they cover, and why each one is there rather than the
+2346 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A
