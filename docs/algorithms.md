@@ -1681,6 +1681,154 @@ what a reader comparing this code with the book needs to see.
 
 ---
 
+## The three things that are safe in pairs
+
+```console
+$ python scripts/measure_triad.py
+$ rel train linear-td --env baird
+$ rel train gradient-td --env baird
+```
+
+Everything above this point on the page has used at most two of these three at
+once:
+
+    function approximation   more states than weights, so states share
+    bootstrapping            a target built from an estimate, not a return
+    off-policy               data from one policy, a question about another
+
+Any two together are safe. All three are called the **deadly triad**, and this
+project now has all three legs, so it should say what happens when they are
+put together rather than leave a reader to assume it is fine.
+
+### The counterexample
+
+`baird` is seven states arranged so that nothing else can be blamed.
+
+```
+o o o o o o     dashed  goes to one of the six upper states, evenly
+      o         solid   goes to the lower state
+```
+
+Every reward is zero, so every state is worth zero under either policy. There
+are eight weights for seven states, laid out so the rows overlap:
+
+    upper state i   worth 2 * w[i] + w[7]
+    lower state     worth w[6] + 2 * w[7]
+
+Eight weights of zero say the answer exactly. **The approximation is not the
+limitation here.** The behaviour policy dashes six times out of seven and the
+target policy always goes solid, so the data is nearly all about the upper
+states and the question is about the lower one.
+
+That mismatch is the third leg. Every state shares `w[7]`, and the lower state
+leans on it twice as hard as any upper one, so an update that lowers an upper
+state's estimate lowers `w[7]`, which lowers the lower state's estimate by
+twice as much, which raises the error the next update is trying to fix.
+
+### What that does
+
+| agent | discount | median value error | every seed |
+| --- | ---: | ---: | --- |
+| linear-td | 0.99 | 1.327e+22 | 4.83e+21 6.08e+22 1.56e+22 8.32e+20 1.33e+22 |
+| gradient-td | 0.99 | 1.927 | 1.93 1.93 1.93 1.93 1.93 |
+| linear-td | 0.5 | 1.839e-15 | 1.3e-15 1.84e-15 1.84e-15 1.93e-15 1.69e-15 |
+| gradient-td | 0.5 | 5.632e-15 | 5.63e-15 5.63e-15 7.78e-15 5.63e-15 1.1e-14 |
+
+*Five seeds, twenty thousand steps each, step size 0.05. The true value is
+zero at every state, so the error is the whole of what the agent believes.*
+
+`linear-td` is semi-gradient TD over the features the environment hands out.
+At 0.99 its estimates pass 1e22 and keep going. `gradient-td` is the same
+update with one term added, from the same start over the same features under
+the same two policies, and it stays at 1.9.
+
+**The bottom two rows are the same three ingredients at a different discount.**
+Both agents reach the answer to the last bits a float has. Nothing else about
+those runs is different, and the section below is about why.
+
+### It is not the step size
+
+| step size | median value error of linear-td |
+| ---: | ---: |
+| 0.005 | 6584 |
+| 0.02 | 9.128e+09 |
+| 0.05 | 1.327e+22 |
+| 0.2 | 2.493e+78 |
+
+*The same runs at four step sizes.*
+
+A divergence gets blamed on a step size often enough to be worth ruling out
+rather than denying. **A smaller step size does not stop this, it slows it
+down.** At 0.005 the estimates are past six thousand after twenty thousand
+steps and still climbing.
+
+### It is the discount, and there is a number
+
+| discount | largest weight after the expected update |
+| ---: | ---: |
+| 0.5 | 6.769 |
+| 0.8 | 6.769 |
+| 0.85 | 6.771 |
+| 0.88 | 9.104 |
+| 0.9 | 2365 |
+| 0.95 | 1.152e+08 |
+| 0.99 | 1.567e+22 |
+
+*Four thousand steps of the update the model says to make, which is
+deterministic and has no seeds.*
+
+The three ingredients are the same at every row. **Below a discount of about
+0.88 they are stable and above it they are not**, and the whole of the
+difference between the top of that table and the bottom is a number nobody
+would think twice about choosing.
+
+Bisecting on it gives 0.8840. `rel.envs.baird` gives the same crossing in
+closed form, at `(9 + n) / (5 + 2n)` for `n` upper states, which is fifteen
+seventeenths or **0.8824**. Nothing that measures reads the closed form, so
+the two agreeing is two answers rather than one printed twice.
+
+That is why the discount in the literature is 0.99 rather than a round number.
+
+### More states make it worse
+
+| upper states | closed form | measured |
+| ---: | ---: | ---: |
+| 4 | never | never |
+| 5 | 0.9333 | 0.9369 |
+| 6 | 0.8824 | 0.8840 |
+| 8 | 0.8095 | 0.8073 |
+| 10 | 0.7600 | 0.7574 |
+| 20 | 0.6444 | 0.6466 |
+
+*The crossing at six sizes of the same counterexample, worked out two ways.*
+
+The crossing falls as the problem grows, towards a half. **Four upper states
+or fewer never diverge at any discount below one**, and twenty of them diverge
+at discounts that six of them are safe at. A counterexample with more places
+to share a weight between is a counterexample that needs less help.
+
+### What the correction buys, and what it does not
+
+`gradient-td` is TDC. Semi-gradient TD follows the gradient of half the
+squared error and drops the part that runs through the next state's value, and
+off-policy that dropped part is what stops the correction coming back.
+Estimating it in a second weight vector and subtracting it is the whole
+method, and it costs one more vector and one more step size.
+
+It does not merely stay bounded. The bottom row of the first table is this
+agent below the crossing, and it reaches the answer.
+
+At 0.99 it is still at 1.93 after twenty thousand steps, and
+`python scripts/measure_triad.py --episodes 200` leaves it at 1.85 after two
+hundred thousand. That is not a failure and it is worth knowing about. What is
+left at that point is one direction, in which every state's estimate is the
+same number, and the error a constant estimate creates is one minus the
+discount times that constant. At 0.99 that is a hundredth of it, so the last
+direction is removed a hundred times more slowly than at 0.5, and a run that
+looks stuck is a run with one mode left.
+
+---
+
 ## A value network, and the two pieces that make one work
 
 ```console
@@ -2483,6 +2631,7 @@ which is harmless and still worth spelling one way.
 | The engine, faster and unchanged | `python scripts/measure_engine.py` |
 | Decision time against background planning | `python scripts/measure_search.py --episodes 40 --runs 3` |
 | One rule at several dials | `python scripts/measure_exploration.py --rules count-bonus:0.1,count-bonus:2` |
+| The three things that are safe in pairs | `python scripts/measure_triad.py` |
 
 ### The commands that are behind no table
 
