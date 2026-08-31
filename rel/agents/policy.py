@@ -50,7 +50,7 @@ from __future__ import annotations
 import math
 from collections.abc import Iterator, Sequence
 
-from rel.agents.base import Agent, Transition
+from rel.agents.base import DiscreteAgent, Transition
 from rel.agents.features import Encoder
 from rel.core import DIGEST_FIGURES, ObsT
 from rel.nn.autograd import (
@@ -69,7 +69,7 @@ from rel.rng import Rng
 from rel.spaces import Discrete
 
 
-class Reinforce(Agent[ObsT]):
+class Reinforce(DiscreteAgent[ObsT]):
     """Waits for the episode, then pushes up whatever led to a good return.
 
     This is Williams' REINFORCE, with an optional learned baseline.

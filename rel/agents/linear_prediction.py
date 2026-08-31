@@ -43,7 +43,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Mapping, Sequence
 
-from rel.agents.base import Agent, Transition, rows_of
+from rel.agents.base import DiscreteAgent, Transition, rows_of
 from rel.agents.linear import Coder, Encoded
 from rel.agents.off_policy import ratio
 from rel.core import ObsT
@@ -78,7 +78,7 @@ def fixed(shares: Sequence[float]) -> Policy[ObsT]:
     return shares_at
 
 
-class LinearPredictor(Agent[ObsT]):
+class LinearPredictor(DiscreteAgent[ObsT]):
     """What a fixed policy is worth, as a weight for each feature.
 
     The weights are one vector rather than one for each action, because a

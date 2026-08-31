@@ -46,7 +46,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping, Sequence
 
-from rel.agents.base import Agent, Transition
+from rel.agents.base import DiscreteAgent, Transition
 from rel.agents.traces import CUTOFF, KINDS, Kind
 from rel.core import DIGEST_FIGURES, encoded
 from rel.rng import Rng
@@ -54,7 +54,7 @@ from rel.schedules import Schedule, as_schedule
 from rel.spaces import Discrete
 
 
-class Predictor(Agent[int]):
+class Predictor(DiscreteAgent[int]):
     """Follows a fixed policy and keeps one number for each state.
 
     The table is a dictionary rather than an array, for the same reason the

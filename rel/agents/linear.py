@@ -55,7 +55,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from typing import Protocol, TypeVar
 
-from rel.agents.base import Agent, Transition, rows_of
+from rel.agents.base import DiscreteAgent, Transition, rows_of
 from rel.rng import Rng
 from rel.schedules import Schedule, as_schedule
 from rel.spaces import Discrete
@@ -100,7 +100,7 @@ class Coder(Protocol[Read]):
         """The weight that makes a state nothing is known about worth this."""
 
 
-class LinearAgent(Agent[Observation]):
+class LinearAgent(DiscreteAgent[Observation]):
     """The parts that every agent over a coder shares."""
 
     def __init__(

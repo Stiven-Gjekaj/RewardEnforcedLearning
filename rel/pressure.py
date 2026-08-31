@@ -39,7 +39,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
-from rel.agents.base import Agent
+from rel.agents.base import DiscreteAgent
 from rel.agents.dp import value_iteration
 from rel.core import TabularEnv
 from rel.rng import Rng
@@ -54,7 +54,7 @@ Builder = Callable[[Rng], TabularEnv]
 LADDER = (1.0, 0.8, 0.5, 0.3, 0.1, 0.0)
 
 
-class PressuredAgent(Agent[int]):
+class PressuredAgent(DiscreteAgent[int]):
     """Follows a fixed policy with probability one minus epsilon.
 
     `greedy` is the same as `act` here, as it is for the random agent. The

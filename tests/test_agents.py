@@ -300,7 +300,7 @@ class TestTheLinearPredictorsStartOffTheAnswer:
     """
 
     @staticmethod
-    def _trained(name: str, **options: float) -> Agent[Any]:
+    def _trained(name: str, **options: float) -> Agent[Any, Any]:
         env = ENVIRONMENTS.make("baird", Rng(1).stream("env"))
         agent = AGENTS.make(name, Rng(1).stream("agent"), env, **options)
         train(env, agent, 5, discount=0.99)

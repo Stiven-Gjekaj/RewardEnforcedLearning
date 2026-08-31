@@ -91,7 +91,7 @@ class Digest:
         return self.hexdigest()
 
 
-def digest_of(agent: Agent[Any]) -> str | None:
+def digest_of(agent: Agent[Any, Any]) -> str | None:
     """A hash of what this agent has learned, or `None` if it says nothing.
 
     The run digest hashes the transitions, so two agents that happen to walk
@@ -234,7 +234,7 @@ class Record:
 
 def run_episode(
     env: Env[Any],
-    agent: Agent[Any],
+    agent: Agent[Any, Any],
     *,
     learn: bool = True,
     greedy: bool = False,
@@ -304,7 +304,7 @@ def run_episode(
 
 def train(
     env: Env[Any],
-    agent: Agent[Any],
+    agent: Agent[Any, Any],
     episodes: int,
     *,
     discount: float = 1.0,
@@ -338,7 +338,7 @@ def train(
 
 def evaluate(
     env: Env[Any],
-    agent: Agent[Any],
+    agent: Agent[Any, Any],
     episodes: int,
     *,
     discount: float = 1.0,

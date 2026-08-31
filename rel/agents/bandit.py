@@ -25,13 +25,13 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 
-from rel.agents.base import Agent, Transition
+from rel.agents.base import DiscreteAgent, Transition
 from rel.rng import Rng
 from rel.schedules import Schedule, as_schedule
 from rel.spaces import Discrete
 
 
-class BanditAgent(Agent[int]):
+class BanditAgent(DiscreteAgent[int]):
     """The parts that every lever puller shares."""
 
     def __init__(self, rng: Rng, actions: Discrete, *, optimism: float = 0.0) -> None:

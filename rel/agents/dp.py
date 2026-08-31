@@ -49,7 +49,7 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from rel.agents.base import Agent
+from rel.agents.base import DiscreteAgent
 from rel.core import TabularEnv
 from rel.rng import Rng
 from rel.spaces import Discrete
@@ -494,7 +494,7 @@ def _evaluate(
     return tuple(values)
 
 
-class FixedPolicyAgent(Agent[int]):
+class FixedPolicyAgent(DiscreteAgent[int]):
     """Plays a policy that was worked out somewhere else and never changes it.
 
     The optimal policy from `value_iteration` becomes an agent through this,

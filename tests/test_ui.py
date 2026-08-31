@@ -458,7 +458,7 @@ class TestWhatAStateIsWorth:
         assert drawn.splitlines()
 
     @staticmethod
-    def _map_pair() -> tuple[object, Agent[int]]:
+    def _map_pair() -> tuple[object, Agent[int, int]]:
         rng = Rng(1)
         env = cliff_walk(rng.stream("env"))
 

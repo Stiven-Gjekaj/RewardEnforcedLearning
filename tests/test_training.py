@@ -73,7 +73,7 @@ class Corridor(TabularEnv):
         return [(1.0, 0)]
 
 
-class AlwaysRight(Agent[int]):
+class AlwaysRight(Agent[int, int]):
     def act(self, observation: int) -> int:
         return 1
 
@@ -332,7 +332,7 @@ def test_the_loop_hands_the_agent_the_action_it_returned() -> None:
     """
     taken: list[int] = []
 
-    class Recording(Agent[int]):
+    class Recording(Agent[int, int]):
         def act(self, observation: int) -> int:
             chosen = 1 if observation < 2 else 0
             taken.append(chosen)
@@ -391,7 +391,7 @@ class TestTheDigestOfWhatAnAgentLearned:
     """
 
     @staticmethod
-    def _fed(agent: Agent[int]) -> Agent[int]:
+    def _fed(agent: Agent[int, int]) -> Agent[int, int]:
         for step in (
             Transition(0, 0, -1.0, 1, terminated=False, truncated=False),
             Transition(1, 1, -1.0, 2, terminated=False, truncated=False),

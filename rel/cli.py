@@ -108,7 +108,7 @@ def build(
     env_settings: dict[str, Any],
     agent_settings: dict[str, Any],
     env_file: str | None = None,
-) -> tuple[Env[Any], Agent[Any] | None]:
+) -> tuple[Env[Any], Agent[Any, Any] | None]:
     """Build the environment and the agent from one seed.
 
     They take different streams of the same seed. That is what lets two agents
@@ -147,7 +147,7 @@ def _number(value: float, places: int = 2) -> str:
 
 
 def exact_report(
-    env: Env[Any], agent: Agent[Any], discount: float
+    env: Env[Any], agent: Agent[Any, Any], discount: float
 ) -> dict[str, float] | None:
     """The value of the greedy policy and of the best one, worked out exactly.
 
@@ -174,7 +174,7 @@ def exact_report(
 
 def report_lines(
     env: Env[Any],
-    agent: Agent[Any],
+    agent: Agent[Any, Any],
     learning: Record,
     watched: Record,
     exact: dict[str, float] | None,
@@ -276,7 +276,7 @@ def report_lines(
     return lines
 
 
-def prediction_error(env: Env[Any], agent: Agent[Any]) -> float | None:
+def prediction_error(env: Env[Any], agent: Agent[Any, Any]) -> float | None:
     """How far this agent's values are from the real ones, if both exist.
 
     Almost nothing can answer this. It needs an environment that knows what
@@ -297,7 +297,7 @@ def prediction_error(env: Env[Any], agent: Agent[Any]) -> float | None:
 
 
 def grid_pictures(
-    env: Env[Any], agent: Agent[Any], palette: Palette, discount: float
+    env: Env[Any], agent: Agent[Any, Any], palette: Palette, discount: float
 ) -> list[str]:
     """The policy, the value map and where the policy differs from the best."""
     if not isinstance(env, GridWorld):

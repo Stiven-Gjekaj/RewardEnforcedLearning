@@ -36,7 +36,7 @@ from rel.agents.explore import EpsilonGreedy, Rule, argmax
 from rel.core import DIGEST_FIGURES, ActT, ObsT, encoded
 from rel.rng import Rng
 from rel.schedules import Schedule, as_schedule
-from rel.spaces import Discrete
+from rel.spaces import Discrete, Space
 
 
 def rows_of(table: Mapping[Any, Sequence[float]], prefix: str = "") -> Iterator[str]:
@@ -71,21 +71,27 @@ class Transition(Generic[ObsT, ActT]):
         return self.terminated or self.truncated
 
 
-class Agent(ABC, Generic[ObsT]):
-    """Something that chooses actions and learns from what follows."""
+class Agent(ABC, Generic[ObsT, ActT]):
+    """Something that chooses actions and learns from what follows.
 
-    def __init__(self, rng: Rng, actions: Discrete) -> None:
+    Two parameters: what it is shown and what it hands back. Almost every
+    agent here hands back a whole number and says so by subclassing
+    `DiscreteAgent` below, which is the same class with the second parameter
+    already filled in.
+    """
+
+    def __init__(self, rng: Rng, actions: Space[ActT]) -> None:
         self.rng = rng
         self.actions = actions
         self.episodes = 0
         self.steps = 0
 
     @abstractmethod
-    def act(self, observation: ObsT) -> int:
+    def act(self, observation: ObsT) -> ActT:
         """The action to take now, exploration included."""
 
     @abstractmethod
-    def greedy(self, observation: ObsT) -> int:
+    def greedy(self, observation: ObsT) -> ActT:
         """The action this agent believes is best, with no exploration.
 
         This is what an evaluation run uses. Reporting the learning policy
@@ -102,7 +108,7 @@ class Agent(ABC, Generic[ObsT]):
         estimates across would be answering a question about the last problem.
         """
 
-    def observe(self, transition: Transition[ObsT, int]) -> None:
+    def observe(self, transition: Transition[ObsT, ActT]) -> None:
         """Take in one step. The default learns nothing."""
         self.steps += 1
 
@@ -194,7 +200,22 @@ class Agent(ABC, Generic[ObsT]):
         return f"{type(self).__name__}()"
 
 
-class RandomAgent(Agent[ObsT]):
+class DiscreteAgent(Agent[ObsT, int]):
+    """An agent whose actions are whole numbers, which is all but one here.
+
+    Everything above this line is written without knowing what an action is.
+    Everything below it reads `actions.n` and subtracts `actions.start`, which
+    only a discrete space has, so the narrowing is written down once here
+    rather than in every class that does it.
+    """
+
+    actions: Discrete
+
+    def __init__(self, rng: Rng, actions: Discrete) -> None:
+        super().__init__(rng, actions)
+
+
+class RandomAgent(DiscreteAgent[ObsT]):
     """Chooses with equal probability and learns nothing.
 
     This is the baseline every result is measured against. An agent that has
@@ -210,7 +231,7 @@ class RandomAgent(Agent[ObsT]):
         return self.act(observation)
 
 
-class TabularAgent(Agent[ObsT]):
+class TabularAgent(DiscreteAgent[ObsT]):
     """An agent that keeps one number for each observation and action.
 
     The table is a dictionary rather than an array. The cost is a little speed
@@ -411,4 +432,11 @@ class TabularAgent(Agent[ObsT]):
         )
 
 
-__all__ = ["Agent", "RandomAgent", "TabularAgent", "Transition", "rows_of"]
+__all__ = [
+    "Agent",
+    "DiscreteAgent",
+    "RandomAgent",
+    "TabularAgent",
+    "Transition",
+    "rows_of",
+]

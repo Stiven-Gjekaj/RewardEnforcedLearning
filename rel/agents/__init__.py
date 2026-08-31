@@ -98,7 +98,7 @@ def _tabular(cls: type[TabularAgent[Any]]) -> AgentBuilder:
         epsilon: float | Schedule = 0.1,
         explore: str = "epsilon-greedy",
         optimism: float = 0.0,
-    ) -> Agent[Any]:
+    ) -> Agent[Any, Any]:
         return cls(
             rng,
             env.action_space,
@@ -112,11 +112,11 @@ def _tabular(cls: type[TabularAgent[Any]]) -> AgentBuilder:
     return build
 
 
-def _random(rng: Rng, env: Env[Any]) -> Agent[Any]:
+def _random(rng: Rng, env: Env[Any]) -> Agent[Any, Any]:
     return RandomAgent(rng, env.action_space)
 
 
-def _optimal(rng: Rng, env: Env[Any], discount: float = 1.0) -> Agent[Any]:
+def _optimal(rng: Rng, env: Env[Any], discount: float = 1.0) -> Agent[Any, Any]:
     """The best policy there is, worked out from the model and then played.
 
     This is the reference every other run is measured against. It learns
@@ -152,7 +152,7 @@ def _n_step(
     epsilon: float | Schedule = 0.1,
     explore: str = "epsilon-greedy",
     optimism: float = 0.0,
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     return NStepSarsa(
         rng,
         env.action_space,
@@ -184,7 +184,7 @@ def _off_policy(
     epsilon: float | Schedule = 0.1,
     explore: str = "epsilon-greedy",
     optimism: float = 0.0,
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     return OffPolicyMonteCarlo(
         rng,
         env.action_space,
@@ -210,7 +210,7 @@ def _traced(cls: type[SarsaLambda[Any]]) -> AgentBuilder:
         epsilon: float | Schedule = 0.1,
         explore: str = "epsilon-greedy",
         optimism: float = 0.0,
-    ) -> Agent[Any]:
+    ) -> Agent[Any, Any]:
         return cls(
             rng,
             env.action_space,
@@ -236,7 +236,7 @@ def _tree_backup(
     epsilon: float | Schedule = 0.1,
     explore: str = "epsilon-greedy",
     optimism: float = 0.0,
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     return TreeBackup(
         rng,
         env.action_space,
@@ -258,7 +258,7 @@ def _monte_carlo(
     epsilon: float | Schedule = 0.1,
     explore: str = "epsilon-greedy",
     optimism: float = 0.0,
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     return MonteCarloControl(
         rng,
         env.action_space,
@@ -280,7 +280,7 @@ def _dyna(cls: type[DynaQ[Any]]) -> AgentBuilder:
         epsilon: float | Schedule = 0.1,
         explore: str = "epsilon-greedy",
         optimism: float = 0.0,
-    ) -> Agent[Any]:
+    ) -> Agent[Any, Any]:
         return cls(
             rng,
             env.action_space,
@@ -304,7 +304,7 @@ def _dyna_plus(
     discount: float = 0.95,
     epsilon: float | Schedule = 0.1,
     explore: str = "epsilon-greedy",
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     return DynaQPlus(
         rng,
         env.action_space,
@@ -326,7 +326,7 @@ def _sweeping(
     discount: float = 0.95,
     epsilon: float | Schedule = 0.1,
     explore: str = "epsilon-greedy",
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     #: Five planning steps where the other two planners take twenty. Ordering
     #: the replays is what buys the reach, so the quota does not have to, and
     #: `docs/algorithms.md` counts what each of them costs in updates.
@@ -366,7 +366,7 @@ def _options(cls: type[OptionsQ]) -> AgentBuilder:
         discount: float = 0.95,
         epsilon: float | Schedule = 0.1,
         optimism: float = 0.0,
-    ) -> Agent[Any]:
+    ) -> Agent[Any, Any]:
         return _built_options(
             cls, rng, env, hallways, step_size, discount, epsilon, optimism
         )
@@ -383,7 +383,7 @@ def _built_options(
     discount: float,
     epsilon: float | Schedule,
     optimism: float,
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     #: `hallways=False` leaves the agent with its primitive actions only, which
     #: is Q-learning. That is the comparison the whole method is measured by,
     #: so it is a setting rather than a second entry: both sides of it are then
@@ -440,7 +440,7 @@ def _td(
     step_size: float | Schedule = 0.1,
     discount: float = 1.0,
     start_value: float = 0.0,
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     return TemporalDifference(
         rng,
         env.action_space,
@@ -459,7 +459,7 @@ def _n_step_td(
     step_size: float | Schedule = 0.1,
     discount: float = 1.0,
     start_value: float = 0.0,
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     return NStepTD(
         rng,
         env.action_space,
@@ -480,7 +480,7 @@ def _td_lambda(
     step_size: float | Schedule = 0.1,
     discount: float = 1.0,
     start_value: float = 0.0,
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     return TDLambda(
         rng,
         env.action_space,
@@ -501,7 +501,7 @@ def _mc_prediction(
     step_size: float | Schedule = 0.1,
     discount: float = 1.0,
     start_value: float = 0.0,
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     return MonteCarloPrediction(
         rng,
         env.action_space,
@@ -521,7 +521,7 @@ def _differential_q(
     epsilon: float | Schedule = 0.1,
     optimism: float = 0.0,
     explore: str = "epsilon-greedy",
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     #: No discount setting, and that is the whole point of the agent. It
     #: subtracts the rate it is collecting instead, so there is no number here
     #: to get wrong.
@@ -544,7 +544,7 @@ def _tree_search(
     confidence: float = 1.0,
     discount: float = 0.95,
     reuse: bool = True,
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     #: `reuse=False` is the ablation, and it is the one that says what the
     #: tree is doing. Off, the agent plans from nothing at every decision and
     #: carries away nothing at all. On, the work done for one state is there
@@ -577,7 +577,7 @@ def _deep_q(
     batch: int = 8,
     target_refresh: int = 200,
     clip: float = 1.0,
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     #: `replay=0` and `target_refresh=0` are the two ablations, so the four
     #: combinations are settings of one agent rather than four entries. Both
     #: sides of a comparison are then the same code.
@@ -618,7 +618,7 @@ def _policy_gradient(cls: type[Reinforce[Any]]) -> AgentBuilder:
         entropy: float = 0.05,
         normalise: bool = True,
         clip: float = 1.0,
-    ) -> Agent[Any]:
+    ) -> Agent[Any, Any]:
         encoder, features = encoder_for(env.observation_space)
         return cls(
             rng,
@@ -647,7 +647,7 @@ def _linear(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder:
         discount: float = 1.0,
         epsilon: float | Schedule = 0.05,
         optimism: float = 0.0,
-    ) -> Agent[Any]:
+    ) -> Agent[Any, Any]:
         box = getattr(env, "tiling_space", env.observation_space)
         if not isinstance(box, Box):
             raise TypeError(
@@ -735,7 +735,7 @@ def _linear_prediction(cls: type[SemiGradientTD[int]]) -> AgentBuilder:
         step_size: float | Schedule = 0.05,
         discount: float = 0.99,
         start_value: float = STARTS_AT,
-    ) -> Agent[Any]:
+    ) -> Agent[Any, Any]:
         behaviour, target = _handed_policies(env)
         return cls(
             rng,
@@ -758,7 +758,7 @@ def _gradient_td(
     step_size: float | Schedule = 0.05,
     discount: float = 0.99,
     start_value: float = STARTS_AT,
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     behaviour, target = _handed_policies(env)
     return GradientTD(
         rng,
@@ -784,7 +784,7 @@ def _radial(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder:
         discount: float = 1.0,
         epsilon: float | Schedule = 0.05,
         optimism: float = 0.0,
-    ) -> Agent[Any]:
+    ) -> Agent[Any, Any]:
         box = getattr(env, "tiling_space", env.observation_space)
         if not isinstance(box, Box):
             raise TypeError(
@@ -811,7 +811,7 @@ def _epsilon_greedy_bandit(
     epsilon: float | Schedule = 0.1,
     step_size: float | Schedule | None = None,
     optimism: float = 0.0,
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     return EpsilonGreedyBandit(
         rng, env.action_space, epsilon=epsilon, step_size=step_size, optimism=optimism
     )
@@ -819,13 +819,15 @@ def _epsilon_greedy_bandit(
 
 def _optimistic_bandit(
     rng: Rng, env: Env[Any], optimism: float = 5.0, step_size: float | Schedule = 0.1
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     return OptimisticBandit(
         rng, env.action_space, optimism=optimism, step_size=step_size
     )
 
 
-def _upper_confidence(rng: Rng, env: Env[Any], confidence: float = 2.0) -> Agent[Any]:
+def _upper_confidence(
+    rng: Rng, env: Env[Any], confidence: float = 2.0
+) -> Agent[Any, Any]:
     return UpperConfidenceBandit(rng, env.action_space, confidence=confidence)
 
 
@@ -834,11 +836,11 @@ def _gradient_bandit(
     env: Env[Any],
     step_size: float | Schedule = 0.1,
     baseline: bool = True,
-) -> Agent[Any]:
+) -> Agent[Any, Any]:
     return GradientBandit(rng, env.action_space, step_size=step_size, baseline=baseline)
 
 
-AGENTS: Registry[Agent[Any]] = Registry(
+AGENTS: Registry[Agent[Any, Any]] = Registry(
     "agent",
     fixed=2,
     entries=[

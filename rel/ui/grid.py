@@ -42,7 +42,7 @@ SHADES = " .:-=+*%@"
 
 
 def policy_map(
-    env: GridWorld, agent: Agent[int], palette: Palette | None = None
+    env: GridWorld, agent: Agent[int, int], palette: Palette | None = None
 ) -> str:
     """The grid with the agent's greedy action drawn in each cell.
 
@@ -137,7 +137,7 @@ def value_map(
 
 def difference_map(
     env: GridWorld,
-    agent: Agent[int],
+    agent: Agent[int, int],
     best: Sequence[int],
     palette: Palette | None = None,
 ) -> str:
@@ -179,7 +179,7 @@ def difference_map(
     return "\n".join(lines)
 
 
-def best_values(env: GridWorld, agent: Agent[int]) -> list[float]:
+def best_values(env: GridWorld, agent: Agent[int, int]) -> list[float]:
     """What the agent thinks each state is worth, taken off its own numbers.
 
     An agent that keeps no numbers has none of these, and this raises rather

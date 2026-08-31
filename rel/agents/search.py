@@ -58,7 +58,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 
-from rel.agents.base import Agent
+from rel.agents.base import DiscreteAgent
 from rel.agents.explore import CountBonus, argmax
 from rel.core import DIGEST_FIGURES, Outcome, TabularEnv
 from rel.rng import Rng
@@ -110,7 +110,7 @@ class Node:
         return f"Node(visits={self.visits})"
 
 
-class TreeSearch(Agent[int]):
+class TreeSearch(DiscreteAgent[int]):
     """Runs simulations from the state it is in, then acts on what they said.
 
     It is given the environment's own model rather than one it learned. That

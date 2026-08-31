@@ -45,7 +45,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from rel.agents.base import Agent, Transition
+from rel.agents.base import DiscreteAgent, Transition
 from rel.agents.features import Encoder
 from rel.agents.replay import Replay
 from rel.core import DIGEST_FIGURES, ObsT
@@ -56,7 +56,7 @@ from rel.rng import Rng
 from rel.schedules import Schedule, as_schedule
 
 
-class DeepQ(Agent[ObsT]):
+class DeepQ(DiscreteAgent[ObsT]):
     """Q-learning over a network, with replay and a target network as settings."""
 
     def __init__(
