@@ -15,6 +15,7 @@ from rel.agents import AGENTS
 from rel.agents.base import Agent, Transition
 from rel.core import Env
 from rel.envs import ENVIRONMENTS
+from rel.envs.baird import Baird
 from rel.rng import Rng
 from rel.training import evaluate, train
 
@@ -263,6 +264,30 @@ class TestNoAgentLearnsAboutACellItNeverStoodIn:
 
         extra = set(agent.q) - stood_in  # type: ignore[attr-defined]
         assert extra == set(), f"{name} has rows for {sorted(extra)}"
+
+
+class TestWhatALinearPredictorIsHanded:
+    def test_an_environment_with_no_table_says_which_one_has_it(self) -> None:
+        env = ENVIRONMENTS.make("cliff", Rng(1).stream("env"))
+        with pytest.raises(TypeError, match="needs 'baird'"):
+            AGENTS.make("linear-td", Rng(1).stream("agent"), env)
+
+    def test_a_table_that_does_not_cover_the_states_is_refused(self) -> None:
+        """Rather than an index error thousands of steps into a run.
+
+        A table one row short works until the first step that lands in the
+        state it has no row for, and the message then names the coder rather
+        than the environment that handed out the wrong table.
+        """
+
+        class OneRowShort(Baird):
+            @property
+            def feature_rows(self) -> tuple[tuple[float, ...], ...]:
+                return super().feature_rows[:-1]
+
+        env = OneRowShort(Rng(1).stream("env"))
+        with pytest.raises(ValueError, match="7 states and hands out 6 rows"):
+            AGENTS.make("linear-td", Rng(1).stream("agent"), env)
 
 
 class TestTheLinearPredictorsStartOffTheAnswer:

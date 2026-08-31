@@ -82,7 +82,7 @@ from rel.options import Option, hallway_options, primitives
 from rel.registry import Entry, Registry
 from rel.rng import Rng
 from rel.schedules import Schedule
-from rel.spaces import Box
+from rel.spaces import Box, Discrete
 
 AgentBuilder = Any
 
@@ -684,6 +684,17 @@ def _handed_features(env: Env[Any]) -> Lookup:
             f"{env.spec.name} carries no table of features, and a linear "
             f"predictor is handed one by the environment rather than working "
             f"it out. This agent needs 'baird'."
+        )
+
+    space = env.observation_space
+    if isinstance(space, Discrete) and len(rows) != space.n:
+        # A table one row short reaches an index error on whichever step first
+        # lands in the state it has no row for, which can be thousands of
+        # steps in and reads as a fault in the agent.
+        raise ValueError(
+            f"{env.spec.name} has {space.n} states and hands out "
+            f"{len(rows)} rows of features. A lookup table needs one row "
+            f"for each state."
         )
     return Lookup(rows)
 
