@@ -160,14 +160,14 @@ class PrioritisedSweeping(DynaQ[ObsT]):
 
     # -- The loop -----------------------------------------------------------
 
-    def _remember(self, transition: Transition[ObsT]) -> None:
+    def _remember(self, transition: Transition[ObsT, int]) -> None:
         super()._remember(transition)
         if not transition.terminated:
             self.leading_to.setdefault(transition.next_observation, set()).add(
                 (transition.observation, transition.action)
             )
 
-    def observe(self, transition: Transition[ObsT]) -> None:
+    def observe(self, transition: Transition[ObsT, int]) -> None:
         # The real step goes on the queue rather than being applied directly,
         # so that everything this agent does to the table happens in `_plan`
         # and the count of replays is the count of updates.

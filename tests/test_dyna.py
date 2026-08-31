@@ -17,7 +17,7 @@ from rel.training import digest_of, train
 TWO = Discrete(2)
 
 
-def go(state: int, action: int, reward: float, landed: int) -> Transition[int]:
+def go(state: int, action: int, reward: float, landed: int) -> Transition[int, int]:
     return Transition(state, action, reward, landed, False, False)
 
 

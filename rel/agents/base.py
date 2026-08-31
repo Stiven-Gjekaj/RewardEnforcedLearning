@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from typing import Any, Generic
 
 from rel.agents.explore import EpsilonGreedy, Rule, argmax
-from rel.core import DIGEST_FIGURES, ObsT, encoded
+from rel.core import DIGEST_FIGURES, ActT, ObsT, encoded
 from rel.rng import Rng
 from rel.schedules import Schedule, as_schedule
 from rel.spaces import Discrete
@@ -56,11 +56,11 @@ def rows_of(table: Mapping[Any, Sequence[float]], prefix: str = "") -> Iterator[
 
 
 @dataclass(frozen=True, slots=True)
-class Transition(Generic[ObsT]):
+class Transition(Generic[ObsT, ActT]):
     """One step, as the agent sees it."""
 
     observation: ObsT
-    action: int
+    action: ActT
     reward: float
     next_observation: ObsT
     terminated: bool
@@ -102,7 +102,7 @@ class Agent(ABC, Generic[ObsT]):
         estimates across would be answering a question about the last problem.
         """
 
-    def observe(self, transition: Transition[ObsT]) -> None:
+    def observe(self, transition: Transition[ObsT, int]) -> None:
         """Take in one step. The default learns nothing."""
         self.steps += 1
 
@@ -393,7 +393,7 @@ class TabularAgent(Agent[ObsT]):
 
     # -- The target ---------------------------------------------------------
 
-    def bootstrap(self, transition: Transition[ObsT], value: float) -> float:
+    def bootstrap(self, transition: Transition[ObsT, int], value: float) -> float:
         """The learning target: the reward, plus the future unless there is none.
 
         A terminated episode has no future and the value is dropped. A

@@ -46,6 +46,15 @@ from rel.spaces import Discrete, Space
 
 ObsT = TypeVar("ObsT")
 
+#: What an environment accepts as an action.
+#:
+#: A whole number for every environment here but the ones whose action space is
+#: a box, where it is a tuple of floats. It is a parameter rather than a union
+#: so that an agent over whole numbers can subtract the start of its action
+#: space without narrowing anything first, which is what it did before there
+#: was more than one kind of action.
+ActT = TypeVar("ActT")
+
 # An empty info map, shared. A step that reports nothing extra hands this back
 # rather than building a dictionary that nothing reads.
 NO_INFO: Mapping[str, float] = {}

@@ -19,7 +19,7 @@ from rel.training import train
 THREE = Discrete(3)
 
 
-def pull(action: int, reward: float) -> Transition[int]:
+def pull(action: int, reward: float) -> Transition[int, int]:
     return Transition(0, action, reward, 0, False, False)
 
 

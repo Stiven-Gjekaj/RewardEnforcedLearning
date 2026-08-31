@@ -108,7 +108,7 @@ class DifferentialQ(TabularAgent[ObsT]):
         #: The reward per step this agent believes its policy collects.
         self.average = 0.0
 
-    def observe(self, transition: Transition[ObsT]) -> None:
+    def observe(self, transition: Transition[ObsT, int]) -> None:
         super().observe(transition)
 
         row = self.values(transition.observation)

@@ -191,9 +191,9 @@ class SemiGradientSarsa(LinearAgent):
 
     def __init__(self, *args: object, **options: object) -> None:
         super().__init__(*args, **options)  # type: ignore[arg-type]
-        self._held: Transition[Observation] | None = None
+        self._held: Transition[Observation, int] | None = None
 
-    def observe(self, transition: Transition[Observation]) -> None:
+    def observe(self, transition: Transition[Observation, int]) -> None:
         super().observe(transition)
 
         held = self._held
@@ -216,7 +216,7 @@ class SemiGradientSarsa(LinearAgent):
         super().end_episode()
 
     def _learn(
-        self, transition: Transition[Observation], next_action: int | None
+        self, transition: Transition[Observation, int], next_action: int | None
     ) -> None:
         encoded = self.coder.encode(transition.observation)
         current = self.value(encoded, transition.action)
@@ -237,7 +237,7 @@ class SemiGradientQ(LinearAgent):
     the next state whatever the policy does there.
     """
 
-    def observe(self, transition: Transition[Observation]) -> None:
+    def observe(self, transition: Transition[Observation, int]) -> None:
         super().observe(transition)
 
         encoded = self.coder.encode(transition.observation)

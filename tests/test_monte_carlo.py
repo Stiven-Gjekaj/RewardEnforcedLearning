@@ -14,15 +14,15 @@ from rel.training import train
 TWO = Discrete(2)
 
 
-def go(state: int, action: int, reward: float, landed: int) -> Transition[int]:
+def go(state: int, action: int, reward: float, landed: int) -> Transition[int, int]:
     return Transition(state, action, reward, landed, False, False)
 
 
-def ends(state: int, action: int, reward: float, landed: int) -> Transition[int]:
+def ends(state: int, action: int, reward: float, landed: int) -> Transition[int, int]:
     return Transition(state, action, reward, landed, True, False)
 
 
-def play(agent: MonteCarloControl, steps: list[Transition[int]]) -> None:
+def play(agent: MonteCarloControl, steps: list[Transition[int, int]]) -> None:
     for step in steps:
         agent.observe(step)
     agent.end_episode()

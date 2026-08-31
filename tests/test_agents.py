@@ -255,7 +255,7 @@ class TestNoAgentLearnsAboutACellItNeverStoodIn:
         stood_in: set[int] = set()
         watched = agent.observe
 
-        def observe(transition: Transition[int]) -> None:
+        def observe(transition: Transition[int, int]) -> None:
             stood_in.add(transition.observation)
             watched(transition)
 

@@ -142,7 +142,9 @@ class SarsaLambda(Sarsa[ObsT]):
 
     # -- The update ---------------------------------------------------------
 
-    def error(self, transition: Transition[ObsT], next_action: int | None) -> float:
+    def error(
+        self, transition: Transition[ObsT, int], next_action: int | None
+    ) -> float:
         """How wrong the value of the cell just left turned out to be."""
         row = self.values(transition.observation)
         index = transition.action - self.actions.start
@@ -157,7 +159,9 @@ class SarsaLambda(Sarsa[ObsT]):
 
         return target - row[index]
 
-    def _learn(self, transition: Transition[ObsT], next_action: int | None) -> None:
+    def _learn(
+        self, transition: Transition[ObsT, int], next_action: int | None
+    ) -> None:
         delta = self.error(transition, next_action)
         self.bump(transition.observation, transition.action)
 
@@ -190,7 +194,9 @@ class WatkinsQLambda(SarsaLambda[ObsT]):
     it is the reason the tree backup method exists.
     """
 
-    def error(self, transition: Transition[ObsT], next_action: int | None) -> float:
+    def error(
+        self, transition: Transition[ObsT, int], next_action: int | None
+    ) -> float:
         row = self.values(transition.observation)
         index = transition.action - self.actions.start
 
@@ -203,7 +209,9 @@ class WatkinsQLambda(SarsaLambda[ObsT]):
 
         return target - row[index]
 
-    def _learn(self, transition: Transition[ObsT], next_action: int | None) -> None:
+    def _learn(
+        self, transition: Transition[ObsT, int], next_action: int | None
+    ) -> None:
         # Whether the action taken next was the greedy one has to be read
         # before the update, because the update changes what greedy means.
         explored = next_action is not None and next_action != self.greedy(

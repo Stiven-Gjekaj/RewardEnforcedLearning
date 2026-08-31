@@ -138,7 +138,7 @@ class Predictor(Agent[int]):
         current = self.value(observation)
         self.v[observation] = current + self.current_step_size() * (target - current)
 
-    def target_from(self, transition: Transition[int]) -> float:
+    def target_from(self, transition: Transition[int, int]) -> float:
         """The one step target: the reward, plus the future unless there is none."""
         if transition.terminated:
             return transition.reward
@@ -179,7 +179,7 @@ class TemporalDifference(Predictor):
     where you ended up.
     """
 
-    def observe(self, transition: Transition[int]) -> None:
+    def observe(self, transition: Transition[int, int]) -> None:
         super().observe(transition)
         self._move(transition.observation, self.target_from(transition))
 
@@ -237,7 +237,7 @@ class NStepTD(Predictor):
         self._ended = False
         self._credited = 0
 
-    def observe(self, transition: Transition[int]) -> None:
+    def observe(self, transition: Transition[int, int]) -> None:
         super(Predictor, self).observe(transition)
 
         self._states.append(transition.observation)
@@ -306,12 +306,12 @@ class MonteCarloPrediction(Predictor):
             start_value=start_value,
         )
         self.first_visit = first_visit
-        self._episode: list[Transition[int]] = []
+        self._episode: list[Transition[int, int]] = []
 
     def start_episode(self) -> None:
         self._episode = []
 
-    def observe(self, transition: Transition[int]) -> None:
+    def observe(self, transition: Transition[int, int]) -> None:
         super(Predictor, self).observe(transition)
         self._episode.append(transition)
         if transition.done:
@@ -421,7 +421,7 @@ class TDLambda(Predictor):
                 faded[state] = value
         self.e = faded
 
-    def observe(self, transition: Transition[int]) -> None:
+    def observe(self, transition: Transition[int, int]) -> None:
         super(Predictor, self).observe(transition)
 
         error = self.target_from(transition) - self.value(transition.observation)

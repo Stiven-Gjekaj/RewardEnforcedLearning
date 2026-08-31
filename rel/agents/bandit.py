@@ -59,7 +59,7 @@ class BanditAgent(Agent[int]):
             return tied[0]
         return tied[self.rng.below(len(tied))]
 
-    def _record(self, transition: Transition[int]) -> int:
+    def _record(self, transition: Transition[int, int]) -> int:
         """Count the pull and give back the index of the lever."""
         index = transition.action - self.actions.start
         self.counts[index] += 1
@@ -100,7 +100,7 @@ class EpsilonGreedyBandit(BanditAgent):
             return self.actions.start + self.rng.below(self.actions.n)
         return self.greedy(observation)
 
-    def observe(self, transition: Transition[int]) -> None:
+    def observe(self, transition: Transition[int, int]) -> None:
         super().observe(transition)
         index = self._record(transition)
         error = transition.reward - self.estimates[index]
@@ -165,7 +165,7 @@ class UpperConfidenceBandit(BanditAgent):
         ]
         return self.actions.start + self._argmax(scores)
 
-    def observe(self, transition: Transition[int]) -> None:
+    def observe(self, transition: Transition[int, int]) -> None:
         super().observe(transition)
         index = self._record(transition)
         self.estimates[index] += (
@@ -225,7 +225,7 @@ class GradientBandit(BanditAgent):
     def greedy(self, observation: int) -> int:
         return self.actions.start + self._argmax(self.estimates)
 
-    def observe(self, transition: Transition[int]) -> None:
+    def observe(self, transition: Transition[int, int]) -> None:
         super().observe(transition)
         shares = self.probabilities()
         index = self._record(transition)

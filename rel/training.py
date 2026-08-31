@@ -41,7 +41,7 @@ from rel.core import DIGEST_FIGURES, Env, encoded
 from rel.metrics import Summary, last_mean, summarise
 
 
-def digest_line(transition: Transition[Any]) -> str:
+def digest_line(transition: Transition[Any, int]) -> str:
     """The one line of text that stands for a transition.
 
     This is what the digest hashes, and `rel.recording` writes a file whose
@@ -66,7 +66,7 @@ class Digest:
         self._hash = hashlib.blake2b(digest_size=8)
         self._steps = 0
 
-    def add(self, transition: Transition[Any]) -> None:
+    def add(self, transition: Transition[Any, int]) -> None:
         self._steps += 1
         self._hash.update(digest_line(transition).encode("ascii"))
 

@@ -111,7 +111,7 @@ class Reinforce(Agent[ObsT]):
                 self.value.parameters(), value_step_size, clip=clip
             )
 
-        self._episode: list[Transition[ObsT]] = []
+        self._episode: list[Transition[ObsT, int]] = []
 
     # -- Acting -------------------------------------------------------------
 
@@ -150,7 +150,7 @@ class Reinforce(Agent[ObsT]):
 
     # -- Learning -----------------------------------------------------------
 
-    def observe(self, transition: Transition[ObsT]) -> None:
+    def observe(self, transition: Transition[ObsT, int]) -> None:
         super().observe(transition)
         self._episode.append(transition)
 
@@ -160,7 +160,7 @@ class Reinforce(Agent[ObsT]):
             self._episode.clear()
         super().end_episode()
 
-    def _tail(self, transition: Transition[ObsT]) -> float:
+    def _tail(self, transition: Transition[ObsT, int]) -> float:
         """What the rest of an episode that the step limit stopped is worth.
 
         A cut off episode has a future. Calling that future zero is the fault

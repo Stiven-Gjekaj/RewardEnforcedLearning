@@ -24,15 +24,15 @@ from rel.training import evaluate, train
 TWO = Discrete(2)
 
 
-def go(state: int, action: int, reward: float, landed: int) -> Transition[int]:
+def go(state: int, action: int, reward: float, landed: int) -> Transition[int, int]:
     return Transition(state, action, reward, landed, False, False)
 
 
-def ends(state: int, action: int, reward: float, landed: int) -> Transition[int]:
+def ends(state: int, action: int, reward: float, landed: int) -> Transition[int, int]:
     return Transition(state, action, reward, landed, True, False)
 
 
-def cut(state: int, action: int, reward: float, landed: int) -> Transition[int]:
+def cut(state: int, action: int, reward: float, landed: int) -> Transition[int, int]:
     return Transition(state, action, reward, landed, False, True)
 
 

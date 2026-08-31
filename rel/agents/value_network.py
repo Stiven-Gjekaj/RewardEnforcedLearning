@@ -143,7 +143,7 @@ class DeepQ(Agent[ObsT]):
 
     # -- Learning ------------------------------------------------------------
 
-    def observe(self, transition: Transition[ObsT]) -> None:
+    def observe(self, transition: Transition[ObsT, int]) -> None:
         super().observe(transition)
 
         if self.memory is not None:
@@ -162,7 +162,7 @@ class DeepQ(Agent[ObsT]):
             self.target.copy_from(self.live)
             self.refreshes += 1
 
-    def _fit(self, batch: Sequence[Transition[ObsT]]) -> None:
+    def _fit(self, batch: Sequence[Transition[ObsT, int]]) -> None:
         loss: Tensor | None = None
         for transition in batch:
             predicted = select(
@@ -178,7 +178,7 @@ class DeepQ(Agent[ObsT]):
         scale(loss, 1.0 / len(batch)).backward()
         self.optimiser.step()
 
-    def _target_for(self, transition: Transition[ObsT]) -> float:
+    def _target_for(self, transition: Transition[ObsT, int]) -> float:
         """What this step says the action taken was worth.
 
         A terminated episode has no future. A step limit is not termination,

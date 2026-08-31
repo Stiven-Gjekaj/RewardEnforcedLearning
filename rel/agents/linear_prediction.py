@@ -191,7 +191,7 @@ class LinearPredictor(Agent[ObsT]):
     def current_step_size(self, values: Sequence[float]) -> float:
         return self.shared_out(self.step_size(self.steps), values)
 
-    def correction(self, transition: Transition[ObsT]) -> float:
+    def correction(self, transition: Transition[ObsT, int]) -> float:
         """How much more likely the target policy was to take this action."""
         return ratio(
             self.target(transition.observation),
@@ -199,7 +199,7 @@ class LinearPredictor(Agent[ObsT]):
             transition.action - self.actions.start,
         )
 
-    def observe(self, transition: Transition[ObsT]) -> None:
+    def observe(self, transition: Transition[ObsT, int]) -> None:
         super().observe(transition)
 
         rho = self.correction(transition)

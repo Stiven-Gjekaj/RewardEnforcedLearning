@@ -87,13 +87,13 @@ class DynaQ(TabularAgent[ObsT]):
                 f",{encoded(landed)},{int(ended)}"
             )
 
-    def observe(self, transition: Transition[ObsT]) -> None:
+    def observe(self, transition: Transition[ObsT, int]) -> None:
         super().observe(transition)
         self._apply(transition)
         self._remember(transition)
         self._plan()
 
-    def _apply(self, transition: Transition[ObsT]) -> None:
+    def _apply(self, transition: Transition[ObsT, int]) -> None:
         row = self.values(transition.observation)
         offset = transition.action - self.actions.start
         target = self.bootstrap(
@@ -101,7 +101,7 @@ class DynaQ(TabularAgent[ObsT]):
         )
         row[offset] += self.current_step_size() * (target - row[offset])
 
-    def _remember(self, transition: Transition[ObsT]) -> None:
+    def _remember(self, transition: Transition[ObsT, int]) -> None:
         key = (transition.observation, transition.action)
         if key not in self.model:
             self._seen.append(key)
@@ -181,7 +181,7 @@ class DynaQPlus(DynaQ[ObsT]):
         self.kappa = kappa
         self.last_taken: dict[tuple[ObsT, int], int] = {}
 
-    def _remember(self, transition: Transition[ObsT]) -> None:
+    def _remember(self, transition: Transition[ObsT, int]) -> None:
         for action in self.actions:
             key = (transition.observation, action)
             if key not in self.model:

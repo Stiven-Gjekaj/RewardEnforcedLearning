@@ -22,11 +22,11 @@ from rel.training import train
 TWO = Discrete(2)
 
 
-def go(state: int, action: int, reward: float, landed: int) -> Transition[int]:
+def go(state: int, action: int, reward: float, landed: int) -> Transition[int, int]:
     return Transition(state, action, reward, landed, False, False)
 
 
-def stop(state: int, action: int, reward: float, landed: int) -> Transition[int]:
+def stop(state: int, action: int, reward: float, landed: int) -> Transition[int, int]:
     return Transition(state, action, reward, landed, True, False)
 
 
@@ -199,7 +199,7 @@ class TestItLearns:
         stood_in: set[int] = set()
         watched = agent.observe
 
-        def observe(transition: Transition[int]) -> None:
+        def observe(transition: Transition[int, int]) -> None:
             stood_in.add(transition.observation)
             watched(transition)
 

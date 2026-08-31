@@ -72,9 +72,9 @@ class MonteCarloControl(TabularAgent[ObsT]):
         )
         self.averaging = step_size is None
         self.visits: dict[tuple[ObsT, int], int] = {}
-        self._episode: list[Transition[ObsT]] = []
+        self._episode: list[Transition[ObsT, int]] = []
 
-    def observe(self, transition: Transition[ObsT]) -> None:
+    def observe(self, transition: Transition[ObsT, int]) -> None:
         super().observe(transition)
         self._episode.append(transition)
 

@@ -38,7 +38,7 @@ WALK = (
 )
 
 
-def feed(agent: Predictor, steps: tuple[Transition[int], ...] = WALK) -> Predictor:
+def feed(agent: Predictor, steps: tuple[Transition[int, int], ...] = WALK) -> Predictor:
     agent.start_episode()
     for step in steps:
         agent.observe(step)

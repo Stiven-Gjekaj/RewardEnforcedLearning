@@ -35,7 +35,7 @@ def an_agent(**extra: object) -> DeepQ[int]:
 
 def go(
     state: int, action: int, reward: float, landed: int, **flags: bool
-) -> Transition[int]:
+) -> Transition[int, int]:
     return Transition(
         state,
         action,

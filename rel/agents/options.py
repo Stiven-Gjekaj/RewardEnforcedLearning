@@ -194,7 +194,7 @@ class OptionsQ(TabularAgent[int]):
     def start_episode(self) -> None:
         self.running = None
 
-    def observe(self, transition: Transition[int]) -> None:
+    def observe(self, transition: Transition[int, int]) -> None:
         super().observe(transition)
         if self.running is None:
             return
@@ -209,7 +209,7 @@ class OptionsQ(TabularAgent[int]):
             self._learn(transition)
             self.running = None
 
-    def _learn_from_step(self, transition: Transition[int]) -> None:
+    def _learn_from_step(self, transition: Transition[int, int]) -> None:
         """Learn from the step just taken, before knowing where it leads.
 
         Nothing here. This agent waits for the option to stop and credits the
@@ -218,7 +218,7 @@ class OptionsQ(TabularAgent[int]):
         difference between the two.
         """
 
-    def _learn(self, transition: Transition[int]) -> None:
+    def _learn(self, transition: Transition[int, int]) -> None:
         """Learn from the option that has just stopped."""
         assert self.running is not None
 
@@ -299,7 +299,7 @@ class IntraOptionQ(OptionsQ):
     credit its starting state twice for the same experience.
     """
 
-    def _learn(self, transition: Transition[int]) -> None:
+    def _learn(self, transition: Transition[int, int]) -> None:
         """Nothing but the counters.
 
         The multi step update is replaced rather than added to. The option
@@ -309,7 +309,7 @@ class IntraOptionQ(OptionsQ):
         self.finished += 1
         self.steps_in_options += self.length
 
-    def _learn_from_step(self, transition: Transition[int]) -> None:
+    def _learn_from_step(self, transition: Transition[int, int]) -> None:
         step_size = self.current_step_size()
 
         for index, option in enumerate(self.options):
@@ -322,7 +322,9 @@ class IntraOptionQ(OptionsQ):
             )
             self._bump()
 
-    def _target(self, option: Option, index: int, transition: Transition[int]) -> float:
+    def _target(
+        self, option: Option, index: int, transition: Transition[int, int]
+    ) -> float:
         """What this step says the option is worth, from where it landed.
 
         A terminated episode has no future at all. Otherwise it is the option's

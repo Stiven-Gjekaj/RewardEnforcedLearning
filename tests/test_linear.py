@@ -33,19 +33,19 @@ def a_coder(grids: int = 4) -> TileCoder:
 
 def go(
     here: float, action: int, reward: float, there: float
-) -> Transition[tuple[float, ...]]:
+) -> Transition[tuple[float, ...], int]:
     return Transition((here,), action, reward, (there,), False, False)
 
 
 def ends(
     here: float, action: int, reward: float, there: float
-) -> Transition[tuple[float, ...]]:
+) -> Transition[tuple[float, ...], int]:
     return Transition((here,), action, reward, (there,), True, False)
 
 
 def cut(
     here: float, action: int, reward: float, there: float
-) -> Transition[tuple[float, ...]]:
+) -> Transition[tuple[float, ...], int]:
     return Transition((here,), action, reward, (there,), False, True)
 
 

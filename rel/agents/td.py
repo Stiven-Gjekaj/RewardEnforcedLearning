@@ -39,7 +39,7 @@ class QLearning(TabularAgent[ObsT]):
     sometimes wanders, which is what makes it learn the cliff edge.
     """
 
-    def observe(self, transition: Transition[ObsT]) -> None:
+    def observe(self, transition: Transition[ObsT, int]) -> None:
         super().observe(transition)
 
         row = self.values(transition.observation)
@@ -91,9 +91,9 @@ class Sarsa(TabularAgent[ObsT]):
             optimism=optimism,
             explore=explore,
         )
-        self._held: Transition[ObsT] | None = None
+        self._held: Transition[ObsT, int] | None = None
 
-    def observe(self, transition: Transition[ObsT]) -> None:
+    def observe(self, transition: Transition[ObsT, int]) -> None:
         super().observe(transition)
 
         held = self._held
@@ -122,7 +122,9 @@ class Sarsa(TabularAgent[ObsT]):
             self._held = None
         super().end_episode()
 
-    def _learn(self, transition: Transition[ObsT], next_action: int | None) -> None:
+    def _learn(
+        self, transition: Transition[ObsT, int], next_action: int | None
+    ) -> None:
         row = self.values(transition.observation)
         index = transition.action - self.actions.start
 
@@ -145,7 +147,7 @@ class ExpectedSarsa(TabularAgent[ObsT]):
     walk it reaches a good policy in fewer episodes than either neighbour.
     """
 
-    def observe(self, transition: Transition[ObsT]) -> None:
+    def observe(self, transition: Transition[ObsT, int]) -> None:
         super().observe(transition)
 
         row = self.values(transition.observation)
@@ -228,7 +230,7 @@ class DoubleQ(TabularAgent[ObsT]):
             )
         ]
 
-    def observe(self, transition: Transition[ObsT]) -> None:
+    def observe(self, transition: Transition[ObsT, int]) -> None:
         super().observe(transition)
 
         # The row being written needs `values`, which makes one. The two rows
@@ -298,7 +300,7 @@ class NStepSarsa(TabularAgent[ObsT]):
         self._end: int | None = None
         self._next = 0
 
-    def observe(self, transition: Transition[ObsT]) -> None:
+    def observe(self, transition: Transition[ObsT, int]) -> None:
         super().observe(transition)
 
         self._states.append(transition.observation)

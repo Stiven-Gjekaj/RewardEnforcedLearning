@@ -50,12 +50,12 @@ class Replay(Generic[ObsT]):
 
         self.rng = rng
         self.capacity = capacity
-        self._kept: list[Transition[ObsT]] = []
+        self._kept: list[Transition[ObsT, int]] = []
         self._cursor = 0
         #: How many steps have ever been put in, including the ones dropped.
         self.seen = 0
 
-    def add(self, transition: Transition[ObsT]) -> None:
+    def add(self, transition: Transition[ObsT, int]) -> None:
         self.seen += 1
         if len(self._kept) < self.capacity:
             self._kept.append(transition)
@@ -64,7 +64,7 @@ class Replay(Generic[ObsT]):
         self._kept[self._cursor] = transition
         self._cursor = (self._cursor + 1) % self.capacity
 
-    def sample(self, size: int) -> list[Transition[ObsT]]:
+    def sample(self, size: int) -> list[Transition[ObsT, int]]:
         """`size` steps drawn at random, with replacement.
 
         A buffer holding fewer than `size` steps gives what it has rather than
@@ -78,7 +78,7 @@ class Replay(Generic[ObsT]):
             return []
         return [self._kept[self.rng.below(len(self._kept))] for _ in range(size)]
 
-    def steps(self) -> Sequence[Transition[ObsT]]:
+    def steps(self) -> Sequence[Transition[ObsT, int]]:
         """Everything in the buffer, oldest first is not promised."""
         return tuple(self._kept)
 

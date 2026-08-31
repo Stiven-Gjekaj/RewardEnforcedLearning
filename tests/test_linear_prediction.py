@@ -40,11 +40,11 @@ ONE_HOT: list[list[float]] = [
 ]
 
 
-def step(here: int, action: int, reward: float, there: int) -> Transition[int]:
+def step(here: int, action: int, reward: float, there: int) -> Transition[int, int]:
     return Transition(here, action, reward, there, False, False)
 
 
-def ends(here: int, action: int, reward: float, there: int) -> Transition[int]:
+def ends(here: int, action: int, reward: float, there: int) -> Transition[int, int]:
     return Transition(here, action, reward, there, True, False)
 
 
@@ -186,7 +186,7 @@ class TestItIsTheTabularUpdateWithTheTableRemoved:
     """
 
     @staticmethod
-    def _walk() -> list[Transition[int]]:
+    def _walk() -> list[Transition[int, int]]:
         return [
             step(0, 0, 1.0, 1),
             step(1, 1, -2.0, 2),

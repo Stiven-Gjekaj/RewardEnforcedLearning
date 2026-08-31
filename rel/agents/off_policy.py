@@ -132,7 +132,7 @@ class OffPolicyMonteCarlo(TabularAgent[ObsT]):
         #: estimator and a sum of the ratios for the weighted one, which is the
         #: only difference between them.
         self.weight: dict[tuple[ObsT, int], float] = {}
-        self._episode: list[Transition[ObsT]] = []
+        self._episode: list[Transition[ObsT, int]] = []
 
     def target_probabilities(self, observation: ObsT) -> list[float]:
         """The greedy policy: all of the weight on the best action."""
@@ -141,7 +141,7 @@ class OffPolicyMonteCarlo(TabularAgent[ObsT]):
         shares[best] = 1.0
         return shares
 
-    def observe(self, transition: Transition[ObsT]) -> None:
+    def observe(self, transition: Transition[ObsT, int]) -> None:
         super().observe(transition)
         self._episode.append(transition)
 

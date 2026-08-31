@@ -30,7 +30,7 @@ CORRIDOR = Option(name="to the end", policy={0: 1, 1: 1, 2: 1}, stops=frozenset(
 
 def go(
     state: int, action: int, reward: float, landed: int, **flags: bool
-) -> Transition[int]:
+) -> Transition[int, int]:
     return Transition(
         state,
         action,
@@ -273,7 +273,7 @@ class TestItLearns:
         stood_in: set[int] = set()
         watched = agent.observe
 
-        def observe(transition: Transition[int]) -> None:
+        def observe(transition: Transition[int, int]) -> None:
             stood_in.add(transition.observation)
             watched(transition)
 
@@ -554,7 +554,7 @@ class TestIntraOptionLearns:
         stood_in: set[int] = set()
         watched = agent.observe
 
-        def observe(transition: Transition[int]) -> None:
+        def observe(transition: Transition[int, int]) -> None:
             stood_in.add(transition.observation)
             watched(transition)
 

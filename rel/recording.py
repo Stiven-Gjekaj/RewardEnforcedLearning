@@ -88,7 +88,7 @@ class Recorder(Digest):
         super().__init__()
         self._kept: list[str] = []
 
-    def add(self, transition: Transition[Any]) -> None:
+    def add(self, transition: Transition[Any, int]) -> None:
         super().add(transition)
         self._kept.append(
             digest_line(transition).rstrip("\n")
@@ -311,7 +311,7 @@ def read_run(path: str | Path, *, check: bool = True) -> Recording:
     return parse(raw.decode("utf-8"), where=str(found), check=check)
 
 
-def watched(steps: Iterable[Transition[Any]]) -> Recorder:
+def watched(steps: Iterable[Transition[Any, int]]) -> Recorder:
     """A recorder that has already seen these steps. For tests and for replay."""
     recorder = Recorder()
     for step in steps:

@@ -9,7 +9,7 @@ from rel.agents.replay import Replay
 from rel.rng import Rng
 
 
-def step(number: int) -> Transition[int]:
+def step(number: int) -> Transition[int, int]:
     return Transition(number, 0, float(number), number + 1, False, False)
 
 

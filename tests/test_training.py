@@ -341,7 +341,7 @@ def test_the_loop_hands_the_agent_the_action_it_returned() -> None:
         def greedy(self, observation: int) -> int:
             return self.act(observation)
 
-        def observe(self, transition: Transition[int]) -> None:
+        def observe(self, transition: Transition[int, int]) -> None:
             assert transition.action == taken[-1]
 
     env: Env[int] = Corridor(Rng(1))
