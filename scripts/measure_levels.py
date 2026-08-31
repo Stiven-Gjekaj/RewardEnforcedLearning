@@ -12,7 +12,8 @@ into levels, and the question this answers is how many levels are worth having.
 Two things are measured.
 
 **The ladder.** The same agent over the same problem at several counts of
-levels, at two budgets. The answer is not the one a reader expects.
+levels, at two budgets. The two columns disagree about which count is best,
+and that disagreement is the answer.
 
 **The two kinds of agent.** What learns this problem at all: the agents that
 keep a value and rank it, against the ones that learn a policy directly, with
@@ -95,23 +96,34 @@ def ladder_section(
         f"{WATCHED} greedy episodes.\n"
     )
 
-    rows: list[list[str]] = []
+    got: dict[tuple[int, int], float] = {}
     for count in levels:
-        row = [str(count)]
         for episodes in budgets:
-            got = [
+            seeds = [
                 on_levels(LADDER_AGENT, count, seed, episodes)
                 for seed in range(1, runs + 1)
             ]
-            row.append(f"{statistics.mean(got):.1f}")
-        rows.append(row)
+            got[count, episodes] = statistics.mean(seeds)
 
     for line in table(
         ["levels", *(f"{episodes} episodes" for episodes in budgets)],
-        rows,
+        [
+            [str(count), *(f"{got[count, episodes]:.1f}" for episodes in budgets)]
+            for count in levels
+        ],
         align=["right", *("right" for _ in budgets)],
     ):
         print(f"  {line}")
+
+    # Which row won each column, worked out rather than written down. The
+    # first reading of this table was from one budget, and the sentence under
+    # it said that a finer cut is never better. The second budget disagreed.
+    print()
+    for episodes in budgets:
+        best = max(levels, key=lambda count: got[count, episodes])
+        print(
+            f"  Best at {episodes} episodes: {best} levels, {got[best, episodes]:.1f}"
+        )
 
 
 def agents_section(runs: int, episodes: int, levels: int) -> None:
@@ -151,10 +163,11 @@ def main() -> int:
     agents_section(args.runs, budgets[0], args.middle)
 
     print(
-        "\nA finer cut is not a better one. Two levels is a switch, and full "
-        "power in\nwhichever direction the weight is already moving reaches "
-        "the top, so a switch\nis enough here and every extra level is another "
-        "column to learn."
+        "\nA coarse cut learns faster and a fine one learns better. Every extra "
+        "level\nis another column to learn, so a small budget is spent better on "
+        "fewer of\nthem, and a switch is enough to swing this problem up at all. "
+        "Which count is\nright is a question about the budget rather than about "
+        "the environment."
     )
     print(f"\nTook {time.perf_counter() - started:.0f}s.")
     return 0

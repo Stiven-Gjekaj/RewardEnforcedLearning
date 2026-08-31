@@ -165,6 +165,24 @@ class TestTheReport:
         ]
         assert rungs == ["2", "4"]
 
+    def test_the_best_row_of_each_column_is_worked_out(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The line under the ladder is read off the table rather than typed.
+
+        The first reading of that table was from one budget, and the sentence
+        under it said a finer cut is never better. Adding the second budget
+        disagreed, and a sentence somebody typed does not notice.
+        """
+        self._run(script, monkeypatch, "--levels", "2", "3", "--middle", "3")
+        ladder = capsys.readouterr().out.split("What learns")[0]
+        said = [line for line in ladder.splitlines() if "Best at" in line]
+        assert len(said) == 1
+        assert said[0].split()[4] in {"2", "3"}
+
     def test_a_second_budget_is_a_second_column(
         self,
         script: ModuleType,
