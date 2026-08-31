@@ -25,6 +25,7 @@ KNOWN_TAGS = frozenset(
         "average-reward",
         "bandit",
         "baseline",
+        "continuous-actions",
         "linear",
         "needs-model",
         "network",
@@ -60,7 +61,12 @@ DEFAULT_ENVIRONMENT = "cliff"
 #: rather than working them out from a box, so the tag they share with the
 #: agents over a tile coder points at the wrong environment for them. Baird's
 #: counterexample is the one that carries a table.
-INSTEAD = {"mcts": "maze", "linear-td": "baird", "gradient-td": "baird"}
+INSTEAD = {
+    "mcts": "maze",
+    "linear-td": "baird",
+    "gradient-td": "baird",
+    "gaussian-actor-critic": "pendulum",
+}
 
 
 def environment_for(name: str, seed: int = 1) -> Env[Any, Any]:

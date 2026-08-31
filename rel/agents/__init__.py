@@ -52,6 +52,7 @@ from rel.agents.dp import FixedPolicyAgent, value_iteration
 from rel.agents.dyna import DynaQ, DynaQPlus
 from rel.agents.explore import as_rule
 from rel.agents.features import encoder_for
+from rel.agents.gaussian import GaussianActorCritic
 from rel.agents.linear import SemiGradientQ, SemiGradientSarsa
 from rel.agents.linear_prediction import (
     GradientTD,
@@ -670,6 +671,52 @@ def _linear(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder:
     return build
 
 
+def _a_box_of_actions(env: Env[Any, Any]) -> Box:
+    """The environment's action space, when its actions are numbers.
+
+    The other side of `_whole_numbers`. An agent whose policy is a
+    distribution over a box needs the bounds of one, and an environment that
+    hands out a short list of actions instead is refused here rather than
+    where the bounds would be read.
+    """
+    space = env.action_space
+    if not isinstance(space, Box):
+        raise TypeError(
+            f"{env.spec.name} takes an action from {space!r}, and this agent "
+            f"aims at a point in a box. An environment whose actions are a "
+            f"short list needs any of the other agents, or `pendulum-levels` "
+            f"is that list cut from this box."
+        )
+    return space
+
+
+def _gaussian(
+    rng: Rng,
+    env: Env[Any, Any],
+    hidden: int = 32,
+    step_size: float = 0.05,
+    value_step_size: float = 0.05,
+    spread_step_size: float = 0.01,
+    discount: float = 0.99,
+    spread: float = 0.5,
+    entropy: float = 0.0,
+) -> Agent[Any, Any]:
+    encoder, features = encoder_for(env.observation_space)
+    return GaussianActorCritic(
+        rng,
+        _a_box_of_actions(env),
+        encoder,
+        features,
+        hidden=hidden,
+        step_size=step_size,
+        value_step_size=value_step_size,
+        spread_step_size=spread_step_size,
+        discount=discount,
+        spread=spread,
+        entropy=entropy,
+    )
+
+
 def _whole_numbers(env: Env[Any, Any]) -> Discrete:
     """The environment's action space, when its actions are whole numbers.
 
@@ -1046,6 +1093,12 @@ AGENTS: Registry[Agent[Any, Any]] = Registry(
             "The same, with the term that stops it diverging put back.",
             _gradient_td,
             tags=("linear", "prediction", "off-policy"),
+        ),
+        Entry(
+            "gaussian-actor-critic",
+            "Aims at a point in a box and learns how far to wander from it.",
+            _gaussian,
+            tags=("network", "on-policy", "continuous-actions"),
         ),
         Entry(
             "deep-q",
