@@ -20,7 +20,10 @@ from types import ModuleType
 
 import pytest
 
-from rel.envs.baird import STARTING_WEIGHTS, Baird
+from rel.agents.base import Transition
+from rel.agents.linear_prediction import SemiGradientTD, fixed
+from rel.agents.lookup import Lookup
+from rel.envs.baird import SOLID, STARTING_WEIGHTS, Baird
 from rel.rng import Rng
 
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "measure_triad.py"
@@ -54,6 +57,20 @@ def body_of(name: str) -> str:
     raise AssertionError(f"{name} is not in the script")
 
 
+class HalfAndHalf(Baird):
+    """The counterexample under a behaviour policy that dashes half the time.
+
+    It is not the counterexample any more, because the closed form for the
+    crossing assumes an even spread over the states. It is here so that
+    `visits` has something to work out: at these shares the agent spends half
+    its time in the lower state and a twelfth in each of the others.
+    """
+
+    @property
+    def behaviour_shares(self) -> tuple[float, ...]:
+        return (0.5, 0.5)
+
+
 class TestWhereTheAgentIs:
     def test_the_behaviour_policy_is_everywhere_equally(
         self, script: ModuleType
@@ -63,6 +80,18 @@ class TestWhereTheAgentIs:
             assert len(spread) == upper + 1
             assert max(spread) - min(spread) < 1e-12, upper
             assert sum(spread) == pytest.approx(1.0)
+
+    def test_a_spread_that_is_not_even_comes_out_uneven(
+        self, script: ModuleType
+    ) -> None:
+        # The even answer is also the guess it starts from, so on this
+        # environment a version that never iterated at all would agree with
+        # one that does. This is an environment where they cannot.
+        spread = script.visits(HalfAndHalf(Rng(1).stream("env")))
+        assert sum(spread) == pytest.approx(1.0)
+        assert spread[6] == pytest.approx(0.5)
+        for state in range(6):
+            assert spread[state] == pytest.approx(0.5 / 6), state
 
     def test_it_is_worked_out_rather_than_written_down(
         self, script: ModuleType
@@ -102,14 +131,50 @@ class TestTheExpectedUpdate:
     def test_weights_of_zero_have_nothing_to_change(self, script: ModuleType) -> None:
         # Nothing pays anything, so a value of zero everywhere has no error
         # anywhere, and the answer the agent is looking for is already in it.
-        from rel.agents.lookup import Lookup
-
         env = an_environment()
         coder = Lookup(env.feature_rows)
         change = script.expected_change(
             env, coder, script.visits(env), [0.0] * coder.features, 0.99
         )
         assert change == [0.0] * coder.features
+
+    def test_it_is_the_agents_own_update_averaged_over_the_steps(
+        self, script: ModuleType
+    ) -> None:
+        """The strongest thing that can be said about the expected update.
+
+        Put all the weight of the state distribution on one state, and what
+        comes back is the step the agent takes there, times how often the
+        behaviour policy takes the action that leads to it. Anything the
+        expected update forgets, from the ratio to the divisor the step size
+        is shared out by, moves one side of this and not the other.
+        """
+        env = an_environment()
+        coder = Lookup(env.feature_rows)
+        before = script.starting_weights(env)
+        step = 0.05
+
+        agent = SemiGradientTD(
+            Rng(1).stream("agent"),
+            env.action_space,
+            coder,
+            fixed(env.behaviour_shares),
+            fixed(env.target_shares),
+            step_size=step,
+            discount=0.99,
+        )
+        agent.weights[:] = list(before)
+        agent.observe(Transition(0, SOLID, 0.0, env.lower, False, False))
+        moved = [after - was for after, was in zip(agent.weights, before, strict=True)]
+
+        here = [0.0] * env.observation_space.n
+        here[0] = 1.0
+        change = script.expected_change(env, coder, here, list(before), 0.99)
+
+        share = env.behaviour_shares[SOLID]
+        assert [step * one for one in change] == pytest.approx(
+            [share * one for one in moved]
+        )
 
     def test_it_settles_below_the_crossing(self, script: ModuleType) -> None:
         settled = script.expected_size(an_environment(), 0.8, script.EXPECTED_STEP, 400)
