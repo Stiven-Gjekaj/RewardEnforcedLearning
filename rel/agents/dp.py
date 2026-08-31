@@ -50,11 +50,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from rel.agents.base import DiscreteAgent
-from rel.core import TabularEnv
+from rel.core import Outcome, TabularEnv
 from rel.rng import Rng
 from rel.spaces import Discrete
 
 #: How small the largest change in a sweep has to be before the sweep stops.
+#: Every branch of every state and action, read once. See `_model`.
+Model = dict[tuple[int, int], Sequence[Outcome]]
+
 TOLERANCE = 1e-9
 
 #: A cap on the sweeps of one evaluation. Reaching it is reported as a failure
@@ -119,12 +122,13 @@ def value_iteration(
     values = [0.0] * count
     terminal = env.terminal_states()
     live = [state for state in range(count) if state not in terminal]
+    model = _model(env)
 
     for sweeps in range(1, max_sweeps + 1):  # noqa: B007
         largest = 0.0
         for state in live:
             best = max(
-                _backup(env, values, state, action, discount)
+                _backup(model[state, action], values, discount)
                 for action in env.action_space
             )
             largest = max(largest, abs(best - values[state]))
@@ -138,7 +142,7 @@ def value_iteration(
         )
 
     policy = tuple(
-        _greedy_action(env, values, state, discount) for state in range(count)
+        _greedy_action(env, model, values, state, discount) for state in range(count)
     )
     return Solution(
         values=tuple(values),
@@ -164,15 +168,20 @@ def policy_iteration(
     terminal = env.terminal_states()
     policy = _proper_policy(env, terminal)
     values: tuple[float, ...] = ()
+    model = _model(env)
 
     for rounds in range(1, max_rounds + 1):  # noqa: B007
-        values = _evaluate(env, policy, discount, tolerance, max_sweeps, terminal)
+        values = _evaluate(
+            env, policy, discount, tolerance, max_sweeps, terminal, model=model
+        )
 
         settled = True
         for state in range(env.observation_space.n):
             if state in terminal:
                 continue
-            better = _improve(env, values, state, policy[state], discount, tolerance)
+            better = _improve(
+                env, model, values, state, policy[state], discount, tolerance
+            )
             if better != policy[state]:
                 policy[state] = better
                 settled = False
@@ -269,6 +278,7 @@ def evaluate_shares(
         )
 
     terminal = env.terminal_states()
+    model = _model(env)
     values = [0.0] * env.observation_space.n
     sweeping = [
         state for state in range(env.observation_space.n) if state not in terminal
@@ -278,7 +288,7 @@ def evaluate_shares(
         largest = 0.0
         for state in sweeping:
             updated = sum(
-                share * _backup(env, values, state, action, discount)
+                share * _backup(model[state, action], values, discount)
                 for action, share in zip(env.action_space, shares[state], strict=True)
                 if share > 0.0
             )
@@ -446,16 +456,36 @@ def _start_value(env: TabularEnv, values: Sequence[float]) -> float:
     return sum(share * values[state] for share, state in env.start_states())
 
 
+def _model(env: TabularEnv) -> Model:
+    """Every branch of every state and action, read once.
+
+    `transitions` builds a fresh tuple of outcomes on every call, and a sweep
+    asks for the same ones again on every pass. On the thousand cell walk that
+    is a hundred branches for each of a thousand states, twice, and the
+    building of them was very nearly the whole cost: reading them once takes a
+    sweep of that walk from 147 seconds to 13.
+
+    A model is a description of the environment rather than of where it is
+    standing, so reading it once is not an assumption. Nothing steps an
+    environment during a sweep, and
+    `tests/test_model_agrees_with_stepping.py` holds every environment here to
+    a model that does not move while it is stepped either.
+    """
+    return {
+        (state, action): env.transitions(state, action)
+        for state in range(env.observation_space.n)
+        for action in env.action_space
+    }
+
+
 def _backup(
-    env: TabularEnv,
+    branches: Sequence[Outcome],
     values: Sequence[float],
-    state: int,
-    action: int,
     discount: float,
 ) -> float:
     """What one action is worth, given what the states after it are worth."""
     total = 0.0
-    for outcome in env.transitions(state, action):
+    for outcome in branches:
         if outcome.probability <= 0.0:
             continue
         if outcome.terminated or discount == 0.0:
@@ -474,7 +504,11 @@ def _backup(
 
 
 def _greedy_action(
-    env: TabularEnv, values: Sequence[float], state: int, discount: float
+    env: TabularEnv,
+    model: Model,
+    values: Sequence[float],
+    state: int,
+    discount: float,
 ) -> int:
     """The best action, with ties going to the lowest number.
 
@@ -485,7 +519,7 @@ def _greedy_action(
     best_action = env.action_space.start
     best_value = -math.inf
     for action in env.action_space:
-        value = _backup(env, values, state, action, discount)
+        value = _backup(model[state, action], values, discount)
         if value > best_value:
             best_value = value
             best_action = action
@@ -494,6 +528,7 @@ def _greedy_action(
 
 def _improve(
     env: TabularEnv,
+    model: Model,
     values: Sequence[float],
     state: int,
     current: int,
@@ -508,12 +543,12 @@ def _improve(
     at size eight is one of those, and it ran for a thousand rounds without
     stopping before this margin was put in.
     """
-    best = _greedy_action(env, values, state, discount)
+    best = _greedy_action(env, model, values, state, discount)
     if best == current:
         return current
 
-    gain = _backup(env, values, state, best, discount) - _backup(
-        env, values, state, current, discount
+    gain = _backup(model[state, best], values, discount) - _backup(
+        model[state, current], values, discount
     )
     return best if gain > tolerance else current
 
@@ -526,6 +561,7 @@ def _evaluate(
     max_sweeps: int,
     terminal: frozenset[int],
     live: set[int] | None = None,
+    model: Model | None = None,
 ) -> tuple[float, ...]:
     """What each state is worth under this policy.
 
@@ -533,6 +569,9 @@ def _evaluate(
     not a number, which says "this policy never goes here" rather than zero,
     which would say "this policy goes here and it is worth nothing".
     """
+    if model is None:
+        model = _model(env)
+
     count = env.observation_space.n
     if live is None:
         values = [0.0] * count
@@ -544,7 +583,7 @@ def _evaluate(
     for _ in range(max_sweeps):
         largest = 0.0
         for state in sweeping:
-            updated = _backup(env, values, state, policy[state], discount)
+            updated = _backup(model[state, policy[state]], values, discount)
             largest = max(largest, abs(updated - values[state]))
             values[state] = updated
         if largest < tolerance:

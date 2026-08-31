@@ -16,6 +16,7 @@ import pytest
 from rel.agents.dp import (
     DidNotSettleError,
     FixedPolicyAgent,
+    _model,
     average_reward,
     evaluate_policy,
     evaluate_shares,
@@ -512,3 +513,38 @@ class TestTheLongWalkUnderTheUniformPolicy:
         values = self._values()
         for state in (1, 50, 200, 499):
             assert values[state] + values[1001 - state] == pytest.approx(1.0, abs=1e-6)
+
+
+class TestTheModelIsReadOnce:
+    """A sweep asks for the same branches on every pass and they never move.
+
+    Reading them once is a speed change and not a behaviour change, so what is
+    worth holding is that it changes no number, and that a model read once is
+    the model the environment describes.
+    """
+
+    def test_it_holds_every_pair(self) -> None:
+        env = cliff_walk(Rng(1).stream("env"))
+        model = _model(env)
+        assert len(model) == env.observation_space.n * env.action_space.n
+        for state in range(env.observation_space.n):
+            for action in env.action_space:
+                assert model[state, action] == env.transitions(state, action)
+
+    @pytest.mark.parametrize(
+        "builder", [cliff_walk, dyna_maze, four_rooms, frozen_lake, windy_grid]
+    )
+    def test_reading_it_twice_gives_the_same_thing(self, builder: object) -> None:
+        # Which is what makes reading it once safe. A model that moved between
+        # two reads would be an environment describing where it is standing
+        # rather than what it is.
+        env = builder(Rng(1).stream("env"))  # type: ignore[operator]
+        assert _model(env) == _model(env)
+
+    def test_the_long_walk_is_worth_the_same_as_the_closed_form_says(self) -> None:
+        # The small walk, whose values are arithmetic, through the same code
+        # path the thousand cell one uses.
+        walk = RandomWalk(Rng(1).stream("env"), size=9)
+        assert evaluate_shares(walk, uniform_shares(walk)) == pytest.approx(
+            walk.true_values(), abs=1e-6
+        )
