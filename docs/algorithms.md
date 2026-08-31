@@ -1343,6 +1343,69 @@ built to find that out.
 
 ---
 
+## The smallest approximation there is
+
+```console
+$ python scripts/measure_aggregation.py
+$ rel train linear-td --env long-walk --set groups=50
+```
+
+Put the states into groups and keep one number for each group. That is state
+aggregation, and it is the whole of function approximation with everything
+optional taken out: no features to design, no widths to choose, nothing but a
+count.
+
+`long-walk` is a thousand cells in a line, and a step covers up to a hundred of
+them either way. A table there has a thousand rows and learns nothing about one
+cell from standing in the next. Fifty groups is fifty numbers, and every cell
+in a group shares all of its learning with the other nineteen.
+
+### The floor is arithmetic
+
+What a staircase of `n` steps can say about a line is limited before any
+learning happens, and by how much is arithmetic: the best each step can be is
+the mean of the true values under it, and what is left is the error no agent
+can remove.
+
+| groups | best a staircase can do | what linear-td reached |
+| ---: | ---: | ---: |
+| 1 | 0.2717 | 0.3431 |
+| 2 | 0.1356 | 0.2637 |
+| 5 | 0.0539 | 0.1156 |
+| 10 | 0.0267 | 0.0619 |
+| 20 | 0.0134 | 0.0436 |
+| 50 | 0.0053 | **0.0301** |
+| 100 | **0.0027** | 0.0442 |
+
+*Five seeds, a thousand episodes, step size 0.2. The error is the root mean
+square against the true values, over the thousand cells an agent can be in.*
+
+**The two columns have their best in different places.** The floor falls all
+the way and halves with every doubling, because a staircase of twice as many
+steps is twice as close to a line. What the agent reaches falls to fifty
+groups and turns back up, because the same thousand episodes are spread over
+twice as many numbers to learn.
+
+The gap between the columns is the learning that has not finished, and it grows
+as the groups do. At one group the agent is within a quarter of the floor. At a
+hundred it is sixteen times it, and almost all of what it is wrong about is
+unfinished rather than unreachable.
+
+### Where the true values come from
+
+Not from a formula. The walk with a stride of one has a closed form, `k` over
+the number of gaps, and a stride of a hundred does not: a step passes an ending
+rather than landing on it, and that overshoot is exactly what the fair game
+argument leaves out. Cell 1000 of a thousand is worth 0.961 rather than the
+0.999 a straight line would give it.
+
+So the reference is a sweep of the model under the policy the walk is run at,
+which `rel.agents.dp.evaluate_shares` does. On the small walk that sweep is
+equal to the closed form at every size, and the script prints the two side by
+side, because a reference nothing checks is a reference nobody should trust.
+
+---
+
 ## The tile coder
 
 A tile coder lays several grids over a continuous space, each shifted by a
@@ -2651,10 +2714,10 @@ was where its numbers came from, and it had that wrong in a dozen places.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **444 of this
-  page's numbers are in prose rather than in a cell**, against 1184 in cells.
+- **Any number written in a sentence.** It reads tables, and **448 of this
+  page's numbers are in prose rather than in a cell**, against 1205 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 444 are settings, seed counts and episode caps rather than anything a
+  those 448 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -2710,7 +2773,7 @@ written as a console block.
   numbers have moved, and the difference is one line further down the report,
   which names the command and the budget it wanted. `--timeout` is what to
   reach for before believing the first reading.
-- **893 of 1184 numbers are checked.** The rest are in a table or a column that
+- **914 of 1205 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
@@ -2753,6 +2816,7 @@ which is harmless and still worth spelling one way.
 | One rule at several dials | `python scripts/measure_exploration.py --rules count-bonus:0.1,count-bonus:2` |
 | The three things that are safe in pairs | `python scripts/measure_triad.py` |
 | An action that is a number | `python scripts/measure_levels.py` |
+| The smallest approximation there is | `python scripts/measure_aggregation.py` |
 
 ### The commands that are behind no table
 
