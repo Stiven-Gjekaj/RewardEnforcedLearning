@@ -53,6 +53,13 @@ from rel.agents.dyna import DynaQ, DynaQPlus
 from rel.agents.explore import as_rule
 from rel.agents.features import encoder_for
 from rel.agents.linear import SemiGradientQ, SemiGradientSarsa
+from rel.agents.linear_prediction import (
+    GradientTD,
+    Policy,
+    SemiGradientTD,
+    fixed,
+)
+from rel.agents.lookup import Lookup
 from rel.agents.monte_carlo import MonteCarloControl
 from rel.agents.off_policy import Estimator, OffPolicyMonteCarlo
 from rel.agents.options import IntraOptionQ, OptionsQ
@@ -661,6 +668,84 @@ def _linear(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder:
     return build
 
 
+def _handed_features(env: Env[Any]) -> Lookup:
+    """The table of features the environment carries, if it carries one.
+
+    This is the third door of its kind, after `tiling_space` and the model a
+    tabular environment writes out: a builder reads one thing off the
+    environment for one turn and the agent never sees it. Baird's
+    counterexample is the whole reason. Its features are what makes it a
+    counterexample, and an agent that carried them would be an agent that knew
+    which environment it was in.
+    """
+    rows = getattr(env, "feature_rows", None)
+    if rows is None:
+        raise TypeError(
+            f"{env.spec.name} carries no table of features, and a linear "
+            f"predictor is handed one by the environment rather than working "
+            f"it out. This agent needs 'baird'."
+        )
+    return Lookup(rows)
+
+
+def _handed_policies(env: Env[Any]) -> tuple[Policy[int], Policy[int]]:
+    """The policy that collects the data and the policy the question is about.
+
+    An environment that says nothing about either is predicted under a uniform
+    policy, on-policy, which is the ordinary case and the one where every
+    importance ratio is one.
+    """
+    even = [1.0 / env.action_space.n] * env.action_space.n
+    behaviour = tuple(getattr(env, "behaviour_shares", even))
+    target = tuple(getattr(env, "target_shares", behaviour))
+    return fixed(behaviour), fixed(target)
+
+
+def _linear_prediction(cls: type[SemiGradientTD[int]]) -> AgentBuilder:
+    def build(
+        rng: Rng,
+        env: Env[Any],
+        step_size: float | Schedule = 0.05,
+        discount: float = 0.99,
+        start_value: float = 0.0,
+    ) -> Agent[Any]:
+        behaviour, target = _handed_policies(env)
+        return cls(
+            rng,
+            env.action_space,
+            _handed_features(env),
+            behaviour,
+            target,
+            step_size=step_size,
+            discount=discount,
+            start_value=start_value,
+        )
+
+    return build
+
+
+def _gradient_td(
+    rng: Rng,
+    env: Env[Any],
+    helper_step: float = 0.25,
+    step_size: float | Schedule = 0.05,
+    discount: float = 0.99,
+    start_value: float = 0.0,
+) -> Agent[Any]:
+    behaviour, target = _handed_policies(env)
+    return GradientTD(
+        rng,
+        env.action_space,
+        _handed_features(env),
+        behaviour,
+        target,
+        helper_step=helper_step,
+        step_size=step_size,
+        discount=discount,
+        start_value=start_value,
+    )
+
+
 def _radial(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder:
     def build(
         rng: Rng,
@@ -891,6 +976,18 @@ AGENTS: Registry[Agent[Any]] = Registry(
             "Q-learning over radial basis features.",
             _radial(SemiGradientQ),
             tags=("linear", "off-policy"),
+        ),
+        Entry(
+            "linear-td",
+            "Prediction over features handed in, which off-policy can diverge.",
+            _linear_prediction(SemiGradientTD),
+            tags=("linear", "prediction", "off-policy"),
+        ),
+        Entry(
+            "gradient-td",
+            "The same, with the term that stops it diverging put back.",
+            _gradient_td,
+            tags=("linear", "prediction", "off-policy"),
         ),
         Entry(
             "deep-q",

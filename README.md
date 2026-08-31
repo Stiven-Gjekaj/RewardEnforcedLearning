@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-2294_passing-427819?style=for-the-badge" alt="2294 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-2310_passing-427819?style=for-the-badge" alt="2310 tests passing"/>
 </p>
 
 <p align="center">
@@ -341,7 +341,7 @@ an agent when it is fifty times too large.
 rel/core.py         the contract: what an environment is, what a step is
 rel/rng.py          PCG written out, with named independent streams
 rel/envs/           sixteen environments. Never import an agent.
-rel/agents/         thirty four agents. Never import an environment.
+rel/agents/         thirty six agents. Never import an environment.
   dp.py             value iteration, policy iteration, exact policy values
   td.py             SARSA, Q-learning, Expected SARSA, Double Q, n-step
   tiles.py          tile coding, worked out exactly rather than hashed
@@ -401,7 +401,7 @@ import statements of every module:
 $ pytest
 ```
 
-2294 tests. Some of what they cover, and why each one is there rather than the
+2310 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A

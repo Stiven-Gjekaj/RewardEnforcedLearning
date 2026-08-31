@@ -55,7 +55,11 @@ DEFAULT_ENVIRONMENT = "cliff"
 #: cost millions of simulated steps, and this file runs several such episodes
 #: for every agent. The Dyna maze exercises the same code, settles in about
 #: sixteen steps, and costs a second.
-INSTEAD = {"mcts": "maze"}
+#: `linear-td` and `gradient-td` are handed their features by the environment
+#: rather than working them out from a box, so the tag they share with the
+#: agents over a tile coder points at the wrong environment for them. Baird's
+#: counterexample is the one that carries a table.
+INSTEAD = {"mcts": "maze", "linear-td": "baird", "gradient-td": "baird"}
 
 
 def environment_for(name: str, seed: int = 1) -> Env[Any]:
