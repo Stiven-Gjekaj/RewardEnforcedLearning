@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 
 from rel.agents import AGENTS
-from rel.agents.base import Transition
+from rel.agents.base import Agent, Transition
 from rel.core import Env
 from rel.envs import ENVIRONMENTS
 from rel.rng import Rng
@@ -263,3 +263,38 @@ class TestNoAgentLearnsAboutACellItNeverStoodIn:
 
         extra = set(agent.q) - stood_in  # type: ignore[attr-defined]
         assert extra == set(), f"{name} has rows for {sorted(extra)}"
+
+
+class TestTheLinearPredictorsStartOffTheAnswer:
+    """The default that `STARTS_AT` exists for, and the fault without it.
+
+    Baird's counterexample pays nothing, so its answer is zero, so an agent
+    that starts every state at zero has no error anywhere and never moves. It
+    is not wrong, it is finished before it begins, and the run it prints is
+    five hundred thousand steps in which nothing happens.
+    """
+
+    @staticmethod
+    def _trained(name: str, **options: float) -> Agent[Any]:
+        env = ENVIRONMENTS.make("baird", Rng(1).stream("env"))
+        agent = AGENTS.make(name, Rng(1).stream("agent"), env, **options)
+        train(env, agent, 5, discount=0.99)
+        return agent
+
+    @pytest.mark.parametrize("name", ["linear-td", "gradient-td"])
+    def test_the_default_start_leaves_something_to_learn(self, name: str) -> None:
+        agent = self._trained(name)
+        assert any(weight != 0.0 for weight in agent.weights)
+
+    @pytest.mark.parametrize("name", ["linear-td", "gradient-td"])
+    def test_starting_at_the_answer_moves_nothing_at_all(self, name: str) -> None:
+        agent = self._trained(name, start_value=0.0)
+        assert agent.weights == [0.0] * len(agent.weights)
+
+    def test_the_default_start_makes_every_state_worth_one(self) -> None:
+        # Every row of that table adds up to three, so a third in each weight
+        # is a value of one, and a whole one in each weight would be three.
+        env = ENVIRONMENTS.make("baird", Rng(1).stream("env"))
+        agent = AGENTS.make("linear-td", Rng(1).stream("agent"), env)
+        for state in range(env.observation_space.n):
+            assert agent.value(state) == pytest.approx(1.0)

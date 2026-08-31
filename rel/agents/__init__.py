@@ -701,13 +701,29 @@ def _handed_policies(env: Env[Any]) -> tuple[Policy[int], Policy[int]]:
     return fixed(behaviour), fixed(target)
 
 
+#: What a linear predictor here starts every state at.
+#:
+#: The classes start at nothing, which is the right general answer and is the
+#: one number that demonstrates nothing on the only environment these can run
+#: on. Baird's counterexample pays nothing, so nothing is the answer, so an
+#: agent that starts there has no error to move on and never takes a step.
+#: `rel train linear-td --env baird` printed a run of five hundred thousand
+#: steps in which no weight moved.
+#:
+#: One puts every state at a value of one, because every row of that table
+#: adds up to three and a weight of a third therefore makes a state worth one.
+#: A table whose rows do not agree cannot answer this at all, and `Lookup`
+#: says so rather than sharing out a number that is right for some states.
+STARTS_AT = 1.0
+
+
 def _linear_prediction(cls: type[SemiGradientTD[int]]) -> AgentBuilder:
     def build(
         rng: Rng,
         env: Env[Any],
         step_size: float | Schedule = 0.05,
         discount: float = 0.99,
-        start_value: float = 0.0,
+        start_value: float = STARTS_AT,
     ) -> Agent[Any]:
         behaviour, target = _handed_policies(env)
         return cls(
@@ -730,7 +746,7 @@ def _gradient_td(
     helper_step: float = 0.25,
     step_size: float | Schedule = 0.05,
     discount: float = 0.99,
-    start_value: float = 0.0,
+    start_value: float = STARTS_AT,
 ) -> Agent[Any]:
     behaviour, target = _handed_policies(env)
     return GradientTD(

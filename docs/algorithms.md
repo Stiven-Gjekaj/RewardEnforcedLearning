@@ -1685,8 +1685,8 @@ what a reader comparing this code with the book needs to see.
 
 ```console
 $ python scripts/measure_triad.py
-$ rel train linear-td --env baird
-$ rel train gradient-td --env baird
+$ rel train linear-td --env baird --episodes 20
+$ rel train gradient-td --env baird --episodes 20
 ```
 
 Everything above this point on the page has used at most two of these three at
