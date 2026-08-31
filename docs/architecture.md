@@ -121,6 +121,17 @@ it would be an attribute error.
 the action can take with its probability. That is enough for
 `rel/agents/dp.py` to work out the best possible policy exactly.
 
+Most of those models are a handful of branches written out. Two are not.
+`rel/envs/rental.py` builds its branches from a pair of Poisson distributions
+truncated at what a car park holds, and `rel/envs/blackjack.py` builds its own
+by recursion over the cards a dealer draws while under seventeen. Both are
+exact, and neither draws a card to make one.
+
+Blackjack is there because the book that uses it says the model is awkward to
+write, and writes none. Writing it means an agent that learns from episodes can
+be scored against the answer rather than against another agent, and every other
+episodic environment here is a grid where the model is obvious.
+
 That number is what makes every other claim checkable. "The agent reached -17"
 says nothing on its own. "The agent reached -17 and the best possible is -13"
 says what is left to gain, and it comes from the environment rather than from a
@@ -339,7 +350,7 @@ negative, an untouched entry of zero is the highest number in the table.
 | Solving exactly | [`rel/agents/dp.py`](../rel/agents/dp.py) |
 | The one step learners | [`rel/agents/td.py`](../rel/agents/td.py) |
 | The gradient engine | [`rel/nn/autograd.py`](../rel/nn/autograd.py) |
-| A point in a box turned into features | [`rel/agents/tiles.py`](../rel/agents/tiles.py) and [`rel/agents/basis.py`](../rel/agents/basis.py) |
+| A point in a box turned into features | [`rel/agents/tiles.py`](../rel/agents/tiles.py), [`rel/agents/basis.py`](../rel/agents/basis.py) and [`rel/agents/fourier.py`](../rel/agents/fourier.py) |
 | A state turned into features, from a table | [`rel/agents/lookup.py`](../rel/agents/lookup.py) |
 | Where the deadly triad diverges | [`rel/envs/baird.py`](../rel/envs/baird.py) and [`rel/agents/linear_prediction.py`](../rel/agents/linear_prediction.py) |
 | The rules about layering | [`tests/test_layering.py`](../tests/test_layering.py) |

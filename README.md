@@ -203,9 +203,22 @@ the path digest rather than trusting it.
 - **A task with no ending.** Two loops paying 1 and 2 a step, where any
   discount below 0.7394 makes the worse one the right answer. The reward there
   says exactly what was meant and the discount is the part that does not.
-- **A random walk.** The one environment here whose values are arithmetic
+- **A random walk.** One of two environments here whose values are arithmetic
   rather than another computation, which is what makes a prediction checkable
   against the answer.
+- **A bet on a coin.** The other one. A fair coin makes it a fair game, so a
+  capital is worth that capital over the goal however it is staked, and the
+  sweep agrees to 1.6e-12. At a fair coin every stake is as good as every
+  other, so the famous picture of its policy is a picture of a tie breaking
+  rule.
+- **Two car parks and a van.** The one model here that is a distribution
+  rather than a handful of branches written out. Requests and returns are
+  Poisson, and the two questions it answers exactly are what the van buys and
+  at what price it stops being used.
+- **Blackjack.** The card game the book uses to introduce Monte Carlo, because
+  the dealer playing out his whole hand is awkward to write as a model. It is
+  written out here, so an agent that learns from episodes can be scored
+  against the answer rather than against another agent.
 - **Control.** A cart pole and a mountain car, with the physics written out and
   a note on which integrator and why.
 - **Three where the reward is not the point.** A boat race that can be farmed,
@@ -229,7 +242,9 @@ package: see [docs/grids.md](docs/grids.md).
 - **Traces.** SARSA with eligibility traces and Watkins' Q with them, in
   accumulating, replacing and dutch flavours.
 - **Off-policy.** Monte Carlo with ordinary and weighted importance sampling,
-  and n-step tree backup, which asks the same question and never divides.
+  n-step tree backup, which asks the same question and never divides, and
+  Q(sigma), which is the family with tree backup at one end and the sample at
+  the other.
 - **Planning.** Dyna-Q, Dyna-Q+, and prioritised sweeping, which replays the
   step that matters rather than a random one. Beside them a tree search that
   plans at the moment of choosing instead, by running simulations from the
@@ -240,8 +255,11 @@ package: see [docs/grids.md](docs/grids.md).
 - **Options.** Q-learning whose choices can last several steps, over hallway
   options read off the layout rather than written down, with and without
   credit for the states an option passed through.
-- **Approximation.** Semi-gradient SARSA and Q-learning, over a tile coder or
-  over radial basis features. The same agent runs on either.
+- **Approximation.** Semi-gradient SARSA and Q-learning, over a tile coder,
+  over radial basis features, or over cosine waves whose only setting is an
+  order. The same agent runs on all three. Beside them state aggregation,
+  which is the smallest approximation there is: one number for each group of
+  states and nothing else to choose.
 - **Exploring.** Every tabular agent takes a rule: epsilon-greedy, softmax, or
   a count-based bonus. Optimistic initialisation sits beside them as a starting
   value rather than a rule.

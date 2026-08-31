@@ -48,6 +48,103 @@ written and not read back, because the action went into the file through an f
 string and came out through `int`. And a demonstration printed a torque to
 seventeen digits, which pushes the reward off a narrow terminal.
 
+**State aggregation and a Fourier basis**, as `aggregated`, `fourier-sarsa`
+and `fourier-q`. Two more ways of approximating a value, at the two ends of how
+much design they need.
+
+Aggregation is the smallest there is: put the states in groups and keep one
+number for each, so a thousand cells becomes fifty numbers and the count is the
+whole design. What a staircase of `n` steps can say about a line is arithmetic
+rather than a run, and the floor and what an agent reaches have their best at
+different counts: the floor halves with every doubling and what `linear-td`
+reaches turns back up past fifty groups.
+
+A Fourier basis is the other end. Every feature is a cosine wave over the whole
+box and an order is the whole design, with no bins, widths, centres or offsets
+to get right. Its one attached setting, dividing the step for each feature by
+how fast that feature waves, is measured both ways over ten seeds and **the
+sign flips**: it loses at order one, wins at order three, loses at order five
+and is not told apart at order seven, with three of those four intervals clear
+of zero.
+
+Both sides of that had to be swept over step sizes or the answer is a different
+question. Every scale a Fourier basis asks for is at most one, so scaling makes
+each step smaller as well as uneven, and the first probe of it found the scaled
+side far ahead at order five where the swept comparison puts the flat side
+ahead by 19.7.
+
+**A coder can ask for a different step size on each feature**, which is what
+the basis above needed and what nothing else here wants. `GradientTD` had to be
+changed as well as `SemiGradientTD`: the base class reads the scales in its
+constructor, so a subclass that forgot to apply them would keep a number it
+never used and quietly take the wrong step.
+
+**Two problems dynamic programming can answer exactly**, as `gambler`,
+`fair-gambler` and `rental`.
+
+The gambler stakes part of a capital on a coin, and its famous jagged staircase
+of a policy is mostly the solver. Varying two things that cannot change the
+answer, the sweep's tolerance and which of the two solvers ran it, moves 72 of
+the 99 stakes at a fair coin and 36 at the coin the literature draws. At a fair
+coin nothing is decided at all: every stake is exactly as good, and the widest
+gap between the best and worst anywhere on the board is 8e-13, which is the
+sweep's own rounding.
+
+A fair coin also gives this project its second closed form. A fair game stopped
+at either end is worth the same however it is played, so a capital is worth that
+capital over the goal, and the sweep agrees to 1.6e-12 over all ninety nine.
+
+The car rental is the one model here that is a distribution rather than a
+handful of branches written out. Its two questions are what the van buys and at
+what price it stops being used: 2.42 a day at the book's price of 2 a car,
+4.02 free, and nothing at all at 10, where the value falls back exactly onto
+the row with no van.
+
+Staking nothing is not an action, and the reason is measured. It is a loop of
+one state, so at a discount of one it ties with the best real stake everywhere,
+and built that way value iteration staked nothing at 35 of the 99 capitals and
+the policy it reported never reached an ending from anywhere.
+
+**Blackjack with the model the book says is awkward to write**, as `blackjack`.
+The book uses it to introduce Monte Carlo because the dealer plays out his whole
+hand. Writing the model out anyway means the optimal policy and the value of the
+deal are known before a card is dealt, and an agent that learns from episodes
+can be scored against the answer rather than against another agent.
+
+Solved, it reproduces the book's figure square for square on both halves of the
+board, which is the check that the model is right rather than merely consistent.
+
+Against it, Monte Carlo control at five hundred thousand hands reaches -0.048
+where perfect play is -0.047, eight or nine squares from the optimum. The
+docstring claim that a fixed step size is what control needs even in a fixed
+environment does not survive: the running average wins at the large budgets and
+a fixed step wins only at the small ones.
+
+**n-step Q(sigma)**, as `q-sigma`, which is the family with tree backup at one
+end and sampling at the other. Sutton and Barto raise the middle as a question
+and leave it open, and on the cliff walk over ten seeds the answer is no: tree
+backup reaches -13.800 and every other sigma is behind it, with 0.75 behind by
+1.600 on an interval clear of zero. The schedule the book suggests, sigma
+falling from one to nothing, lands with the middle rather than with either end.
+
+The collapse to tree backup at sigma of nothing is exact against a greedy target
+and the last bits against an averaged one. Writing it found a fault of its own:
+the first version asked the target policy for its shares three times inside one
+update, and a greedy target breaks ties by drawing, so the three answers could
+disagree and each spent randomness.
+
+**A sweep that did not settle guessed at why.** Both messages said the policy
+probably never ends. There are two reasons and they need different answers, and
+the gambler at a fair coin is where the guess became visibly wrong: every policy
+there ends, and an undiscounted walk over a hundred states settles slowly enough
+that a tight tolerance runs past twenty thousand sweeps while still converging.
+
+**Continuous integration runs the number checker.** It had existed for a while
+and nothing ran it, because a whole run of the page is three hours. Five fast
+commands and three tables is twenty seconds, and `--strict` is what turns a
+report into a gate: without it a table nothing accounts for is printed and the
+run exits zero.
+
 **The deadly triad**, as `baird`, `linear-td` and `gradient-td`. Function
 approximation, bootstrapping and off-policy learning were all here separately
 and nothing said what happens when they meet. Baird's counterexample is seven
