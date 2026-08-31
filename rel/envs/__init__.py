@@ -39,6 +39,7 @@ from rel.envs.classic import (
     dyna_maze,
     four_rooms,
     frozen_lake,
+    long_walk,
     random_walk,
     windy_grid,
 )
@@ -120,6 +121,12 @@ ENVIRONMENTS: Registry[Env[Any, Any]] = Registry(
             "walk",
             "Five cells in a line between two endings. The right one pays 1.",
             random_walk,
+            tags=("tabular",),
+        ),
+        Entry(
+            "long-walk",
+            "A thousand cells in a line, a hundred of them covered by a step.",
+            long_walk,
             tags=("tabular",),
         ),
         Entry(

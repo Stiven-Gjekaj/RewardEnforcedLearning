@@ -247,6 +247,24 @@ class RandomWalk(TabularEnv):
     a strong check and still a check against another computation. This is a
     check against arithmetic.
 
+    ## A step can be longer than one cell
+
+    `stride` is how many cells a step can cover. At one this is the walk above.
+    At more, the action still picks the direction and the environment picks the
+    distance, evenly between one cell and `stride`, and a step that would pass
+    an ending stops at it.
+
+    That is Sutton and Barto, example 9.1, and it is here because state
+    aggregation needs a state space too large to hold a row for each state. A
+    thousand cells taking one cell a step reaches an ending after about a
+    quarter of a million steps, which no episode limit worth having would
+    survive. A hundred cells a step reaches one after a few thousand.
+
+    **The closed form is for a stride of one.** A longer step overshoots the
+    ending rather than landing on it, and the overshoot is what the closed form
+    does not account for. `true_values` says so rather than answering, and
+    `rel.agents.dp` gives the values from the model.
+
     ## Why it is not a grid
 
     A one row grid would have four actions, two of which walk into a wall, and
@@ -265,12 +283,15 @@ class RandomWalk(TabularEnv):
     LEFT = 0
     RIGHT = 1
 
-    def __init__(self, rng: Rng, size: int = 5) -> None:
+    def __init__(self, rng: Rng, size: int = 5, stride: int = 1) -> None:
         super().__init__(rng)
 
         if size < 1:
             raise ValueError("A walk needs at least one cell between its endings.")
+        if stride < 1:
+            raise ValueError("A step covers at least one cell.")
         self.size = size
+        self.stride = stride
 
         self.observation_space = Discrete(size + 2)
         self.action_space = Discrete(2)
@@ -296,7 +317,19 @@ class RandomWalk(TabularEnv):
         the chance of reaching the right ending from the k-th cell is k over
         the number of gaps, and the value is that chance because the right
         ending pays 1 and nothing else pays anything.
+
+        Only when a step covers one cell. A longer step passes an ending rather
+        than landing on it, and that overshoot is exactly what the fair game
+        argument leaves out, so this refuses rather than answering a little
+        wrongly.
         """
+        if self.stride != 1:
+            raise ValueError(
+                f"The closed form is for a stride of one and this walk has "
+                f"{self.stride}. A longer step overshoots the ending. "
+                f"`rel.agents.dp.evaluate_policy` gives the values from the "
+                f"model instead."
+            )
         gaps = self.size + 1
         return tuple(
             0.0 if state in (0, self.size + 1) else state / gaps
@@ -326,24 +359,43 @@ class RandomWalk(TabularEnv):
         return self.at
 
     def _step(self, action: int) -> Step[int]:
-        landed, reward, ended = self._resolve(self.at, action)
+        step = 1 if self.stride == 1 else 1 + self.rng.below(self.stride)
+        landed, reward, ended = self._resolve(self.at, action, step)
         self.at = landed
         return Step(
             observation=landed, reward=reward, terminated=ended, truncated=False
         )
 
-    def _resolve(self, state: int, action: int) -> tuple[int, float, bool]:
+    def _resolve(
+        self, state: int, action: int, step: int = 1
+    ) -> tuple[int, float, bool]:
         if self.is_ending(state):
             return state, 0.0, True
 
-        landed = state - 1 if action == self.LEFT else state + 1
+        landed = state - step if action == self.LEFT else state + step
+        # A step that would pass an ending stops at it. Without this a walk of
+        # a hundred cells a step would leave the state space, and the ending
+        # reached is the one it was heading for either way.
+        landed = min(max(landed, 0), self.size + 1)
+
         if landed == self.size + 1:
             return landed, 1.0, True
         return landed, 0.0, landed == 0
 
     def transitions(self, state: int, action: int) -> Sequence[Outcome]:
-        landed, reward, ended = self._resolve(state, action)
-        return (Outcome(1.0, landed, reward, ended),)
+        share = 1.0 / self.stride
+        landings: dict[tuple[int, float, bool], float] = {}
+        for step in range(1, self.stride + 1):
+            # Several step sizes land on the same place once one of them has
+            # reached an ending, and a model that listed the same branch twice
+            # would be a model whose probabilities did not add up the way a
+            # reader counts them.
+            landed = self._resolve(state, action, step)
+            landings[landed] = landings.get(landed, 0.0) + share
+        return tuple(
+            Outcome(weight, landed, reward, ended)
+            for (landed, reward, ended), weight in landings.items()
+        )
 
     def start_states(self) -> Sequence[tuple[float, int]]:
         return ((1.0, self.start),)
@@ -365,6 +417,17 @@ def random_walk(rng: Rng, size: int = 5) -> RandomWalk:
     return RandomWalk(rng, size=size)
 
 
+def long_walk(rng: Rng, size: int = 1000, stride: int = 100) -> RandomWalk:
+    """The thousand cell walk of Sutton and Barto, example 9.1.
+
+    The same environment with a longer step and far more cells. It is here
+    because a table with a row for each of a thousand states learns nothing
+    from one state about the next, and state aggregation is the smallest thing
+    that does.
+    """
+    return RandomWalk(rng, size=size, stride=stride)
+
+
 __all__ = [
     "CLIFF",
     "CORRIDOR",
@@ -380,6 +443,7 @@ __all__ = [
     "dyna_maze",
     "four_rooms",
     "frozen_lake",
+    "long_walk",
     "random_walk",
     "windy_grid",
 ]
