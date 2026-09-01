@@ -117,6 +117,7 @@ class TestEverySigmaIsSweptAndComparedAgainstTreeBackup:
             step: float,
             episodes: int,
             seed: int,
+            window: int = 3,
         ) -> float:
             asked.append((sigma, step))
             return -15.0
@@ -136,7 +137,7 @@ class TestEverySigmaIsSweptAndComparedAgainstTreeBackup:
         monkeypatch.setattr(
             script,
             "one_run",
-            lambda grid, sigma, step, episodes, seed: -100.0 * step,
+            lambda grid, sigma, step, episodes, seed, window=3: -100.0 * step,
         )
         got, at_step = script.best_of("cliff", 0.5, (0.1, 0.5), 10, 2)
         assert at_step == 0.1
@@ -183,7 +184,7 @@ class TestEverySigmaIsSweptAndComparedAgainstTreeBackup:
         monkeypatch.setattr(
             script,
             "one_run",
-            lambda grid, sigma, step, episodes, seed: -15.0 - seed,
+            lambda grid, sigma, step, episodes, seed, window=3: -15.0 - seed,
         )
         script.sigma_section(
             "cliff", (0.0, 1.0), (0.2,), 10, 3, Rng(1).stream("compare")
@@ -205,7 +206,10 @@ class TestEverySigmaIsSweptAndComparedAgainstTreeBackup:
         monkeypatch.setattr(
             script,
             "one_run",
-            lambda grid, sigma, step, episodes, seed: (seen.append(sigma), -15.0)[1],
+            lambda grid, sigma, step, episodes, seed, window=3: (
+                seen.append(sigma),
+                -15.0,
+            )[1],
         )
         script.sigma_section("cliff", (0.0,), (0.2,), 10, 1, Rng(1).stream("compare"))
         assert seen.count(0.0) == 1
@@ -242,7 +246,7 @@ class TestTheSchedule:
         monkeypatch.setattr(
             script,
             "one_run",
-            lambda grid, sigma, step, episodes, seed: -15.0,
+            lambda grid, sigma, step, episodes, seed, window=3: -15.0,
         )
         script.sigma_section("cliff", (0.0,), (0.2,), 10, 2, Rng(1).stream("compare"))
         assert "1 falling to 0" in capsys.readouterr().out
@@ -254,7 +258,10 @@ class TestTheSchedule:
         monkeypatch.setattr(
             script,
             "one_run",
-            lambda grid, sigma, step, episodes, seed: (seen.append(sigma), -15.0)[1],
+            lambda grid, sigma, step, episodes, seed, window=3: (
+                seen.append(sigma),
+                -15.0,
+            )[1],
         )
         script.sigma_section("cliff", (0.0,), (0.2,), 10, 1, Rng(1).stream("compare"))
         assert any(callable(sigma) for sigma in seen)
@@ -296,9 +303,64 @@ class TestTheReport:
         monkeypatch.setattr(
             script,
             "one_run",
-            lambda grid, sigma, step, episodes, seed: -15.0,
+            lambda grid, sigma, step, episodes, seed, window=3: -15.0,
         )
         script.sigma_section(
             "cliff", (0.0, 1.0), (0.2,), 10, 3, Rng(1).stream("compare")
         )
         assert "cannot give a p below" in capsys.readouterr().out
+
+
+class TestItRunsMoreThanOneWindow:
+    def test_the_default_is_the_one_the_page_documents(
+        self, script: ModuleType
+    ) -> None:
+        assert script.STEPS == 3
+
+    def test_the_window_it_was_given_reaches_the_agent(
+        self, script: ModuleType, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # At the agent rather than through the score, for the reason given
+        # above about how few numbers a cliff walk policy is worth.
+        seen: list[object] = []
+        real = script.AGENTS
+
+        class Watched:
+            def make(
+                self, name: str, rng: object, env: object, **options: object
+            ) -> object:
+                seen.append(options["n"])
+                return real.make(name, rng, env, **options)
+
+        monkeypatch.setattr(script, "AGENTS", Watched())
+        script.one_run("cliff", 0.0, 0.1, 3, 1, 7)
+        assert seen == [7]
+
+    def test_the_sweep_carries_the_window_through(
+        self, script: ModuleType, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        seen: list[object] = []
+        real = script.AGENTS
+
+        class Watched:
+            def make(
+                self, name: str, rng: object, env: object, **options: object
+            ) -> object:
+                seen.append(options["n"])
+                return real.make(name, rng, env, **options)
+
+        monkeypatch.setattr(script, "AGENTS", Watched())
+        script.best_of("cliff", 0.0, (0.1,), 3, 2, 10)
+        assert seen == [10, 10]
+
+    def test_the_heading_names_the_window_it_ran(
+        self, script: ModuleType, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        script.sigma_section("cliff", (0.0,), (0.1,), 3, 1, Rng(1), 9)
+        assert "n of 9" in capsys.readouterr().out
+
+    def test_the_default_window_is_still_the_documented_one(
+        self, script: ModuleType, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        script.sigma_section("cliff", (0.0,), (0.1,), 3, 1, Rng(1))
+        assert "n of 3" in capsys.readouterr().out

@@ -99,6 +99,7 @@ def one_run(
     step_size: float,
     episodes: int,
     seed: int,
+    steps: int = STEPS,
 ) -> float:
     """The exact value of what one seed learned, or the worst there is.
 
@@ -112,7 +113,7 @@ def one_run(
         "q-sigma",
         Rng(seed).stream("agent"),
         env,
-        n=STEPS,
+        n=steps,
         sigma=sigma,
         step_size=step_size,
         discount=discount,
@@ -135,11 +136,13 @@ def best_of(
     steps: tuple[float, ...],
     episodes: int,
     runs: int,
+    window: int = STEPS,
 ) -> tuple[list[float], float]:
     """Every seed at the best of the swept step sizes, and the step that won."""
     got = {
         step: [
-            one_run(grid, sigma, step, episodes, seed) for seed in range(1, runs + 1)
+            one_run(grid, sigma, step, episodes, seed, window)
+            for seed in range(1, runs + 1)
         ]
         for step in steps
     }
@@ -154,16 +157,17 @@ def sigma_section(
     episodes: int,
     runs: int,
     rng: Rng,
+    window: int = STEPS,
 ) -> None:
     reachable, discount = best_possible(grid)
     print(
-        f"{grid}, {episodes} episodes, {runs} seeds, n of {STEPS}, epsilon "
+        f"{grid}, {episodes} episodes, {runs} seeds, n of {window}, epsilon "
         f"{EPSILON:g},\ndiscount {discount:g}. The best possible return is "
         f"{reachable:.3f}.\nEvery sigma is swept over {len(steps)} step sizes "
         f"and read at its own best.\n"
     )
 
-    against, at_against = best_of(grid, 0.0, steps, episodes, runs)
+    against, at_against = best_of(grid, 0.0, steps, episodes, runs, window)
     rows = []
     named: list[tuple[str, float | Schedule]] = [
         (f"{sigma:g}", sigma) for sigma in sigmas
@@ -174,7 +178,7 @@ def sigma_section(
         got, at_step = (
             (against, at_against)
             if sigma == 0.0
-            else best_of(grid, sigma, steps, episodes, runs)
+            else best_of(grid, sigma, steps, episodes, runs, window)
         )
         answer = compare(got, against, rng)
         rows.append(
@@ -218,6 +222,13 @@ def main() -> int:
     parser.add_argument("--step-sizes", type=float, nargs="+", default=list(STEP_SIZES))
     parser.add_argument("--episodes", type=int, default=EPISODES)
     parser.add_argument("--runs", type=int, default=RUNS)
+    parser.add_argument(
+        "--steps",
+        type=int,
+        nargs="+",
+        default=[STEPS],
+        help="the window n to run, repeatable for a table at each",
+    )
     args = parser.parse_args()
 
     # Tree backup is the row every other row is read against, so it goes in
@@ -225,14 +236,21 @@ def main() -> int:
     sigmas = tuple(sorted({*args.sigmas, 0.0}))
 
     started = time.perf_counter()
-    sigma_section(
-        args.env,
-        sigmas,
-        tuple(args.step_sizes),
-        args.episodes,
-        args.runs,
-        Rng(13).stream("compare"),
-    )
+    for index, window in enumerate(args.steps):
+        if index:
+            print()
+        # A fresh comparison source for each window, so that the table at
+        # one n is the same table whether or not another n was asked for
+        # in the same run.
+        sigma_section(
+            args.env,
+            sigmas,
+            tuple(args.step_sizes),
+            args.episodes,
+            args.runs,
+            Rng(13).stream("compare"),
+            window,
+        )
     print(f"\nTook {time.perf_counter() - started:.0f}s.")
     return 0
 

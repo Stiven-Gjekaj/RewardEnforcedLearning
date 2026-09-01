@@ -7,7 +7,7 @@ centres, no offsets between grids. That is what it is for.
 
     python scripts/measure_fourier.py
     python scripts/measure_fourier.py --orders 3 5 --runs 3
-    python scripts/measure_fourier.py --episodes 400
+    python scripts/measure_fourier.py --env mountaincar cartpole
 
 The one thing said about it that is not the basis itself is that the step size
 should be divided for each feature by how fast that feature waves. This runs
@@ -65,7 +65,12 @@ DISCOUNT = 1.0
 
 
 def one_setting(
-    order: int, scaled: bool, step_size: float, runs: int, episodes: int
+    order: int,
+    scaled: bool,
+    step_size: float,
+    runs: int,
+    episodes: int,
+    env_name: str = ENVIRONMENT,
 ) -> list[float]:
     """The greedy return of each seed after training it at this setting.
 
@@ -75,7 +80,7 @@ def one_setting(
     """
     got = []
     for seed in range(1, runs + 1):
-        env = ENVIRONMENTS.make(ENVIRONMENT, Rng(seed).stream("env"))
+        env = ENVIRONMENTS.make(env_name, Rng(seed).stream("env"))
         agent = AGENTS.make(
             "fourier-sarsa",
             Rng(seed).stream("agent"),
@@ -92,14 +97,22 @@ def one_setting(
 
 
 def best_of(
-    order: int, scaled: bool, steps: tuple[float, ...], runs: int, episodes: int
+    order: int,
+    scaled: bool,
+    steps: tuple[float, ...],
+    runs: int,
+    episodes: int,
+    env_name: str = ENVIRONMENT,
 ) -> tuple[list[float], float]:
     """Every seed at the best of the swept step sizes, and the step that won.
 
     Best is the largest mean return. These returns are negative, so a sweep
     that took the smallest would report the worst setting of each side.
     """
-    got = {step: one_setting(order, scaled, step, runs, episodes) for step in steps}
+    got = {
+        step: one_setting(order, scaled, step, runs, episodes, env_name)
+        for step in steps
+    }
     best = max(got, key=lambda step: statistics.mean(got[step]))
     return got[best], best
 
@@ -114,8 +127,8 @@ def at_an_end(step: float, steps: tuple[float, ...]) -> bool:
     return step in (min(steps), max(steps))
 
 
-def features_of(order: int) -> int:
-    env = ENVIRONMENTS.make(ENVIRONMENT, Rng(1).stream("env"))
+def features_of(order: int, env_name: str = ENVIRONMENT) -> int:
+    env = ENVIRONMENTS.make(env_name, Rng(1).stream("env"))
     box = getattr(env, "tiling_space", env.observation_space)
     assert isinstance(box, Box)
     return FourierBasis(box, order=order).features
@@ -127,24 +140,25 @@ def scales_section(
     runs: int,
     episodes: int,
     rng: Rng,
+    env_name: str = ENVIRONMENT,
 ) -> None:
     print(
         f"Dividing the step size by the speed of each wave, against not "
         f"doing it.\nBoth sides swept over {len(steps)} step sizes and read "
-        f"at their own best.\n{ENVIRONMENT}, {runs} seeds, {episodes} "
+        f"at their own best.\n{env_name}, {runs} seeds, {episodes} "
         f"episodes.\n"
     )
 
     rows = []
     unbracketed = []
     for order in orders:
-        scaled, at_scaled = best_of(order, True, steps, runs, episodes)
-        flat, at_flat = best_of(order, False, steps, runs, episodes)
+        scaled, at_scaled = best_of(order, True, steps, runs, episodes, env_name)
+        flat, at_flat = best_of(order, False, steps, runs, episodes, env_name)
         answer = compare(scaled, flat, rng)
         rows.append(
             [
                 str(order),
-                str(features_of(order)),
+                str(features_of(order, env_name)),
                 f"{statistics.mean(scaled):.1f}",
                 f"{at_scaled:g}",
                 f"{statistics.mean(flat):.1f}",
@@ -199,16 +213,28 @@ def main() -> int:
     parser.add_argument("--step-sizes", type=float, nargs="+", default=list(STEP_SIZES))
     parser.add_argument("--runs", type=int, default=RUNS, help="seeds per setting")
     parser.add_argument("--episodes", type=int, default=EPISODES)
+    parser.add_argument(
+        "--env",
+        nargs="+",
+        default=[ENVIRONMENT],
+        help="the environments to run, one table each",
+    )
     args = parser.parse_args()
 
     started = time.perf_counter()
-    scales_section(
-        tuple(args.orders),
-        tuple(args.step_sizes),
-        args.runs,
-        args.episodes,
-        Rng(9).stream("compare"),
-    )
+    for index, env_name in enumerate(args.env):
+        if index:
+            print()
+        # A fresh comparison source for each environment, so the table for one
+        # is the same table whether or not another was asked for beside it.
+        scales_section(
+            tuple(args.orders),
+            tuple(args.step_sizes),
+            args.runs,
+            args.episodes,
+            Rng(9).stream("compare"),
+            env_name,
+        )
     print(f"\nTook {time.perf_counter() - started:.0f}s.")
     return 0
 

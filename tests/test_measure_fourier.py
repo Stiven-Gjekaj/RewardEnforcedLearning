@@ -89,7 +89,7 @@ class TestBestOf:
         monkeypatch.setattr(
             script,
             "one_setting",
-            lambda order, scaled, step, runs, episodes: {
+            lambda order, scaled, step, runs, episodes, env=None: {
                 0.1: [-300.0, -300.0],
                 0.5: [-100.0, -140.0],
                 1.0: [-400.0, -400.0],
@@ -109,7 +109,7 @@ class TestBestOf:
         monkeypatch.setattr(
             script,
             "one_setting",
-            lambda order, scaled, step, runs, episodes: [-step * 1000.0],
+            lambda order, scaled, step, runs, episodes, env=None: [-step * 1000.0],
         )
         assert script.best_of(3, True, (0.2, 0.9), 1, 5) == ([-200.0], 0.2)
 
@@ -121,7 +121,7 @@ class TestBestOf:
         monkeypatch.setattr(
             script,
             "one_setting",
-            lambda order, scaled, step, runs, episodes: {
+            lambda order, scaled, step, runs, episodes, env=None: {
                 0.1: [-150.0, -150.0],
                 0.5: [-10.0, -400.0],
             }[step],
@@ -136,7 +136,12 @@ class TestBothSidesAreSwept:
         asked: list[tuple[int, bool, float]] = []
 
         def record(
-            order: int, scaled: bool, step: float, runs: int, episodes: int
+            order: int,
+            scaled: bool,
+            step: float,
+            runs: int,
+            episodes: int,
+            env: str | None = None,
         ) -> list[float]:
             asked.append((order, scaled, step))
             return [-100.0, -110.0]
@@ -200,7 +205,7 @@ class TestTheSweepSaysWhenItDidNotBracketASide:
         monkeypatch.setattr(
             script,
             "one_setting",
-            lambda order, scaled, step, runs, episodes: [-1000.0 * step] * 3,
+            lambda order, scaled, step, runs, episodes, env=None: [-1000.0 * step] * 3,
         )
         script.scales_section((3,), (0.1, 0.5, 1.0), 1, 5, Rng(1).stream("compare"))
         printed = capsys.readouterr().out
@@ -217,7 +222,9 @@ class TestTheSweepSaysWhenItDidNotBracketASide:
         monkeypatch.setattr(
             script,
             "one_setting",
-            lambda order, scaled, step, runs, episodes: [-abs(step - 0.5) * 1000.0] * 3,
+            lambda order, scaled, step, runs, episodes, env=None: (
+                [-abs(step - 0.5) * 1000.0] * 3
+            ),
         )
         script.scales_section((3,), (0.1, 0.5, 1.0), 1, 5, Rng(1).stream("compare"))
         assert "bracket" not in capsys.readouterr().out
@@ -281,3 +288,46 @@ class TestTheReport:
             if line.strip() and line.strip()[0].isdigit()
         ]
         assert rows == ["1", "2"]
+
+
+class TestItRunsMoreThanOneEnvironment:
+    def test_the_default_is_the_one_the_page_documents(
+        self, script: ModuleType
+    ) -> None:
+        assert script.ENVIRONMENT == "mountaincar"
+
+    def test_the_feature_count_follows_the_environment(
+        self, script: ModuleType
+    ) -> None:
+        # The mountain car is a box of two dimensions and the cart pole of
+        # four, so the same order is a very different number of waves. That
+        # is the growth this basis has, and a table that reported one count
+        # for both would hide it.
+        assert script.features_of(1, "mountaincar") == 4
+        assert script.features_of(1, "cartpole") == 16
+        assert script.features_of(3, "cartpole") == 256
+
+    def test_a_run_goes_to_the_environment_it_was_given(
+        self, script: ModuleType
+    ) -> None:
+        cart = script.one_setting(1, True, 0.2, 1, 5, "cartpole")
+        car = script.one_setting(1, True, 0.2, 1, 5, "mountaincar")
+        assert cart != car
+        # The cart pole pays for staying up and the mountain car for finishing,
+        # so their returns have opposite signs and cannot be confused.
+        assert cart[0] > 0.0
+        assert car[0] < 0.0
+
+    def test_the_sweep_carries_the_environment_through(
+        self, script: ModuleType
+    ) -> None:
+        got, _ = script.best_of(1, True, (0.2,), 1, 5, "cartpole")
+        assert got == script.one_setting(1, True, 0.2, 1, 5, "cartpole")
+
+    def test_the_heading_names_the_environment_it_ran(
+        self, script: ModuleType, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        script.scales_section((1,), (0.2,), 1, 5, Rng(1), "cartpole")
+        printed = capsys.readouterr().out
+        assert "cartpole" in printed
+        assert "mountaincar" not in printed
