@@ -683,7 +683,9 @@ def _policy_gradient(cls: type[Reinforce[Any]]) -> AgentBuilder:
     return build
 
 
-def _linear(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder:
+def _linear(
+    cls: type[SemiGradientSarsa[Any]] | type[SemiGradientQ[Any]],
+) -> AgentBuilder:
     def build(
         rng: Rng,
         env: Env[Any, Any],
@@ -896,7 +898,9 @@ def _gradient_td(
     )
 
 
-def _fourier(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder:
+def _fourier(
+    cls: type[SemiGradientSarsa[Any]] | type[SemiGradientQ[Any]],
+) -> AgentBuilder:
     """SARSA or Q-learning over cosine waves.
 
     There is no `optimism` here, unlike its two neighbours. A Fourier basis
@@ -936,7 +940,62 @@ def _fourier(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder
     return build
 
 
-def _radial(cls: type[SemiGradientSarsa] | type[SemiGradientQ]) -> AgentBuilder:
+def _grouped(
+    cls: type[SemiGradientSarsa[Any]] | type[SemiGradientQ[Any]],
+) -> AgentBuilder:
+    """SARSA or Q-learning over states grouped together.
+
+    Every other coder in this project needs a `Box`. This one needs a whole
+    number, which is what the tabular environments hand out, so it is the one
+    approximator that can be run on the same environments as the tables.
+
+    `groups` is a resolution dial with a table at one end. At `groups` equal to
+    the number of states each state has its own weight, and the update is then
+    the tabular update exactly: a one hot row makes `w[i] += a * d * x[i]` into
+    `q[s] += a * d`. Below that, states share weights and the agent cannot tell
+    them apart.
+
+    That is what makes it worth having here. `scripts/measure_resolution.py`
+    runs the gaming environments down this dial, and the question it asks is
+    whether an agent that cannot see a place clearly can still find the way to
+    game it.
+    """
+
+    def build(
+        rng: Rng,
+        env: Env[Any, Any],
+        groups: int = 0,
+        step_size: float | Schedule = 0.1,
+        discount: float = 1.0,
+        epsilon: float | Schedule = 0.1,
+        optimism: float = 0.0,
+    ) -> Agent[Any, Any]:
+        space = env.observation_space
+        if not isinstance(space, Discrete):
+            raise TypeError(
+                f"{env.spec.name} has a {type(space).__name__} observation, "
+                f"and states are grouped by their number. This agent needs an "
+                f"environment tagged 'tabular'."
+            )
+        #: Zero means one group for each state, which is a table written as a
+        #: coder. A number would have to be right for every environment at
+        #: once, and they run from sixteen states to several thousand.
+        return cls(
+            rng,
+            _whole_numbers(env),
+            aggregated(space.n, space.n if groups <= 0 else groups),
+            step_size=step_size,
+            discount=discount,
+            epsilon=epsilon,
+            optimism=optimism,
+        )
+
+    return build
+
+
+def _radial(
+    cls: type[SemiGradientSarsa[Any]] | type[SemiGradientQ[Any]],
+) -> AgentBuilder:
     def build(
         rng: Rng,
         env: Env[Any, Any],
@@ -1170,6 +1229,19 @@ AGENTS: Registry[Agent[Any, Any]] = Registry(
             "tile-q",
             "Q-learning over a tile coder.",
             _linear(SemiGradientQ),
+            tags=("linear", "off-policy"),
+        ),
+        Entry(
+            "grouped-sarsa",
+            "SARSA over states grouped together, which is a dial from a table "
+            "to one number.",
+            _grouped(SemiGradientSarsa),
+            tags=("linear", "on-policy"),
+        ),
+        Entry(
+            "grouped-q",
+            "Q-learning over states grouped together.",
+            _grouped(SemiGradientQ),
             tags=("linear", "off-policy"),
         ),
         Entry(

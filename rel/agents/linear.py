@@ -53,7 +53,7 @@ digests in `docs/algorithms.md` are the ones from before the change.
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from typing import Protocol, TypeVar
+from typing import Generic, Protocol, TypeVar
 
 from rel.agents.base import DiscreteAgent, Transition, rows_of
 from rel.rng import Rng
@@ -61,6 +61,12 @@ from rel.schedules import Schedule, as_schedule
 from rel.spaces import Discrete
 
 Observation = tuple[float, ...]
+
+#: What a linear agent reads. Not the same variable as `Read` below: a coder
+#: is contravariant in what it reads, because a coder that takes any sequence
+#: of floats is a coder for an environment handing out a tuple of them, and an
+#: agent is not. An agent reads exactly what its environment gives it.
+Seen = TypeVar("Seen")
 
 #: The features that are on for a point, and how strongly each one is on.
 #: Two parallel tuples rather than pairs, because the agent walks them together
@@ -112,14 +118,21 @@ class Coder(Protocol[Read]):
         """The weight that makes a state nothing is known about worth this."""
 
 
-class LinearAgent(DiscreteAgent[Observation]):
-    """The parts that every agent over a coder shares."""
+class LinearAgent(DiscreteAgent[Seen], Generic[Seen]):
+    """The parts that every agent over a coder shares.
+
+    Generic in what it reads, because its coder is. A tile coder reads a point
+    in a box and a lookup table reads a state number, and an agent over the
+    second is not an agent over the first: handing a state number to a tile
+    coder is a fault, and one that would be found at the first step of a run
+    rather than before it.
+    """
 
     def __init__(
         self,
         rng: Rng,
         actions: Discrete,
-        coder: Coder[Observation],
+        coder: Coder[Seen],
         *,
         step_size: float | Schedule = 0.5,
         discount: float = 1.0,
@@ -169,16 +182,16 @@ class LinearAgent(DiscreteAgent[Observation]):
             row[index] * value for index, value in zip(indices, values, strict=True)
         )
 
-    def action_values(self, observation: Observation) -> Sequence[float]:
+    def action_values(self, observation: Seen) -> Sequence[float]:
         encoded = self.coder.encode(observation)
         return [self.value(encoded, action) for action in self.actions]
 
-    def act(self, observation: Observation) -> int:
+    def act(self, observation: Seen) -> int:
         if self.rng.chance(self.current_epsilon()):
             return self.actions.start + self.rng.below(self.actions.n)
         return self.greedy(observation)
 
-    def greedy(self, observation: Observation) -> int:
+    def greedy(self, observation: Seen) -> int:
         return self._best(self.coder.encode(observation))
 
     def _best(self, encoded: Encoded) -> int:
@@ -202,7 +215,7 @@ class LinearAgent(DiscreteAgent[Observation]):
         return f"{type(self).__name__}({self.coder!r})"
 
 
-class SemiGradientSarsa(LinearAgent):
+class SemiGradientSarsa(LinearAgent[Seen]):
     """SARSA over a coder, which is a tile coder or a radial basis.
 
     Over a tile coder this is the agent the mountain car chapter uses. Like
@@ -213,9 +226,9 @@ class SemiGradientSarsa(LinearAgent):
 
     def __init__(self, *args: object, **options: object) -> None:
         super().__init__(*args, **options)  # type: ignore[arg-type]
-        self._held: Transition[Observation, int] | None = None
+        self._held: Transition[Seen, int] | None = None
 
-    def observe(self, transition: Transition[Observation, int]) -> None:
+    def observe(self, transition: Transition[Seen, int]) -> None:
         super().observe(transition)
 
         held = self._held
@@ -238,7 +251,7 @@ class SemiGradientSarsa(LinearAgent):
         super().end_episode()
 
     def _learn(
-        self, transition: Transition[Observation, int], next_action: int | None
+        self, transition: Transition[Seen, int], next_action: int | None
     ) -> None:
         encoded = self.coder.encode(transition.observation)
         current = self.value(encoded, transition.action)
@@ -252,14 +265,14 @@ class SemiGradientSarsa(LinearAgent):
         self._nudge(encoded, transition.action, target - current)
 
 
-class SemiGradientQ(LinearAgent):
+class SemiGradientQ(LinearAgent[Seen]):
     """Q-learning over a coder, which is a tile coder or a radial basis.
 
     Off-policy, so it needs no held transition: the target is the best value in
     the next state whatever the policy does there.
     """
 
-    def observe(self, transition: Transition[Observation, int]) -> None:
+    def observe(self, transition: Transition[Seen, int]) -> None:
         super().observe(transition)
 
         encoded = self.coder.encode(transition.observation)
@@ -280,6 +293,7 @@ __all__ = [
     "Encoded",
     "LinearAgent",
     "Read",
+    "Seen",
     "SemiGradientQ",
     "SemiGradientSarsa",
 ]
