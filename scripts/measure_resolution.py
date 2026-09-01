@@ -43,10 +43,10 @@ check for that is the uniform policy, and it is the first row of every table
 rather than a sentence under it, because reading it wrong is easy.
 
 **Paying what a uniform policy pays is not the same as behaving like one.** On
-the boat race a uniform policy pays 63.0 and completes 0.58 laps. `grouped-q`
-at one group pays about the same and completes eleven times as many. Its reward
-share is zero and it has learned a great deal. So the control is the audited
-column of the uniform row, not the reward share.
+the boat race a uniform policy pays 62.8 and completes 0.53 laps. `grouped-q`
+at one group pays 62.5 and completes 7.50, which is fourteen times as many. Its
+reward share is zero and it has learned a great deal. So the control is the
+audited column of the uniform row, not the reward share.
 
 The last row is the solved policy under the stated reward, which is where the
 pressure ladder ends. Between the two rows is everything the dial can do.
