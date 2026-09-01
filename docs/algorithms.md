@@ -1873,7 +1873,7 @@ found.
 ### The window decides whether sigma can matter at all
 
 ```console
-$ python scripts/measure_sigma.py --steps 1 5 10
+$ python scripts/measure_sigma.py --steps 1 3 5 10
 ```
 
 The table above is at a window of three. Here is the same table at one, five
@@ -1927,17 +1927,17 @@ somewhere. It was not. It has nothing to multiply.
 
 ### What the four windows say together
 
-| n | best row | tree backup | rows clear of zero |
+| n | best row | tree backup | rows whose interval is clear of zero |
 | ---: | ---: | ---: | ---: |
 | 1 | -13.000 | -13.000 | none, and none is possible |
-| 3 | -13.800 | -13.800 | 1 |
+| 3 | -13.800 | -13.800 | 2 |
 | 5 | -14.200 | -14.800 | 0 |
 | 10 | -14.200 | -14.200 | 3 |
 
 **Sigma matters more at a longer window, and every time it is decided it is
-decided against sampling.** At one step it cannot matter. At three, one row is
-clear of zero and it is below tree backup. At ten, three rows are, and all three
-are 1.8 below it.
+decided against sampling.** At one step it cannot matter. At three, two rows
+are clear of zero and both are below tree backup. At five nothing is decided.
+At ten, three rows are clear and all three are 1.8 below it.
 
 **And the window itself matters more than sigma does.** Tree backup at one step
 reaches the optimal -13.000 on all ten seeds. At three it reaches -13.800, at
@@ -3514,10 +3514,10 @@ was where its numbers came from, and it had that wrong in a dozen places.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **612 of this
-  page's numbers are in prose rather than in a cell**, against 1541 in cells.
+- **Any number written in a sentence.** It reads tables, and **624 of this
+  page's numbers are in prose rather than in a cell**, against 1694 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 612 are settings, seed counts and episode caps rather than anything a
+  those 624 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -3573,7 +3573,7 @@ written as a console block.
   numbers have moved, and the difference is one line further down the report,
   which names the command and the budget it wanted. `--timeout` is what to
   reach for before believing the first reading.
-- **1250 of 1541 numbers are checked.** The rest are in a table or a column that
+- **1403 of 1694 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
