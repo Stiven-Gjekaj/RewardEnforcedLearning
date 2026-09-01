@@ -1887,45 +1887,49 @@ that value minus itself. The target is the reward plus the expectation over the
 target policy, at every sigma. One step Q(sigma) is expected SARSA whatever it
 is asked for, and `tests/test_tree.py` holds that cell for cell.
 
-| n | sigma | at step | greedy, exactly | over tree backup | 95 percent interval | p |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 0 | 0.1 | **-13.000** | - | - | - |
-| 1 | 0.25 | 0.1 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
-| 1 | 0.5 | 0.1 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
-| 1 | 0.75 | 0.1 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
-| 1 | 1 | 0.1 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
-| 1 | 1 falling to 0 | 0.1 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
+| sigma | at step | greedy, exactly | over tree backup | 95 percent interval | p |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 0.1 | **-13.000** | - | - | - |
+| 0.25 | 0.1 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
+| 0.5 | 0.1 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
+| 0.75 | 0.1 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
+| 1 | 0.1 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
+| 1 falling to 0 | 0.1 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
 
-*Six rows identical to the last digit, and every one of them at the best
-possible return.*
+*Cliff walk at a window of one. Six rows identical to the last digit,
+and every one of them at the best possible return.*
 
 So a reader who sees that table is entitled to wonder whether sigma was dropped
 somewhere. It was not. It has nothing to multiply.
 
-| n | sigma | at step | greedy, exactly | over tree backup | 95 percent interval | p |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 5 | 0 | 0.05 | -14.800 | - | - | - |
-| 5 | 0.25 | 0.05 | **-14.200** | +0.600 | [-0.200, +1.400] | 0.375 |
-| 5 | 0.5 | 0.05 | -14.800 | +0.000 | [-0.600, +0.600] | 1.000 |
-| 5 | 0.75 | 0.05 | -15.000 | -0.200 | [-1.000, +0.600] | 1.000 |
-| 5 | 1 | 0.1 | -15.000 | -0.200 | [-0.800, +0.400] | 1.000 |
-| 5 | 1 falling to 0 | 0.05 | -14.600 | +0.200 | [-0.600, +1.000] | 1.000 |
+| sigma | at step | greedy, exactly | over tree backup | 95 percent interval | p |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 0.05 | -14.800 | - | - | - |
+| 0.25 | 0.05 | **-14.200** | +0.600 | [-0.200, +1.400] | 0.375 |
+| 0.5 | 0.05 | -14.800 | +0.000 | [-0.600, +0.600] | 1.000 |
+| 0.75 | 0.05 | -15.000 | -0.200 | [-1.000, +0.600] | 1.000 |
+| 1 | 0.1 | -15.000 | -0.200 | [-0.800, +0.400] | 1.000 |
+| 1 falling to 0 | 0.05 | -14.600 | +0.200 | [-0.600, +1.000] | 1.000 |
 
-*Nothing here is decided. Every interval crosses zero and the smallest p is
-0.375.*
+*Cliff walk at a window of five. Nothing here is decided: every interval
+crosses zero and the smallest p is 0.375.*
 
-| n | sigma | at step | greedy, exactly | over tree backup | 95 percent interval | p |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 10 | 0 | 0.05 | **-14.200** | - | - | - |
-| 10 | 0.25 | 0.05 | -15.200 | -1.000 | [-2.400, +0.400] | 0.281 |
-| 10 | 0.5 | 0.2 | -16.000 | -1.800 | [-3.000, -0.600] | **0.062** |
-| 10 | 0.75 | 0.1 | -16.000 | -1.800 | [-2.800, -0.600] | **0.031** |
-| 10 | 1 | 0.2 | -16.000 | -1.800 | [-3.000, -0.600] | **0.047** |
-| 10 | 1 falling to 0 | 0.4 | -15.600 | -1.400 | [-2.800, +0.200] | 0.172 |
+| sigma | at step | greedy, exactly | over tree backup | 95 percent interval | p |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 0.05 | **-14.200** | - | - | - |
+| 0.25 | 0.05 | -15.200 | -1.000 | [-2.400, +0.400] | 0.281 |
+| 0.5 | 0.2 | -16.000 | -1.800 | [-3.000, -0.600] | **0.062** |
+| 0.75 | 0.1 | -16.000 | -1.800 | [-2.800, -0.600] | **0.031** |
+| 1 | 0.2 | -16.000 | -1.800 | [-3.000, -0.600] | **0.047** |
+| 1 falling to 0 | 0.4 | -15.600 | -1.400 | [-2.800, +0.200] | 0.172 |
 
-*Three rows clear of zero, and all three are worse than tree backup.*
+*Cliff walk at a window of ten. Three rows clear of zero, and all three
+are worse than tree backup.*
 
 ### What the four windows say together
+
+<!-- not checked: one row taken from each of the four tables above, and the
+last column is read off their intervals rather than printed by anything -->
 
 | n | best row | tree backup | rows whose interval is clear of zero |
 | ---: | ---: | ---: | ---: |
@@ -3639,7 +3643,7 @@ was where its numbers came from, and it had that wrong in a dozen places.
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
 - **Any number written in a sentence.** It reads tables, and **653 of this
-  page's numbers are in prose rather than in a cell**, against 1770 in cells.
+  page's numbers are in prose rather than in a cell**, against 1752 in cells.
   A table cell is a result by construction and a sentence is not: most of
   those 653 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
@@ -3697,7 +3701,7 @@ written as a console block.
   numbers have moved, and the difference is one line further down the report,
   which names the command and the budget it wanted. `--timeout` is what to
   reach for before believing the first reading.
-- **1456 of 1770 numbers are checked.** The rest are in a table or a column that
+- **1423 of 1752 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
