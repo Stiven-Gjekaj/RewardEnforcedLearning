@@ -146,14 +146,15 @@ class DeepQ(DiscreteAgent[ObsT]):
     def observe(self, transition: Transition[ObsT, int]) -> None:
         super().observe(transition)
 
+        batch: Sequence[Transition[ObsT, int]]
         if self.memory is not None:
             self.memory.add(transition)
-            batch = self.memory.sample(self.batch)
+            batch = self.memory.sample(self.batch).steps
         else:
             # No buffer, so the only step to learn from is the one just taken.
             # Learning from it `batch` times would be the same gradient added
             # up, which is a larger step and not a larger batch.
-            batch = [transition]
+            batch = (transition,)
 
         if batch:
             self._fit(batch)
