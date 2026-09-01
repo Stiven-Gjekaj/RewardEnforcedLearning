@@ -294,7 +294,22 @@ def prediction_error(env: Env[Any, Any], agent: Agent[Any, Any]) -> float | None
     if not callable(describe) or not callable(score):
         return None
 
-    error: float = score(describe())
+    try:
+        wanted = describe()
+    except ValueError:
+        # An environment can have the method and still be unable to answer for
+        # the settings it was built with. `long-walk` is a random walk whose
+        # step covers a hundred cells, and the closed form for a walk is for a
+        # step of one, so it refuses rather than answering a little wrongly.
+        # A gambler below an even coin refuses for its own reason.
+        #
+        # That refusal is right and it is not this run's problem. Before this,
+        # `rel train linear-td --env long-walk --set groups=50` printed its
+        # whole report and then exited two, and that command is on the
+        # algorithms page.
+        return None
+
+    error: float = score(wanted)
     return error
 
 

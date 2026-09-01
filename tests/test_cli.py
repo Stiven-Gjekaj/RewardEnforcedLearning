@@ -12,14 +12,18 @@ from pathlib import Path
 
 import pytest
 
+from rel.agents import AGENTS
 from rel.cli import (
     main,
     parse_over,
     parse_settings,
     parse_value,
+    prediction_error,
     spelled_action,
     sweep_settings,
 )
+from rel.envs import ENVIRONMENTS
+from rel.rng import Rng
 
 
 class TestAnActionInADemonstration:
@@ -1189,3 +1193,70 @@ class TestCompareSaysWhetherTheDifferenceIsReal:
         out = self._ran(["q-learning", "q-learning"], 5, capsys)
         assert "The same agent twice" in out
         assert "paired by seed" not in out
+
+
+class TestAnEnvironmentThatCannotStateItsOwnValues:
+    """It has the method and it refuses, and that is not this run's problem.
+
+    `rel train linear-td --env long-walk --set groups=50` is on the algorithms
+    page. It printed its whole report and then exited two, because a random
+    walk whose step covers a hundred cells refuses to give a closed form that
+    is right for a step of one. The refusal is correct. Dying on it is not.
+
+    `scripts/check_numbers.py --all` found it, and it is the reason that
+    script exists.
+    """
+
+    def test_the_long_walk_runs_to_the_end(self) -> None:
+        assert (
+            main(
+                [
+                    "train",
+                    "linear-td",
+                    "--env",
+                    "long-walk",
+                    "--set",
+                    "groups=50",
+                    "--episodes",
+                    "5",
+                    "--quiet",
+                    "--no-colour",
+                ]
+            )
+            == 0
+        )
+
+    def test_a_gambler_below_an_even_coin_runs_to_the_end(self) -> None:
+        # A different environment refusing for a different reason, so the fix
+        # is about the shape of the problem rather than about one walk.
+        assert (
+            main(
+                [
+                    "train",
+                    "td",
+                    "--env",
+                    "gambler",
+                    "--env-set",
+                    "heads=0.4",
+                    "--episodes",
+                    "5",
+                    "--quiet",
+                    "--no-colour",
+                ]
+            )
+            == 0
+        )
+
+    def test_the_error_is_none_rather_than_a_number(self) -> None:
+        env = ENVIRONMENTS.make("long-walk", Rng(1).stream("env"))
+        agent = AGENTS.make("linear-td", Rng(1).stream("agent"), env, groups=50)
+        assert prediction_error(env, agent) is None
+
+    def test_a_walk_that_can_answer_still_does(self) -> None:
+        # Without this the fix could be swallowing every answer rather than
+        # the refusals.
+        env = ENVIRONMENTS.make("walk", Rng(1).stream("env"))
+        agent = AGENTS.make("td", Rng(1).stream("agent"), env)
+        error = prediction_error(env, agent)
+        assert error is not None
+        assert error > 0.0
