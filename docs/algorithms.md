@@ -3543,14 +3543,48 @@ which.
 ```console
 $ python scripts/check_numbers.py --list
 $ python scripts/check_numbers.py --only tiling
-$ python scripts/check_numbers.py --all --cache outputs.json
+$ python scripts/check_numbers.py --all --jobs 4 --cache outputs.json
 ```
 
 It runs every command on this page once, then puts each table against every
 output and attributes it to the command that accounts for most of its numbers.
 `--list` runs nothing and says what would be checked. `--cache` keeps what each
-command printed, because a whole run is about three hours and the answer stops
-being true as soon as the page is edited.
+command printed, because the answer stops being true as soon as the page is
+edited.
+
+### What a whole run costs
+
+<!-- not checked: seconds on one machine, and the two ordering rows are the
+same measured times arranged two ways rather than two runs -->
+
+| | seconds | as time |
+| :--- | ---: | ---: |
+| every command, added up | 14,921 | 4 hours 9 minutes |
+| the slowest single command | 1,800 | 30 minutes |
+| four at a time, in page order | 4,531 | 75 minutes |
+| four at a time, longest first | 3,731 | 62 minutes |
+| the total divided by four | 3,730 | 62 minutes |
+
+*105 commands on four processors. The two ordering rows are the measured times
+of one run arranged two ways: page order is what that run did, and longest
+first is what the same times give when the long ones start first.*
+
+**Sixty two minutes is the floor and the ordering reaches it.** Four hours of
+work on four processors cannot take less than an hour and two minutes, and
+starting the long commands first is enough to get there. Page order costs
+twelve minutes more, because the twenty five minute command can start last.
+
+`--jobs` is what makes any of that possible. Every command on this page is
+seeded and prints the same numbers whatever else is running, so it moves the
+wall clock and nothing else: the seven fast ones the continuous integration job
+runs take 16.9 seconds one at a time and 8.4 at four, and account for the same
+three tables.
+
+**The first run cannot be ordered.** Nothing is known about how long anything
+takes until something has run, so a first run is in page order and takes the
+seventy five. The cache carries the times into the next one, and it carries
+them across a code change, which is the case that matters: what a command
+prints is worthless once the code moves and how long it takes is not.
 
 ### Matching, because position cannot work
 
@@ -3604,10 +3638,10 @@ was where its numbers came from, and it had that wrong in a dozen places.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **650 of this
-  page's numbers are in prose rather than in a cell**, against 1759 in cells.
+- **Any number written in a sentence.** It reads tables, and **653 of this
+  page's numbers are in prose rather than in a cell**, against 1770 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 650 are settings, seed counts and episode caps rather than anything a
+  those 653 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -3663,7 +3697,7 @@ written as a console block.
   numbers have moved, and the difference is one line further down the report,
   which names the command and the budget it wanted. `--timeout` is what to
   reach for before believing the first reading.
-- **1456 of 1759 numbers are checked.** The rest are in a table or a column that
+- **1456 of 1770 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
@@ -3690,7 +3724,7 @@ which is harmless and still worth spelling one way.
 | Every seed behind a mean | `python scripts/measure_agents.py --env cliff --agents reinforce --runs 12 --episodes 400 --each-seed` |
 | The tile coder offsets | `python scripts/measure_tiling_offsets.py` |
 | Tile coding against a radial basis | `python scripts/measure_approximation.py --runs 10` |
-| Whether this page still says what the code does | `python scripts/check_numbers.py --all --cache outputs.json` |
+| Whether this page still says what the code does | `python scripts/check_numbers.py --all --jobs 4 --cache outputs.json` |
 | What importance sampling costs | `python scripts/measure_importance.py --episodes 1200` |
 | Ordered replay against uniform | `python scripts/measure_sweeping.py --episodes 400` |
 | The seed that gets lost | `python scripts/measure_lost_seed.py --entropies 0.05 0.1 0.2 --ladder-all` |

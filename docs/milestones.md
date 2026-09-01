@@ -24,6 +24,28 @@ not built is a list of the subject.
 
 ## Built since that table was written
 
+**A whole run of the number checker, which had never been affordable.** It
+runs every command on the algorithms page and puts each table against every
+output. One at a time that is four hours and nine minutes, which is long enough
+that nobody does it, and nobody had. `--jobs` runs several at once and
+`--cache` now records how long each took, so a later run starts the long ones
+first: seventy five minutes in page order and sixty two the other way, against
+a floor of sixty two, which is the four hours divided by four processors.
+
+The first whole run found three things. **A command on the page did not run at
+all**: `rel train linear-td --env long-walk --set groups=50` printed its whole
+report and then exited two, because a walk whose step covers a hundred cells
+refuses to give a closed form that is for a step of one. The refusal is right
+and dying on it is not, and `rel train td --env gambler --env-set heads=0.4`
+did the same for its own reason. **Two commands are slower than any budget
+worth giving them**, so two tables are unaccounted for until somebody raises
+`--timeout` past half an hour. And **one table nothing prints** had been added
+without the comment that says so, three days earlier, by the same hand that
+wrote the rule.
+
+Fifty eight of sixty three tables are wholly accounted for. Nineteen more say
+they cannot be, and say why.
+
 **Two of this page's own open questions, asked.** The Fourier section said the
 sign of its finding was measured on the mountain car only. The Q(sigma) section
 said one grid and one n. Neither script could be pointed anywhere else, so both
