@@ -33,6 +33,7 @@ from typing import Any
 from rel.core import Env
 from rel.envs.baird import Baird, baird
 from rel.envs.bandit import KArmedBandit, drifting_bandit, stationary_bandit
+from rel.envs.bias import MaximisationBias, maximisation_bias
 from rel.envs.blackjack import Blackjack
 from rel.envs.classic import (
     cliff_walk,
@@ -112,6 +113,13 @@ ENVIRONMENTS: Registry[Env[Any, Any]] = Registry(
             "long one that pays a lot rarely.",
             two_loops,
             tags=("tabular", "endless"),
+        ),
+        Entry(
+            "bias",
+            "Two states. Going left pays -0.1 on average and a maximum over "
+            "noise says it pays more.",
+            maximisation_bias,
+            tags=("tabular",),
         ),
         Entry(
             "baird",
@@ -215,6 +223,7 @@ __all__ = [
     "GridWorld",
     "KArmedBandit",
     "Levels",
+    "MaximisationBias",
     "MountainCar",
     "Pendulum",
     "Thermostat",
