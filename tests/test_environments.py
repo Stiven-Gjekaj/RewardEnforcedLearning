@@ -32,6 +32,7 @@ KNOWN_TAGS = frozenset(
         "bandit",
         "continuous",
         "continuous-actions",
+        "aliased",
         "endless",
         "gaming",
         "grid",
@@ -61,13 +62,19 @@ def _every_action(space: Space[Any]) -> list[Any]:
     return [tuple(space.low), tuple(space.high), tuple(middle)]
 
 
-def walk(env: Env[Any, Any], policy: Rng, steps: int) -> list[tuple[Any, float]]:
-    """Drive the environment with a random policy and record what came back."""
-    path: list[tuple[Any, float]] = []
+def walk(env: Env[Any, Any], policy: Rng, steps: int) -> list[tuple[Any, float, bool]]:
+    """Drive the environment with a random policy and record what came back.
+
+    Whether the episode ended is part of the record. One environment here
+    hands back the same observation and the same reward at every step on
+    purpose, so a record of those two alone would be the same list whatever
+    the agent did.
+    """
+    path: list[tuple[Any, float, bool]] = []
     env.reset()
     for _ in range(steps):
         outcome = env.step(env.action_space.sample(policy))
-        path.append((outcome.observation, outcome.reward))
+        path.append((outcome.observation, outcome.reward, outcome.done))
         if outcome.done:
             env.reset()
     return path
@@ -128,7 +135,7 @@ class TestEveryEnvironment:
     def test_every_observation_is_inside_the_space(self, name: str) -> None:
         env = build(name)
         policy = Rng(1).stream("policy")
-        for observation, _ in walk(env, policy, 2000):
+        for observation, _reward, _ended in walk(env, policy, 2000):
             assert env.observation_space.contains(observation), (
                 f"{name} returned {observation!r}, "
                 f"which is outside {env.observation_space!r}"
@@ -137,7 +144,7 @@ class TestEveryEnvironment:
     def test_every_reward_is_a_finite_number(self, name: str) -> None:
         env = build(name)
         policy = Rng(2).stream("policy")
-        for _, reward in walk(env, policy, 2000):
+        for _, reward, _ended in walk(env, policy, 2000):
             assert isinstance(reward, float)
             assert math.isfinite(reward)
 

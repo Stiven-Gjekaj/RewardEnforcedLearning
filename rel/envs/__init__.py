@@ -31,6 +31,7 @@ from __future__ import annotations
 from typing import Any
 
 from rel.core import Env
+from rel.envs.aliased import AliasedCorridor, aliased_corridor
 from rel.envs.baird import Baird, baird
 from rel.envs.bandit import KArmedBandit, drifting_bandit, stationary_bandit
 from rel.envs.bias import MaximisationBias, maximisation_bias
@@ -113,6 +114,13 @@ ENVIRONMENTS: Registry[Env[Any, Any]] = Registry(
             "long one that pays a lot rarely.",
             two_loops,
             tags=("tabular", "endless"),
+        ),
+        Entry(
+            "aliased",
+            "Three cells that look the same and one of them works backwards. "
+            "No fixed choice ever finishes.",
+            aliased_corridor,
+            tags=("aliased",),
         ),
         Entry(
             "bias",
@@ -217,6 +225,7 @@ ENVIRONMENTS: Registry[Env[Any, Any]] = Registry(
 
 __all__ = [
     "ENVIRONMENTS",
+    "AliasedCorridor",
     "Baird",
     "BoatRace",
     "CartPole",
