@@ -201,6 +201,90 @@ class TestPriority:
         assert drawn.places == ()
 
     def test_it_says_what_it_holds(self) -> None:
-        buffer: Replay[int] = Replay(Rng(1), 4, priority=0.6)
+        buffer: Replay[int] = Replay(Rng(1), 4, priority=0.6, weighting=0.4)
         buffer.add(step(0))
-        assert repr(buffer) == "Replay(1 of 4, seen 1, priority=0.6)"
+        assert repr(buffer) == "Replay(1 of 4, seen 1, priority=0.6, weighting=0.4)"
+
+
+class TestWeighting:
+    def test_a_power_outside_zero_to_one_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="weighting power"):
+            Replay[int](Rng(1), 4, priority=1.0, weighting=-0.1)
+        with pytest.raises(ValueError, match="weighting power"):
+            Replay[int](Rng(1), 4, priority=1.0, weighting=1.5)
+
+    def test_weighting_without_a_priority_draw_is_refused(self) -> None:
+        # It would correct nothing, so asking for it is a mistake worth saying.
+        with pytest.raises(ValueError, match="needs one"):
+            Replay[int](Rng(1), 4, weighting=0.5)
+
+    def test_a_uniform_draw_needs_no_correction(self) -> None:
+        buffer: Replay[int] = Replay(Rng(1), 4)
+        for number in range(4):
+            buffer.add(step(number))
+        assert buffer.sample(5).weights == (1.0,) * 5
+
+    def test_no_weighting_leaves_every_step_counting_the_same(self) -> None:
+        buffer: Replay[int] = Replay(Rng(1), 4, priority=1.0, weighting=0.0)
+        for number in range(4):
+            buffer.add(step(number))
+        buffer.reprioritise([0, 1, 2, 3], [0.0, 1.0, 2.0, 3.0])
+        assert buffer.sample(6).weights == (1.0,) * 6
+
+    def test_the_step_drawn_most_often_counts_least(self) -> None:
+        buffer: Replay[int] = Replay(Rng(2), 4, priority=1.0, weighting=1.0)
+        for number in range(4):
+            buffer.add(step(number))
+        buffer.reprioritise([0, 1, 2, 3], [1.0, 1.0, 1.0, 9.0])
+
+        drawn = buffer.sample(200)
+        seen = dict(zip(drawn.places, drawn.weights, strict=True))
+        assert seen[3] < seen[0]
+
+    def test_at_full_weighting_the_two_effects_cancel(self) -> None:
+        # A step drawn nine times more often than another counts one ninth as
+        # much, so how much of the batch it accounts for is unchanged.
+        buffer: Replay[int] = Replay(Rng(2), 2, priority=1.0, weighting=1.0)
+        buffer.add(step(0))
+        buffer.add(step(1))
+        buffer.reprioritise([0, 1], [1.0, 9.0])
+
+        drawn = buffer.sample(4000)
+        counted = [0.0, 0.0]
+        for place, weight in zip(drawn.places, drawn.weights, strict=True):
+            counted[place] += weight
+        assert counted[0] / counted[1] == pytest.approx(1.0, abs=0.05)
+
+    def test_half_weighting_corrects_half_of_it(self) -> None:
+        buffer: Replay[int] = Replay(Rng(2), 2, priority=1.0, weighting=0.5)
+        buffer.add(step(0))
+        buffer.add(step(1))
+        buffer.reprioritise([0, 1], [1.0, 9.0])
+
+        drawn = buffer.sample(4000)
+        counted = [0.0, 0.0]
+        for place, weight in zip(drawn.places, drawn.weights, strict=True):
+            counted[place] += weight
+        # Drawn nine to one and counted one to three, so three to one.
+        assert counted[1] / counted[0] == pytest.approx(3.0, abs=0.2)
+
+    def test_no_weight_is_above_one(self) -> None:
+        buffer: Replay[int] = Replay(Rng(7), 6, priority=0.8, weighting=0.7)
+        for number in range(6):
+            buffer.add(step(number))
+        buffer.reprioritise(range(6), [0.0, 0.5, 1.0, 2.0, 4.0, 8.0])
+        for weight in buffer.sample(100).weights:
+            assert 0.0 < weight <= 1.0
+
+    def test_the_least_likely_step_counts_fully(self) -> None:
+        buffer: Replay[int] = Replay(Rng(7), 3, priority=1.0, weighting=1.0)
+        for number in range(3):
+            buffer.add(step(number))
+        buffer.reprioritise([0, 1, 2], [1.0, 3.0, 7.0])
+
+        drawn = buffer.sample(300)
+        seen = dict(zip(drawn.places, drawn.weights, strict=True))
+        assert seen[0] == pytest.approx(1.0)
+
+    def test_an_empty_buffer_gives_no_weights(self) -> None:
+        assert Replay[int](Rng(1), 10, priority=1.0).sample(4).weights == ()

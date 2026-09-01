@@ -58,6 +58,27 @@ everything stays reachable.
 the errors turned out to be. That is why the sample is an object and not a
 list.
 
+## Why drawing by priority needs a correction
+
+Fitting to a batch is an average over the steps in it, and that average only
+estimates what it is meant to estimate if the steps arrived with the right
+probability. Drawing by priority changes those probabilities on purpose, so the
+average is now of a different thing: the steps with large errors are counted
+more often than the buffer says they happen. An agent left like that settles on
+a different answer, not a faster route to the same one.
+
+`weighting` is the correction. A step drawn `k` times more often than uniform
+counts `k` to the power minus `weighting` as much, so at one the two effects
+cancel exactly and at zero there is no correction at all. The trap is real and
+`scripts/measure_prioritised.py` measures it against an answer that is known
+exactly.
+
+The weights are divided by the largest one the whole buffer could produce, so
+every weight is at most one and the correction only ever scales a step down.
+Dividing by the largest in the batch instead, which is the usual shortcut,
+would give the same step a different weight depending on what happened to be
+drawn beside it.
+
 ## What priority costs
 
 Drawing by priority adds up the weights of the whole buffer once for each
@@ -94,6 +115,11 @@ class Batch(Generic[ObsT]):
     #: Where each step sits in the buffer, for `Replay.reprioritise`.
     places: tuple[int, ...]
 
+    #: How much each step counts, correcting for how often it was drawn. All
+    #: one when the draw was uniform, because a uniform draw needs no
+    #: correction.
+    weights: tuple[float, ...]
+
     def __len__(self) -> int:
         return len(self.steps)
 
@@ -110,17 +136,29 @@ class Replay(Generic[ObsT]):
         "priority",
         "rng",
         "seen",
+        "weighting",
     )
 
-    def __init__(self, rng: Rng, capacity: int, priority: float = 0.0) -> None:
+    def __init__(
+        self,
+        rng: Rng,
+        capacity: int,
+        priority: float = 0.0,
+        weighting: float = 0.0,
+    ) -> None:
         if capacity < 1:
             raise ValueError("A buffer holds at least one step.")
         if not 0.0 <= priority <= 1.0:
             raise ValueError("A priority power runs from zero to one.")
+        if not 0.0 <= weighting <= 1.0:
+            raise ValueError("A weighting power runs from zero to one.")
+        if weighting > 0.0 and priority <= 0.0:
+            raise ValueError("Weighting corrects a priority draw, so it needs one.")
 
         self.rng = rng
         self.capacity = capacity
         self.priority = priority
+        self.weighting = weighting
         self._kept: list[Transition[ObsT, int]] = []
         self._weight: list[float] = []
         self._largest = 1.0
@@ -155,15 +193,21 @@ class Replay(Generic[ObsT]):
         if size < 1:
             raise ValueError("A sample is at least one step.")
         if not self._kept:
-            return Batch((), ())
+            return Batch((), (), ())
 
         if self.priority > 0.0:
             places = self._by_priority(size)
+            weights = self._weights_for(places)
         else:
             held = len(self._kept)
             places = [self.rng.below(held) for _ in range(size)]
+            weights = [1.0] * size
 
-        return Batch(tuple(self._kept[place] for place in places), tuple(places))
+        return Batch(
+            tuple(self._kept[place] for place in places),
+            tuple(places),
+            tuple(weights),
+        )
 
     def reprioritise(self, places: Sequence[int], errors: Sequence[float]) -> None:
         """Tell the buffer how wrong the agent turned out to be about a batch.
@@ -196,7 +240,8 @@ class Replay(Generic[ObsT]):
     def __repr__(self) -> str:
         return (
             f"Replay({len(self._kept)} of {self.capacity}, "
-            f"seen {self.seen}, priority={self.priority:g})"
+            f"seen {self.seen}, priority={self.priority:g}, "
+            f"weighting={self.weighting:g})"
         )
 
     # -- Internals -----------------------------------------------------------
@@ -221,6 +266,21 @@ class Replay(Generic[ObsT]):
             place = bisect.bisect_right(running, self.rng.random() * total)
             drawn.append(place if place <= last else last)
         return drawn
+
+    def _weights_for(self, places: Sequence[int]) -> list[float]:
+        """How much each drawn step counts, at most one and never zero.
+
+        A step drawn more often than uniform counts less, by exactly as much
+        at a weighting of one. The divisor is the largest weight the whole
+        buffer could produce, which is the one belonging to the least likely
+        step, so the answer for a step does not depend on what was drawn
+        beside it.
+        """
+        if self.weighting <= 0.0:
+            return [1.0] * len(places)
+
+        smallest = min(self._weight)
+        return [(smallest / self._weight[place]) ** self.weighting for place in places]
 
 
 __all__ = ["FLOOR", "Batch", "Replay"]
