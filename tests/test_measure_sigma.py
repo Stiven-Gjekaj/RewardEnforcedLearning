@@ -364,3 +364,55 @@ class TestItRunsMoreThanOneWindow:
     ) -> None:
         script.sigma_section("cliff", (0.0,), (0.1,), 3, 1, Rng(1))
         assert "n of 3" in capsys.readouterr().out
+
+
+class TestTheSweepSaysWhenItDidNotBracketARow:
+    """The warning `measure_fourier.py` has had from the start.
+
+    A row read at an end of the swept step sizes might do better outside the
+    range, so its number is a floor rather than a best. This script did not
+    say so, and five of the six rows of the table on the algorithms page chose
+    the smallest step size offered, which is exactly the case it is for.
+    """
+
+    def test_an_end_of_the_sweep_is_an_end(self, script: ModuleType) -> None:
+        assert script.at_an_end(0.05, (0.05, 0.1, 0.4))
+        assert script.at_an_end(0.4, (0.05, 0.1, 0.4))
+        assert not script.at_an_end(0.1, (0.05, 0.1, 0.4))
+
+    def test_one_step_swept_is_both_ends_at_once(self, script: ModuleType) -> None:
+        assert script.at_an_end(0.2, (0.2,))
+
+    def test_it_names_the_rows_it_did_not_bracket(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # Every row wants the largest step here, which is an end.
+        monkeypatch.setattr(
+            script,
+            "one_run",
+            lambda grid, sigma, step, episodes, seed, window=3: -1000.0 / step,
+        )
+        script.sigma_section("cliff", (0.0, 1.0), (0.1, 0.5), 10, 2, Rng(1))
+        printed = capsys.readouterr().out
+        assert "did not" in printed
+        assert "sigma 0, at 0.5" in printed
+        assert "sigma 1, at 0.5" in printed
+
+    def test_it_says_nothing_when_every_row_is_bracketed(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        monkeypatch.setattr(
+            script,
+            "one_run",
+            lambda grid, sigma, step, episodes, seed, window=3: (
+                -abs(step - 0.5) * 100.0
+            ),
+        )
+        script.sigma_section("cliff", (0.0, 1.0), (0.1, 0.5, 0.9), 10, 2, Rng(1))
+        assert "did not" not in capsys.readouterr().out

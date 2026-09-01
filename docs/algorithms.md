@@ -1870,16 +1870,98 @@ ties by drawing, so the three answers could disagree and each spent randomness.
 It did not reproduce tree backup at sigma of nothing, which is how that was
 found.
 
+### The window decides whether sigma can matter at all
+
+```console
+$ python scripts/measure_sigma.py --steps 1 5 10
+```
+
+The table above is at a window of three. Here is the same table at one, five
+and ten, and the first of them answers the question before the measurement
+does.
+
+**At a window of one, sigma cannot matter, and that is arithmetic.** The n-step
+return is built from its tail and its base case is `G(h, h) = Q(S(h), A(h))`.
+At one step the base case is the only level, so the term sigma multiplies is
+that value minus itself. The target is the reward plus the expectation over the
+target policy, at every sigma. One step Q(sigma) is expected SARSA whatever it
+is asked for, and `tests/test_tree.py` holds that cell for cell.
+
+| n | sigma | at step | greedy, exactly | over tree backup | 95 percent interval | p |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 0 | 0.1 | **-13.000** | - | - | - |
+| 1 | 0.25 | 0.1 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
+| 1 | 0.5 | 0.1 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
+| 1 | 0.75 | 0.1 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
+| 1 | 1 | 0.1 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
+| 1 | 1 falling to 0 | 0.1 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
+
+*Six rows identical to the last digit, and every one of them at the best
+possible return.*
+
+So a reader who sees that table is entitled to wonder whether sigma was dropped
+somewhere. It was not. It has nothing to multiply.
+
+| n | sigma | at step | greedy, exactly | over tree backup | 95 percent interval | p |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 5 | 0 | 0.05 | -14.800 | - | - | - |
+| 5 | 0.25 | 0.05 | **-14.200** | +0.600 | [-0.200, +1.400] | 0.375 |
+| 5 | 0.5 | 0.05 | -14.800 | +0.000 | [-0.600, +0.600] | 1.000 |
+| 5 | 0.75 | 0.05 | -15.000 | -0.200 | [-1.000, +0.600] | 1.000 |
+| 5 | 1 | 0.1 | -15.000 | -0.200 | [-0.800, +0.400] | 1.000 |
+| 5 | 1 falling to 0 | 0.05 | -14.600 | +0.200 | [-0.600, +1.000] | 1.000 |
+
+*Nothing here is decided. Every interval crosses zero and the smallest p is
+0.375.*
+
+| n | sigma | at step | greedy, exactly | over tree backup | 95 percent interval | p |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 10 | 0 | 0.05 | **-14.200** | - | - | - |
+| 10 | 0.25 | 0.05 | -15.200 | -1.000 | [-2.400, +0.400] | 0.281 |
+| 10 | 0.5 | 0.2 | -16.000 | -1.800 | [-3.000, -0.600] | **0.062** |
+| 10 | 0.75 | 0.1 | -16.000 | -1.800 | [-2.800, -0.600] | **0.031** |
+| 10 | 1 | 0.2 | -16.000 | -1.800 | [-3.000, -0.600] | **0.047** |
+| 10 | 1 falling to 0 | 0.4 | -15.600 | -1.400 | [-2.800, +0.200] | 0.172 |
+
+*Three rows clear of zero, and all three are worse than tree backup.*
+
+### What the four windows say together
+
+| n | best row | tree backup | rows clear of zero |
+| ---: | ---: | ---: | ---: |
+| 1 | -13.000 | -13.000 | none, and none is possible |
+| 3 | -13.800 | -13.800 | 1 |
+| 5 | -14.200 | -14.800 | 0 |
+| 10 | -14.200 | -14.200 | 3 |
+
+**Sigma matters more at a longer window, and every time it is decided it is
+decided against sampling.** At one step it cannot matter. At three, one row is
+clear of zero and it is below tree backup. At ten, three rows are, and all three
+are 1.8 below it.
+
+**And the window itself matters more than sigma does.** Tree backup at one step
+reaches the optimal -13.000 on all ten seeds. At three it reaches -13.800, at
+five -14.800, at ten -14.200. The whole spread across sigma at any window is
+smaller than the spread across the window at sigma of nothing.
+
+That is worth saying because the family is presented as a question about sigma.
+On this grid the setting that decides the answer is the one the family holds
+fixed.
+
 ### Where it is weak
 
 - **One grid and one budget.** The cliff walk at 400 episodes. The maze is not
-  measured here.
+  measured here, and `--env maze` now runs it.
 - **The score is coarse.** A cliff walk policy is worth -13 along the edge, -15
   one row up and -17 two rows up and little else, so a mean over ten seeds moves
   in steps of a fifth. That is why the interval is printed rather than the mean
   alone.
-- **One n.** Three steps. Whether sigma matters more at a longer window is not
-  measured.
+- **Most rows are read at the edge of the sweep rather than at a bracketed
+  best.** The four step sizes are 0.05, 0.1, 0.2 and 0.4. At a window of three
+  and of five, five of the six rows chose 0.05, which is the smallest offered,
+  so what those rows would do at a smaller step is not known. At ten, three of
+  six sit at an end. Only the window of one is clear of it, where every row
+  chose 0.1 and every row reached the optimum anyway.
 
 ---
 

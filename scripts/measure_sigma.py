@@ -153,6 +153,20 @@ def best_of(
     return got[best], best
 
 
+def at_an_end(step: float, steps: tuple[float, ...]) -> bool:
+    """Whether a best step size sits at either end of what was swept.
+
+    A row whose best is at an end might do better outside the range, so it is
+    read at the edge of what it was allowed rather than at a best the sweep
+    bracketed. One value swept is both ends at once.
+
+    `measure_fourier.py` has said this about its own sweep from the start.
+    This one did not, and five of the six rows of the table on the page chose
+    the smallest step size offered, which is exactly the case it is for.
+    """
+    return step in (min(steps), max(steps))
+
+
 def sigma_section(
     grid: str,
     sigmas: tuple[float, ...],
@@ -172,6 +186,7 @@ def sigma_section(
 
     against, at_against = best_of(grid, 0.0, steps, episodes, runs, window)
     rows = []
+    unbracketed: list[str] = []
     named: list[tuple[str, float | Schedule]] = [
         (f"{sigma:g}", sigma) for sigma in sigmas
     ]
@@ -194,6 +209,8 @@ def sigma_section(
                 "-" if sigma == 0.0 else f"{answer.p_value:.3f}",
             ]
         )
+        if at_an_end(at_step, steps):
+            unbracketed.append(f"sigma {label}, at {at_step:g}")
 
     for line in table(
         [
@@ -208,6 +225,14 @@ def sigma_section(
         align=["right"] * 6,
     ):
         print(f"  {line}")
+
+    if unbracketed:
+        print(
+            "\n  Best at an end of the swept step sizes, so the sweep did not"
+            "\n  bracket it and the number above is a floor rather than a best:"
+        )
+        for line in unbracketed:
+            print(f"    {line}")
 
     floor = 2.0 / 2.0**runs
     if floor > 0.05:
