@@ -16,13 +16,30 @@ was here was continuous actions, and it is below.
 
 That is a statement about this table rather than about the subject. Plenty is
 missing: a policy gradient method that works on a hard problem, an
-environment with images, a replay buffer that samples by priority. None of
-those is written here, because a list of everything not built is a list of
-the subject.
+environment with images, a buffer that draws in the log of its size rather
+than in its size. None of those is written here, because a list of everything
+not built is a list of the subject.
 
 ---
 
 ## Built since that table was written
+
+**A replay buffer that draws by priority**, as `priority` and `weighting` on
+the buffer `deep-q` already had. The entry above named it as missing. Drawing a
+step in proportion to the size of the error the agent last made on it spends
+the batch where there is something left to learn, and on the cart pole at 150
+episodes it takes the greedy return from 24 to 99.
+
+The half worth having built it for is the other one. Drawing by priority
+changes the probability each step arrives with, so the average over a batch now
+estimates a different thing and the agent settles somewhere else. That is not
+an argument on this page, it is a number: on a fixed set of twenty rewards
+whose mean is 0.2500, an uncorrected priority draw settles at 0.3442 with a
+spread of 0.0092. It is not noisy, it is wrong.
+
+Correcting it takes the cart pole to 188, which is the only one of the three
+settings whose interval is clear of zero. So the correction is not a tax paid
+to be principled. It is the setting that wins.
 
 **Continuous actions**, as `pendulum`, `pendulum-levels` and
 `gaussian-actor-critic`. The entry above said the whole action interface was

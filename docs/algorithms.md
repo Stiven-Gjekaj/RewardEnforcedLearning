@@ -2351,6 +2351,120 @@ published results come from far more compute than pure Python has.
 
 ---
 
+## Drawing from the buffer by priority
+
+```console
+$ python scripts/measure_prioritised.py
+$ python scripts/measure_prioritised.py --skip-task
+$ rel train deep-q --env cartpole --set priority=0.6 --set weighting=0.4
+```
+
+A buffer that draws evenly spends most of a batch on steps the agent already
+predicts. `priority` draws a step in proportion to the size of the error the
+agent last made on it, so the batch is spent where there is something left to
+learn. Both are settings of the same buffer, so the rows below are one piece of
+code with two numbers changed.
+
+It also breaks the estimate, and that is the more interesting half. Fitting to
+a batch is an average over the steps in it, and an average estimates what it is
+meant to estimate only if the steps arrived with the right probability. Drawing
+by priority changes those probabilities deliberately. The agent then settles
+somewhere else. It is not a faster route to the same answer.
+
+`weighting` is the correction: a step drawn `k` times more often than even
+counts `k` to the power minus `weighting` as much, so at one the two effects
+cancel.
+
+### The bias is not an argument, it is a number
+
+The first section of the script is not a task. One state, one action, and
+twenty rewards with no future, so the target of every step is the reward itself
+and the agent is fitting a constant to a fixed set of numbers.
+
+That is worth doing because the answer is arithmetic. The constant that
+minimises the mean squared error over a set of numbers is their mean. The
+constant an uncorrected priority draw is pulled to instead is the root of
+
+    sum over the numbers of |c - y| * (c - y) = 0
+
+which for fifteen rewards of nothing and five of one is `1 / (1 + sqrt 3)`. The
+script solves it by bisection rather than quoting it, and a test holds the
+closed form against the bisection.
+
+| setting | priority | weighting | settled at | off the mean | spread |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| even | 0 | 0 | 0.2395 | -0.0105 | 0.0734 |
+| priority | 1 | 0 | 0.3442 | **+0.0942** | 0.0092 |
+| corrected | 1 | 1 | 0.2389 | -0.0111 | 0.0354 |
+
+*Five seeds, 400 passes each. The mean of the rewards is 0.2500 and the root
+above is 0.3660.*
+
+**The uncorrected row is nine times further from the mean than either other
+row, and its own spread is a tenth of theirs.** It is not noisy. It has settled,
+and it has settled in the wrong place.
+
+The rewards are skewed on purpose. On a symmetric set the mean and the root are
+the same number and this table would show nothing.
+
+**It does not reach the root, and the reason is in the buffer.** Every step put
+in is given the largest priority the buffer has held, whatever the agent now
+believes about it, so each step is pulled back up once per pass and that pull
+is towards the even draw. 0.3442 sits between the mean and 0.3660. The bias is
+smaller than the argument says because of a choice made elsewhere for a
+different reason, which is worth knowing before reading any single number here
+as the size of the effect.
+
+### On the cart pole it helps, and the correction helps more
+
+<!-- not checked, column seconds: seconds belong to the machine -->
+
+| setting | priority | weighting | return | seconds | minus even | 95 percent interval | p |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| even | 0 | 0 | 24.2 | 32 | - | - | - |
+| priority | 0.6 | 0 | 98.5 | 69 | +74.3 | [+0.3, +181.9] | 0.1230 |
+| corrected | 0.6 | 0.4 | **187.8** | 98 | **+163.5** | [+51.7, +284.0] | **0.0254** |
+
+*Cart pole, ten seeds, 150 episodes, read as the return of the greedy policy at
+the end. The best possible return is 500.*
+
+**Only the corrected row is decided.** Priority alone is ahead by 74 and its
+interval touches zero at +0.3, which at ten seeds is not a result. Correcting
+it as well is ahead by 163 with the interval clear.
+
+That ordering is the useful one. The correction is not a tax paid to be
+principled: on this task the setting that draws by priority and corrects for it
+beats both the even draw and the uncorrected draw, and the uncorrected draw
+beats nothing at a p anybody should act on.
+
+### What it costs
+
+A priority draw adds up the weights of the whole buffer once for each batch,
+where an even draw asks the generator for a whole number and stops. That is two
+thousand additions a step against eight, and the seconds above show it: 32
+seconds becomes 69 and then 98. Half of that second step is the priority draw
+and half is that the better rows survive longer episodes, which are more steps.
+
+The alternative is a sum tree, which draws and updates in the log of the buffer
+size rather than in the buffer size. It is not here. The buffer is a list with a
+cursor and the cost of the draw is the cost of a pass over it, which is the
+right cost for a project whose networks are pure Python.
+
+### Where it is weak
+
+- **One task and one budget.** The cart pole at 150 episodes. What priority does
+  on the cliff walk, where the one-hot representation makes each state nearly
+  its own parameters, is not measured.
+- **One pair of powers.** 0.6 and 0.4 on the task table, chosen before the
+  measurement and not swept. Whether some other pair does better is open.
+- **The seconds are not controlled for.** Every row got the same episodes and
+  not the same time. A comparison at equal seconds would be a different table
+  and might well be a different result.
+- **Ten seeds.** Enough to decide the corrected row and not enough to decide
+  the uncorrected one. The floor at ten seeds is a p of 0.002.
+
+---
+
 ## An action that is a number
 
 ```console
@@ -3050,10 +3164,10 @@ was where its numbers came from, and it had that wrong in a dozen places.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **516 of this
-  page's numbers are in prose rather than in a cell**, against 1413 in cells.
+- **Any number written in a sentence.** It reads tables, and **537 of this
+  page's numbers are in prose rather than in a cell**, against 1446 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 516 are settings, seed counts and episode caps rather than anything a
+  those 537 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -3109,7 +3223,7 @@ written as a console block.
   numbers have moved, and the difference is one line further down the report,
   which names the command and the budget it wanted. `--timeout` is what to
   reach for before believing the first reading.
-- **1122 of 1413 numbers are checked.** The rest are in a table or a column that
+- **1155 of 1446 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
@@ -3144,6 +3258,7 @@ which is harmless and still worth spelling one way.
 | What crediting the middle buys | `python scripts/measure_intra_option.py --episodes 800 --block 100` |
 | Prediction against a known answer | `python scripts/measure_prediction.py` |
 | Replay and a target network | `python scripts/measure_value_network.py --env cartpole --episodes 400 --runs 10 --set step_size=0.02` |
+| Drawing from the buffer by priority | `python scripts/measure_prioritised.py` |
 | Four ways of exploring | `python scripts/measure_exploration.py` |
 | Which loop a discount chooses | `python scripts/measure_average_reward.py` |
 | How large a difference is noise | `python scripts/measure_noise.py --trials 200` |
