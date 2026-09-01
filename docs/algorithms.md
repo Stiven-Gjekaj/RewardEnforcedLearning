@@ -2465,6 +2465,152 @@ right cost for a project whose networks are pure Python.
 
 ---
 
+## The maximum overstates, and what splitting it takes off
+
+```console
+$ python scripts/measure_double.py
+$ rel solve --env bias
+$ rel train deep-q --env bias --set double=true
+```
+
+Q-learning backs up `max Q(s')`. That is the largest of several estimates, each
+carrying error in both directions, and the largest of several noisy numbers is
+above the largest true number. The error does not average out with more
+samples of any one action, because it comes from the choosing.
+
+`bias` is the smallest problem where that matters, Sutton and Barto's example
+6.7. Going right ends the episode with nothing. Going left leads to a gamble
+whose mean is -0.1 and whose spread is 1. `rel solve --env bias` says the best
+possible return is 0, so an agent that goes left is wrong by a tenth, and no
+horizon, representation or exploration problem is in the way.
+
+**The number read is the share of episodes that went the wrong way,** which the
+environment reports as an audit rather than paying for in reward. The return
+would say far less: an episode that went left is worth -1.1 or +0.9 and one
+that went right is worth nothing, so a mean return mixes the mistake with the
+noise that caused it.
+
+An agent that has learned the answer still goes left sometimes, because
+epsilon-greedy explores. That floor is `epsilon / actions`, which is 0.010
+here. Everything above it is the bias.
+
+### Two tables against one
+
+| agent | left, first 50 | last 200, median | mean | mean over the floor | late minus q-learning | 95 percent interval | p |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| q-learning | 0.484 | 0.013 | 0.071 | 7.1 | - | - | - |
+| double-q | **0.146** | 0.010 | **0.011** | **1.1** | -0.060 | [-0.109, -0.017] | **0.0209** |
+
+*Thirty seeds, 1000 episodes, epsilon 0.1, step size 0.1.*
+
+**Over the first fifty episodes Q-learning goes the wrong way about half the
+time and double Q-learning a seventh of the time.** That is the figure the book
+draws and it reproduces.
+
+**The late columns say something the book's figure does not.** The median seed
+of both agents is at the floor by the end: 0.013 against 0.010. The means are
+0.071 and 0.011. So the difference late is not that the typical Q-learning run
+is worse. It is that a few Q-learning runs never settle, and a mean counts
+those.
+
+### Why a few runs never settle
+
+Going right from the start is deterministic, ends the episode and pays nothing,
+so `Q(A, right)` is exactly 0 and stays exactly 0 for the whole run. The
+policy therefore turns on the sign of `Q(A, left)` against an exact zero.
+
+The step size is a constant, so `max Q(B, a)` does not converge. It wanders. On
+the worst of thirty seeds it swung between -0.03 and +0.27 over the last two
+hundred episodes, and `Q(A, left)` followed it from -0.006 up to +0.26 and back
+down. Every excursion above zero flips the policy back to going left.
+
+**So the bias here is intermittent rather than persistent.** It is not that the
+estimates settle in the wrong place. It is that they never settle, and one side
+of the comparison is an exact zero that they keep crossing.
+
+### Whether a longer run pays it off
+
+| episodes | q-learning, median | mean | double-q, median | mean |
+| ---: | ---: | ---: | ---: | ---: |
+| 500 | 0.0150 | 0.0238 | 0.0100 | 0.0123 |
+| 1000 | 0.0100 | 0.0795 | 0.0100 | 0.0125 |
+| 2000 | 0.0125 | 0.0315 | 0.0075 | 0.0103 |
+| 4000 | 0.0100 | 0.0248 | 0.0050 | 0.0090 |
+| 8000 | 0.0100 | 0.0210 | 0.0050 | 0.0083 |
+
+*Twenty seeds at each budget, the share over the last 200 episodes of it. The
+floor is 0.010.*
+
+**No.** Sixteen times the budget takes the Q-learning mean from 0.0238 to
+0.0210 and its median never leaves the floor. Both columns are flat, and they
+are flat because they are measuring different things: the median seed was
+finished by five hundred episodes, and the seeds in the mean are the ones that
+are never finished.
+
+Double Q-learning's median goes below the floor at the long budgets, to 0.0050.
+That is not it doing better than the exploring policy allows. It is that a run
+of two hundred episodes contains two exploring wrong turns on average, and half
+of such runs contain one or none.
+
+### On a network, neither one learns the answer
+
+`deep-q --set double=true` makes the live network name the best action of the
+next state and the target network say what it is worth. That costs nothing: a
+target network is already a second set of weights kept apart from the live one.
+
+| agent | left, first 50 | last 200, median | mean | mean over the floor | late minus deep-q | 95 percent interval | p |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| deep-q | 0.361 | 0.382 | 0.370 | 37.0 | - | - | - |
+| deep-q double | **0.195** | **0.227** | **0.266** | **26.6** | -0.105 | [-0.225, +0.017] | 0.1111 |
+
+*Thirty seeds, 1000 episodes, epsilon 0.1, step size 0.01.*
+
+**Both rows are near the top and neither is near the floor.** The median is 37
+and 27 times the exploration floor, so this is not a tail of bad seeds. It is
+every seed. The split halves nothing here and the interval crosses zero.
+
+The problem is two steps long, so a thousand episodes is about fifteen hundred
+steps, and the buffer of two thousand never fills while the target refreshes
+seven times. Whether the network is biased or simply has not been shown enough
+is not separated by this table.
+
+### On a task where the bias is not the point
+
+| agent | return | minus deep-q | 95 percent interval | p |
+| :--- | ---: | ---: | ---: | ---: |
+| deep-q | **24.2** | - | - | - |
+| deep-q double | 13.3 | -10.9 | [-20.7, -3.1] | **0.0078** |
+
+*Cart pole, ten seeds, 150 episodes, read as the return of the greedy policy at
+the end. The best possible return is 500.*
+
+**Removing the bias makes it worse, and that is decided.** The interval is
+clear of zero at ten seeds.
+
+An overstated maximum is an optimistic value, and optimism about actions not
+yet taken is what drives an epsilon-greedy agent to take them. On a problem
+built so that optimism is the whole mistake, removing it is the whole answer.
+On a problem where nothing is learned yet, removing it takes away a reason to
+explore. **The correction is a correction, not an improvement.**
+
+### Where it is weak
+
+- **The cart pole row is two agents that both fail.** 24.2 and 13.3 out of 500.
+  A difference between two failures is a real difference and it is not evidence
+  about which is better where either one works.
+- **One budget for the network.** 1000 episodes on a two step problem is not
+  much for a network that carries a buffer and a target copy, and the section
+  above says what that leaves undecided.
+- **One step size each.** 0.1 for the tables and 0.01 for the networks, neither
+  swept. The whole mechanism above turns on the size of the wander, which is
+  proportional to the step size, so a sweep would move these numbers and is not
+  done here.
+- **Thirty seeds is not many for a tail.** The late means are counting how many
+  runs of thirty never settled. That is a small integer wearing a decimal
+  point.
+
+---
+
 ## An action that is a number
 
 ```console
@@ -3164,10 +3310,10 @@ was where its numbers came from, and it had that wrong in a dozen places.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **537 of this
-  page's numbers are in prose rather than in a cell**, against 1446 in cells.
+- **Any number written in a sentence.** It reads tables, and **575 of this
+  page's numbers are in prose rather than in a cell**, against 1508 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 537 are settings, seed counts and episode caps rather than anything a
+  those 575 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -3223,7 +3369,7 @@ written as a console block.
   numbers have moved, and the difference is one line further down the report,
   which names the command and the budget it wanted. `--timeout` is what to
   reach for before believing the first reading.
-- **1155 of 1446 numbers are checked.** The rest are in a table or a column that
+- **1217 of 1508 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
@@ -3259,6 +3405,7 @@ which is harmless and still worth spelling one way.
 | Prediction against a known answer | `python scripts/measure_prediction.py` |
 | Replay and a target network | `python scripts/measure_value_network.py --env cartpole --episodes 400 --runs 10 --set step_size=0.02` |
 | Drawing from the buffer by priority | `python scripts/measure_prioritised.py` |
+| The maximum overstates | `python scripts/measure_double.py` |
 | Four ways of exploring | `python scripts/measure_exploration.py` |
 | Which loop a discount chooses | `python scripts/measure_average_reward.py` |
 | How large a difference is noise | `python scripts/measure_noise.py --trials 200` |

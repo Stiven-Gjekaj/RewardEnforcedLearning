@@ -24,6 +24,26 @@ not built is a list of the subject.
 
 ## Built since that table was written
 
+**The problem that separates the two ways of estimating**, as `bias`, and the
+same split on a network, as `deep-q --set double=true`. `double-q` had been
+here from the start and nothing on the page said what it was for. Now the
+smallest problem where a maximum over noise points the wrong way is an
+environment, value iteration answers it exactly, and the two agents are
+measured against that answer rather than against each other on a grid.
+
+Over the first fifty episodes Q-learning goes the wrong way 0.484 of the time
+and double Q-learning 0.146, which is the book's figure reproduced. What the
+book's figure does not show is that late in the run the two medians are both at
+the exploring floor and only the means separate them. The difference late is a
+count of runs that never settled.
+
+Two things were found that were not the plan. The bias here is intermittent
+rather than persistent: at a constant step size the maximum at the middle state
+wanders across zero for ever, and going right is worth exactly zero, so every
+excursion flips the policy back. And on the cart pole the split makes `deep-q`
+worse by 10.9 return with the interval clear of zero. An overstated maximum is
+optimism, and optimism is what makes an epsilon-greedy agent try things.
+
 **A replay buffer that draws by priority**, as `priority` and `weighting` on
 the buffer `deep-q` already had. The entry above named it as missing. Drawing a
 step in proportion to the size of the error the agent last made on it spends

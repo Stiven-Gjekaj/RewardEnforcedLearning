@@ -177,9 +177,14 @@ def bias_section(
     rows = []
     for name, _ in agents:
         early, late = got[name]
+        # The median is beside the mean because on the late window the two say
+        # different things: a seed whose estimates never recover goes left
+        # about a fifth of the time for ever, and a few of those move a mean
+        # further than the whole difference between the two agents.
         row = [
             name,
             f"{statistics.mean(early):.3f}",
+            f"{statistics.median(late):.3f}",
             f"{statistics.mean(late):.3f}",
             f"{statistics.mean(late) / floor:.1f}",
         ]
@@ -198,14 +203,15 @@ def bias_section(
         [
             "agent",
             f"left, first {first}",
-            f"left, last {last}",
-            "times the floor",
+            f"last {last}, median",
+            "mean",
+            "mean over the floor",
             f"late minus {against}",
             "95 percent interval",
             "p",
         ],
         rows,
-        align=["left"] + ["right"] * 6,
+        align=["left"] + ["right"] * 7,
     ):
         print(f"  {line}")
 
