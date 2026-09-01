@@ -2566,8 +2566,10 @@ closed form against the bisection.
 *Five seeds, 400 passes each. The mean of the rewards is 0.2500 and the root
 above is 0.3660.*
 
-**The uncorrected row is nine times further from the mean than either other
-row, and its own spread is a tenth of theirs.** It is not noisy. It has settled,
+**The uncorrected row is about nine times further from the mean than either
+other row, and its spread is the smallest of the three.** It is 0.0942 off
+against 0.0105 and 0.0111, and it varies over 0.0092 where the even draw varies
+over 0.0734 and the corrected one over 0.0354. It is not noisy. It has settled,
 and it has settled in the wrong place.
 
 The rewards are skewed on purpose. On a symmetric set the mean and the root are
@@ -3598,10 +3600,10 @@ was where its numbers came from, and it had that wrong in a dozen places.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **641 of this
+- **Any number written in a sentence.** It reads tables, and **647 of this
   page's numbers are in prose rather than in a cell**, against 1759 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 641 are settings, seed counts and episode caps rather than anything a
+  those 647 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
