@@ -361,6 +361,55 @@ class TestSigmaChangesTheAnswer:
         assert got[0.5] == pytest.approx((got[0.0] + got[1.0]) / 2.0)
 
 
+class TestSigmaCannotMatterAtAWindowOfOne:
+    """Which is the book's own recursion rather than a fault in this one.
+
+    The n-step return is built from the tail, and its base case is
+    `G(h, h) = Q(S(h), A(h))`. At a window of one the base case is the only
+    level, so the term sigma multiplies is `Q(S, A) - Q(S, A)`, which is
+    nothing. The target is then the reward plus the expectation over the
+    target policy, whatever sigma was asked for.
+
+    So one step Q(sigma) is expected SARSA at every sigma, and the family
+    only opens up at two steps and more. `scripts/measure_sigma.py --steps 1`
+    finds every row of its table identical to the last digit, and this says
+    why rather than leaving a reader to wonder whether sigma was dropped.
+    """
+
+    def test_the_two_ends_agree_cell_for_cell(self) -> None:
+        nothing, everything = a_sigma(0.0, n=1), a_sigma(1.0, n=1)
+        feed(nothing)
+        feed(everything)
+        assert cells(nothing) == cells(everything)
+
+    def test_so_does_everything_between_them(self) -> None:
+        against = a_sigma(0.0, n=1)
+        feed(against)
+        for sigma in (0.25, 0.5, 0.75, 1.0):
+            agent = a_sigma(sigma, n=1)
+            feed(agent)
+            assert cells(agent) == cells(against), sigma
+
+    def test_it_holds_for_a_policy_target_too(self) -> None:
+        # A greedy target has shares of one and nothing, so it is the case
+        # where the fewest terms can differ. The policy target spreads its
+        # shares and still agrees.
+        against = a_sigma(0.0, target="policy", n=1)
+        feed(against)
+        other = a_sigma(1.0, target="policy", n=1)
+        feed(other)
+        assert cells(other) == cells(against)
+
+    def test_two_steps_is_where_it_opens_up(self) -> None:
+        # Without this the tests above would pass on an agent that ignored
+        # sigma everywhere rather than only at the window where it cannot
+        # matter.
+        nothing, everything = a_sigma(0.0, n=2), a_sigma(1.0, n=2)
+        feed(nothing)
+        feed(everything)
+        assert cells(nothing) != cells(everything)
+
+
 class TestTheCoefficient:
     def test_at_sigma_of_nothing_it_is_the_share(self) -> None:
         agent = a_sigma(0.0)
