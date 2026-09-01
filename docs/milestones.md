@@ -24,6 +24,35 @@ not built is a list of the subject.
 
 ## Built since that table was written
 
+**Two of this page's own open questions, asked.** The Fourier section said the
+sign of its finding was measured on the mountain car only. The Q(sigma) section
+said one grid and one n. Neither script could be pointed anywhere else, so both
+notes were statements about the scripts rather than about the subject.
+`measure_fourier.py --env` and `measure_sigma.py --steps` fix that.
+
+The sigma answer is clean and the shortest window gives it before the
+measurement does: at n of one the term sigma multiplies is the base case minus
+itself, so one step Q(sigma) is expected SARSA at every sigma. Past that, sigma
+matters more the longer the window and every time it is decided it is decided
+against sampling. **The larger finding is that the window matters more than
+sigma does.** The whole spread across sigma at any window is smaller than the
+spread across the window at sigma of nothing, and the family is presented as a
+question about sigma.
+
+The Fourier answer is that the environment cannot give one. A Fourier basis
+reaches the cart pole's cap of 500 at both orders that finish and at a quarter
+of the budget, so both sides sit on the ceiling and there is nothing left for a
+step size rule to be better or worse at. The mountain car answers the question
+because neither side solves it, and it was not chosen for that reason.
+
+Three smaller things fell out. The n of three table reproduces cell for cell,
+which is the first time it has been re-run since it was written. Five of its
+six rows chose the smallest step size the sweep offers, so five of six numbers
+there are floors, and the script now says so in the words `measure_fourier.py`
+has always used. And the one cart pole row with any difference in it, ahead by
+17.4 at five seeds, was behind by 20.3 at twelve. **Five seeds could not report
+the direction, let alone the size.**
+
 **The gaming gap against how clearly the agent can see**, as `grouped-sarsa`,
 `grouped-q` and `scripts/measure_resolution.py`. The pressure ladder turns one
 dial, how hard the agent optimises, with nothing learned along it. This turns

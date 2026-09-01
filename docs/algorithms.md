@@ -2021,10 +2021,91 @@ the smallest step the sweep offered, so its 46.0 is what scaling bought inside
 the range rather than what it can buy. The script names such rows rather than
 letting them read as findings.
 
+### The cart pole cannot answer this, and that is the answer
+
+```console
+$ python scripts/measure_fourier.py --env cartpole --orders 1 2
+$ python scripts/measure_fourier.py --env cartpole --orders 1 2 --episodes 50
+$ python scripts/measure_fourier.py --env cartpole --orders 1 --episodes 50 --runs 12
+```
+
+The table above is the mountain car. The obvious next question is whether the
+sign still flips somewhere else, and the cart pole is the other box this
+project has.
+
+**It is four dimensions rather than two, and that decides how far the question
+can be asked.** A Fourier basis is `(order + 1)` to the power of the
+dimensions, so the same order is a very different number of waves.
+
+| order | features on the mountain car | features on the cart pole |
+| ---: | ---: | ---: |
+| 1 | 4 | 16 |
+| 3 | 16 | 256 |
+| 5 | 36 | 1296 |
+| 7 | 64 | 4096 |
+
+*The growth this basis has, and the reason the section above says it does not
+go past a few dimensions.*
+
+Orders 1, 2 and 3 were run first. It did not finish in an hour and printed
+nothing, so the run below is orders 1 and 2.
+
+| order | features | scaled | at step | flat | at step | scaled minus flat | 95 percent interval | p |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 16 | 500.0 | 0.05 | 500.0 | 0.2 | +0.0 | [+0.0, +0.0] | 1.000 |
+| 2 | 81 | 500.0 | 0.1 | 500.0 | 0.05 | +0.0 | [+0.0, +0.0] | 1.000 |
+
+*Cart pole, five seeds, 200 episodes. The best possible return is 500.*
+
+**Both sides are on the ceiling.** 500 is the cap, both orders reach it, and
+the difference is exactly nothing. The comparison has no room to say anything,
+because a Fourier basis solves this problem.
+
+A quarter of the budget does not open it either:
+
+| order | features | scaled | at step | flat | at step | scaled minus flat | 95 percent interval | p |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 16 | 500.0 | 0.2 | 482.6 | 0.2 | +17.4 | [+0.0, +52.3] | 1.000 |
+| 2 | 81 | 500.0 | 2 | 500.0 | 0.2 | +0.0 | [+0.0, +0.0] | 1.000 |
+
+*Cart pole, five seeds, 50 episodes.*
+
+### The one row with a difference in it was five seeds talking
+
+The row above at order 1 is the only one on the cart pole where the two sides
+differ at all: scaling ahead by 17.4, on an interval that touches zero at the
+bottom and a p of 1.000. Twelve seeds instead of five:
+
+| order | features | scaled | at step | flat | at step | scaled minus flat | 95 percent interval | p |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 16 | 460.1 | 0.5 | 480.4 | 0.5 | **-20.3** | [-103.5, +45.4] | 0.750 |
+
+*Cart pole, twelve seeds, 50 episodes.*
+
+**The sign reversed.** Ahead by 17.4 at five seeds and behind by 20.3 at
+twelve, and neither is decided. Both sides also chose a different step size
+once there were more seeds to choose on.
+
+That is this page's own rule about seeds, arriving with a number attached. Five
+seeds cannot report a p below 0.0625 whatever the difference is, and here they
+could not report the direction either.
+
+### So the question is still open, and it is open for a reason
+
+Whether the step scaling rule's sign flips on another environment is not
+answered here. The cart pole cannot answer it: a Fourier basis reaches the cap
+on it at both orders that finish and at a quarter of the budget, so there is
+nothing left for a step size rule to be better or worse at.
+
+**The mountain car answers it because neither side solves it.** That is what
+makes it the environment this comparison runs on, and it was not chosen for
+that reason.
+
 ### Where it is weak
 
-- **One environment.** The mountain car only. Whether the sign still flips on
-  the cart pole is not measured here.
+- **Still one environment that can say anything.** The cart pole was measured
+  and is on the ceiling, so the sign flip is known on the mountain car and
+  nowhere else. A third box with room in it is what this needs.
 - **Two hundred episodes.** This is early learning, as the encoder comparison
   above it is.
 - **Four orders.** The sign flips twice across four rows, which is enough to
@@ -2032,6 +2113,9 @@ letting them read as findings.
 - **The order is the whole design and it is not swept against the others.**
   Which of the three encoders is best on this problem is a different question
   and this table does not answer it.
+- **The cart pole rows are five seeds.** The one that was rerun at twelve
+  changed sign, so the other three should be read as saying that both sides
+  reach the cap and nothing more.
 
 ---
 
@@ -3514,10 +3598,10 @@ was where its numbers came from, and it had that wrong in a dozen places.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **624 of this
-  page's numbers are in prose rather than in a cell**, against 1694 in cells.
+- **Any number written in a sentence.** It reads tables, and **641 of this
+  page's numbers are in prose rather than in a cell**, against 1759 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 624 are settings, seed counts and episode caps rather than anything a
+  those 641 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -3573,7 +3657,7 @@ written as a console block.
   numbers have moved, and the difference is one line further down the report,
   which names the command and the budget it wanted. `--timeout` is what to
   reach for before believing the first reading.
-- **1403 of 1694 numbers are checked.** The rest are in a table or a column that
+- **1468 of 1759 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
