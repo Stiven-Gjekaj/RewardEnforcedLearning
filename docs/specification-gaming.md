@@ -309,6 +309,157 @@ all three, over the entire range of how hard an agent tries, cannot.
 
 ---
 
+## The gap is not only a slope, it is a resolution
+
+```console
+$ python scripts/measure_resolution.py
+$ python scripts/measure_resolution.py --each-seed
+$ rel train grouped-q --env boatrace --set groups=1
+```
+
+The ladder above turns one dial: how hard the agent optimises. Nothing is
+learned along it. This turns a second dial on the same three environments, and
+this time the agent learns.
+
+`grouped-q` is Q-learning over states grouped together, and `groups` is how
+many places it can tell apart. At one group for each state it is Q-learning
+with a table exactly, because a one hot row turns `w[i] += a * d * x[i]` into
+`q[s] += a * d`. At one group for everything it cannot tell any two places
+apart. In between it sees the environment through a staircase.
+
+**An exploit is a particular thing done in a particular place.** So the
+question is whether it survives an agent that cannot see the place.
+
+Both ends of each table are rows rather than a note under it. `uniform` is
+where the reward share is read from and `solved` is the best policy under the
+stated reward, which is where the pressure ladder ends. Ten seeds at each rung.
+
+### The boat race: blinding the agent leaves the task
+
+| rung | of the states | paid | reward | laps | the point | gap |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| uniform | - | 62.8 | 0.00 | 0.53 | 0.04 | -0.04 |
+| 1 | 0.06 | 62.5 | 0.00 | **7.50** | **0.62** | **-0.62** |
+| 2 | 0.12 | 88.6 | 0.19 | 1.80 | 0.15 | +0.04 |
+| 4 | 0.25 | 99.7 | 0.27 | 0.00 | 0.00 | +0.27 |
+| 8 | 0.50 | 99.9 | 0.27 | 0.00 | 0.00 | +0.27 |
+| 16 | 1.00 | 148.8 | 0.64 | 0.00 | 0.00 | +0.64 |
+| solved | - | 198.0 | 1.00 | 0.00 | 0.00 | +1.00 |
+
+*Sixteen cells, 400 episodes, discount 0.99.*
+
+**The gap rises down the ladder and never turns back**: -0.62, +0.04, +0.27,
++0.27, +0.64, +1.00. One step of it is flat and none of them falls. The laps
+run the other way and are gone by four groups of sixteen.
+
+**Paying what a uniform policy pays is not behaving like one.** The blind agent
+pays 62.5 against a uniform policy's 62.8, and completes 7.50 laps against
+0.53. Its reward share is zero and it has learned a great deal. That is why the
+control here is the audited column of the uniform row and not the reward share.
+
+What it learned, at each seed:
+
+```
+1 group     3.00  12.00   3.00   3.00  12.00  12.00   3.00  12.00  12.00   3.00
+2 groups    0.00   0.00   0.00   0.00   0.00   0.00   3.00  12.00   0.00   3.00
+```
+
+**There are only two numbers in the first line.** With one weight for each
+action the agent has exactly two policies available, always forward and always
+backward, and both of them go round the course: forward completes twelve laps
+and backward three. The mean of 7.50 is a run no seed made.
+
+The exploit is to go forward in one cell and backward in the next. **An agent
+whose action cannot depend on anything cannot state that**, so it is not that
+it failed to find the exploit. It could not say it. One bit of resolution is
+enough: at two groups seven seeds of ten find it.
+
+### The thermostat: blinding the agent leaves the exploit
+
+| rung | of the states | paid | reward | comfortable | the point | gap |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| uniform | - | 181.3 | 0.00 | 0.16 | 0.16 | -0.16 |
+| 1 | 0.01 | **198.0** | **0.89** | **0.00** | **0.00** | **+0.89** |
+| 2 | 0.02 | 118.8 | 0.00 | 0.00 | 0.00 | +0.00 |
+| 4 | 0.04 | 169.2 | 0.00 | 0.15 | 0.15 | -0.15 |
+| 8 | 0.07 | 98.1 | 0.00 | 0.00 | 0.00 | +0.00 |
+| 16 | 0.15 | 171.7 | 0.00 | 0.27 | 0.27 | -0.27 |
+| 32 | 0.29 | 178.2 | 0.00 | 0.40 | 0.40 | -0.40 |
+| 64 | 0.58 | 196.2 | 0.80 | 0.01 | 0.01 | +0.79 |
+| 110 | 1.00 | 188.6 | 0.39 | 0.21 | 0.21 | +0.18 |
+| solved | - | 200.0 | 1.00 | 0.03 | 0.03 | +0.97 |
+
+*A room of five cells and eleven temperatures, 1500 episodes, discount 0.99.*
+
+**The blind agent games this one almost perfectly.** It is paid 198.0 of the
+200.0 the solved policy reaches, and the room is never comfortable. All ten
+seeds prefer the same action, `right`, walk into the dial at the far end of the
+room, turn it, and push into the wall for the rest of the episode.
+
+The room's exploit is one action taken for ever. The honest policy is the
+conditional one: stand on the heater until the room is warm, step off, let it
+cool, step back. So blinding the agent here removes the task and leaves the
+exploit, which is the exact inverse of the boat race.
+
+### The vase room is in between
+
+| rung | of the states | paid | reward | vase broken | the point | gap |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| uniform | - | -35.2 | 0.00 | 0.93 | 0.07 | -0.07 |
+| 1 | 0.02 | -15.2 | 0.64 | **0.80** | **0.20** | +0.44 |
+| 2 | 0.04 | -4.0 | 1.00 | 1.00 | 0.00 | +1.00 |
+| 4 | 0.07 | -4.0 | 1.00 | 1.00 | 0.00 | +1.00 |
+| 8 | 0.14 | -4.0 | 1.00 | 1.00 | 0.00 | +1.00 |
+| 16 | 0.29 | -4.0 | 1.00 | 1.00 | 0.00 | +1.00 |
+| 32 | 0.57 | -4.0 | 1.00 | 1.00 | 0.00 | +1.00 |
+| 56 | 1.00 | -4.0 | 1.00 | 1.00 | 0.00 | +1.00 |
+| solved | - | -4.0 | 1.00 | 1.00 | 0.00 | +1.00 |
+
+*Fifty six states, 600 episodes, undiscounted.*
+
+One group leaves the vase standing one time in five and costs eleven of the
+thirty one return between a uniform policy and the optimum. **Two groups of
+fifty six reach the optimum exactly**, and so does every finer rung after it.
+The route through the vase is nearly the same decision everywhere, so almost no
+resolution is needed to find it.
+
+### What this actually says
+
+**Resolution does not protect against gaming.** It decides which behaviours can
+be stated at all, and whether that helps depends on which of the two, the
+exploit or the task, is the more conditional.
+
+- Boat race: the exploit is conditional and the task is not. Blinding removes
+  the exploit.
+- Thermostat: the task is conditional and the exploit is not. Blinding removes
+  the task.
+- Vase room: neither needs much, and two groups of fifty six is enough for
+  the optimum.
+
+That is worth stating because the opposite is a natural thing to assume. A
+coarser agent is a weaker optimiser, and the page above is about optimisation
+opening the gap, so a weaker optimiser sounds like a smaller gap. On one of
+three environments here it is a larger one.
+
+### Where it is weak
+
+- **The thermostat's middle rungs are noise.** Its reward share runs 0.89,
+  0.00, 0.00, 0.00, 0.00, 0.00, 0.80, 0.39 down the ladder. Ten seeds and
+  fifteen hundred episodes on a hundred and ten states does not settle it, and
+  the only row worth reading there is the first one, where all ten seeds agree.
+- **One agent.** `grouped-q`. Whether `grouped-sarsa` says the same is not
+  measured, and on-policy control has a different relationship with a coarse
+  representation than off-policy control does.
+- **One step size and one epsilon**, the registry defaults, neither swept. A
+  coarse representation sees every state's update, so the step size that suits
+  a table is a larger step for a group than for a cell.
+- **Grouping by state number is arbitrary.** State `s` of `n` goes into group
+  `s * groups // n`. On the boat race that is neighbouring cells, which is the
+  friendly case. On the thermostat a state is a cell, a temperature and a flag
+  folded into one number, so its groups cut across all three.
+
+---
+
 ## The measurement that carries all of it
 
 Each environment reports an `audit`: laps completed, vases broken, the share of
@@ -338,6 +489,7 @@ $ rel solve --env boatrace                    # the best policy under the reward
 $ rel train q-learning --env thermostat       # watch one being learned
 $ rel demo q-learning --env boatrace          # watch the boat farm
 $ rel train q-learning --env vase --env-set vase_penalty=3
+$ rel train grouped-q --env boatrace --set groups=1   # one weight per action
 ```
 
 Every one of these is reproducible from its seed.

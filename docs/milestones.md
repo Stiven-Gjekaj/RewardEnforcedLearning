@@ -24,6 +24,34 @@ not built is a list of the subject.
 
 ## Built since that table was written
 
+**The gaming gap against how clearly the agent can see**, as `grouped-sarsa`,
+`grouped-q` and `scripts/measure_resolution.py`. The pressure ladder turns one
+dial, how hard the agent optimises, with nothing learned along it. This turns
+another: how many places a learning agent can tell apart, from one group for
+everything to one for each state, where it is Q-learning with a table exactly.
+
+The plan was that blurring an agent would make gaming harder, because an
+exploit is a particular thing done in a particular place. On the boat race that
+is what happens and it is clean: the gap rises with every step of resolution
+and never turns back, and at one group the agent pays what a uniform policy
+pays while completing fourteen times as many laps.
+
+On the thermostat the opposite happens, and the reason is worth the track. An
+exploit is not always the conditional behaviour. The boat race exploit is to go
+forward here and backward there and its honest policy is to keep going one way,
+so an agent with one weight for each action can state the task and cannot state
+the exploit. The thermostat exploit is to walk to the dial and stand on it,
+which is the single action `right` taken for ever, and its honest policy is to
+shuttle on and off the heater as the room cools. All ten seeds at one group
+prefer `right`, park on the dial, and are paid 198.0 of a possible 200.0 while
+the room is never comfortable.
+
+**Resolution does not protect against gaming. It decides which behaviours can
+be stated at all, and whether that helps depends on which of the two is the
+more conditional.** The opposite is the natural thing to assume, because a
+coarser agent is a weaker optimiser and this project's other measurement is
+about optimisation opening the gap.
+
 **An environment whose observation hides the state**, as `aliased`, which is
 Sutton and Barto's example 13.1. Three cells that give the same number, the
 middle one reversed, and neither fixed choice ever finishes. The best policy of
