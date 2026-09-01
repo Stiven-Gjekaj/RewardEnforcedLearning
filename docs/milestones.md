@@ -24,6 +24,30 @@ not built is a list of the subject.
 
 ## Built since that table was written
 
+**An environment whose observation hides the state**, as `aliased`, which is
+Sutton and Barto's example 13.1. Three cells that give the same number, the
+middle one reversed, and neither fixed choice ever finishes. The best policy of
+this shape goes right `2 - sqrt 2` of the time and reaches the goal in
+`6 + 4 sqrt 2` steps, both exact.
+
+The arithmetic predicts the measurement closely. An epsilon-greedy policy is
+stuck at 44.21 steps by the closed form, and the three ranking agents' own
+policies take 43.9, 42.7 and 42.2. `reinforce` takes 12.2 against a best of
+11.66 and puts 0.569 of its policy on going right against a best of 0.5858.
+
+What was not the plan is the first column of that table. Q-learning scores
+-13.6 over the last fifty episodes while learning and the policy it learned is
+worth -43.9. Its two action values are updated by every step of every episode
+and cross each other repeatedly, so it acts as a mixture nobody chose, and the
+mixture is near the middle of the range where this corridor is easy. Stop the
+learning and it is gone. **An agent is worth what its policy is worth, and the
+number a training run prints is not that unless the policy has stopped
+moving.**
+
+This is also the one environment here where `rel train`'s headline number says
+nothing. Every agent's greedy policy runs to the step limit, `reinforce`
+included, because the most likely action of a softmax is still one action.
+
 **The problem that separates the two ways of estimating**, as `bias`, and the
 same split on a network, as `deep-q --set double=true`. `double-q` had been
 here from the start and nothing on the page said what it was for. Now the

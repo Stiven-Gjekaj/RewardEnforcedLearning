@@ -2719,6 +2719,128 @@ exactly what a policy aiming at the answer with that spread is worth.
 
 ---
 
+## When the answer is not a ranking
+
+```console
+$ python scripts/measure_aliased.py
+$ rel train q-learning --env aliased --episodes 600
+$ rel train reinforce --env aliased --episodes 600
+```
+
+Every other environment here hands the agent an observation that names the
+state. `aliased` does not. It is three cells that all give the same number,
+the middle one has its actions reversed, and every step pays -1. So a table
+has one row for the whole corridor and a policy network has one set of weights
+that cannot depend on where it is standing.
+
+Both fixed choices never finish. Always right bounces between the first two
+cells for ever, always left walks into the start's wall. **An agent that ranks
+its two actions and takes the better one is choosing between two policies that
+never reach the goal.** Nothing about the ranking is wrong. The answer is not a
+ranking.
+
+### The arithmetic
+
+Write `p` for the probability of going right. The expected steps from the start
+are `2 (2 - p) / (p (1 - p))`, which `rel/envs/aliased.py` derives in five
+lines from the three cells.
+
+| share of right | steps to the goal |
+| ---: | ---: |
+| 0.05 | 82.11 |
+| 0.2 | 22.50 |
+| 0.4 | 13.33 |
+| 0.5858 | **11.66** |
+| 0.75 | 13.33 |
+| 0.95 | 44.21 |
+
+*It runs off to infinity at both ends, which is the two fixed choices never
+finishing.*
+
+The smallest value is at `2 - sqrt 2`, which is 0.5858, and it is `6 + 4 sqrt
+2` steps, which is 11.66.
+
+**An epsilon-greedy agent is stuck at one end of that column.** It takes its
+favourite action `1 - epsilon / 2` of the time, so at an epsilon of 0.1 its
+share is 0.95 or 0.05 and the best of the two is 44.21 steps. That gap is not a
+badly tuned agent. It is the whole family of methods that produce a ranking,
+measured against the best a policy of this shape can do.
+
+### What each agent reached
+
+| agent | last 50 while learning | its own policy, steps | frozen greedy, steps | share of right |
+| :--- | ---: | ---: | ---: | ---: |
+| q-learning | -13.6 | 43.9 | 1000 | 1.000 |
+| sarsa | -24.5 | 42.7 | 1000 | 1.000 |
+| expected-sarsa | -14.0 | 42.2 | 1000 | 1.000 |
+| reinforce | **-12.2** | **12.2** | 1000 | **0.569** |
+| actor-critic | -77.0 | 68.9 | 1000 | 0.963 |
+
+*Ten seeds, 600 episodes, epsilon 0.1. The last three columns have the learning
+switched off, and the step limit is 1000.*
+
+**The arithmetic predicts the measurement.** The three ranking agents' own
+policies take 43.9, 42.7 and 42.2 steps against the 44.21 the closed form says
+an epsilon-greedy policy is stuck at. `reinforce` takes 12.2 against the 11.66
+the best policy of this shape reaches, and puts 0.569 of its policy on going
+right against the 0.5858 that is best.
+
+### The first column is a mirage
+
+**q-learning scores -13.6 while learning and the policy it learned is worth
+-43.9.** Read only the first column and the three ranking agents look within
+two return of `reinforce`, which finds the answer. They are three and a half
+times worse.
+
+The reason is that their action values never settle. The corridor is one
+observation, so both values are updated by every step of every episode, and
+they cross each other repeatedly. The agent is therefore acting as a mixture,
+and the mixture happens to be near the middle of the range where the corridor
+is easy. Nobody chose that mixture, it is not what the agent has learned, and
+stopping the learning removes it.
+
+**This is what the last two columns are for.** An agent is worth what its
+policy is worth, and the number a training run prints is not that unless the
+policy has stopped moving.
+
+### No agent here has a deterministic policy that works
+
+The `frozen greedy` column is 1000 for every row, which is the step limit.
+That includes `reinforce`: the most likely action of a softmax is still one
+action, and one action never finishes here.
+
+So `rel train`'s headline number, the return of the greedy policy, is -1000 for
+every agent on this environment and says nothing about any of them. The
+environment is the one place in this project where that number is the wrong one
+to read.
+
+### The actor critic does not find it
+
+`actor-critic` can hold the answer. Its policy is a probability like
+`reinforce`'s and 0.5858 is inside the range. It ends at 0.963, which is
+nearly a fixed choice, and its policy is worth -68.9, which is worse than the
+agents that cannot represent the answer at all.
+
+That is consistent with what
+[the actor critic section](#the-two-agents-that-learn-a-policy-directly) below
+already reports about it and is not explained here.
+
+### Where it is weak
+
+- **One epsilon.** 0.1, for the ranking agents. A larger epsilon moves them
+  towards the middle of the column and would help them here, which is the
+  opposite of what it does everywhere else in this project.
+- **One budget.** 600 episodes. Whether the ranking agents' values would
+  eventually settle, and their learning column fall to meet their policy
+  column, is not measured.
+- **The share is read at one observation.** There is only one, so that is not
+  a limitation here, and it would be on anything larger.
+- **No seeds column.** The table is means over ten seeds and the spread is not
+  printed. The finding is a factor of three and a half, which is far outside
+  anything ten seeds hide, and a smaller finding here would need more.
+
+---
+
 ## The two agents that learn a policy directly
 
 Neither is as steady as anything tabular in this project, and both are far
@@ -3310,10 +3432,10 @@ was where its numbers came from, and it had that wrong in a dozen places.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **575 of this
-  page's numbers are in prose rather than in a cell**, against 1508 in cells.
+- **Any number written in a sentence.** It reads tables, and **612 of this
+  page's numbers are in prose rather than in a cell**, against 1541 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 575 are settings, seed counts and episode caps rather than anything a
+  those 612 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -3369,7 +3491,7 @@ written as a console block.
   numbers have moved, and the difference is one line further down the report,
   which names the command and the budget it wanted. `--timeout` is what to
   reach for before believing the first reading.
-- **1217 of 1508 numbers are checked.** The rest are in a table or a column that
+- **1250 of 1541 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
@@ -3406,6 +3528,7 @@ which is harmless and still worth spelling one way.
 | Replay and a target network | `python scripts/measure_value_network.py --env cartpole --episodes 400 --runs 10 --set step_size=0.02` |
 | Drawing from the buffer by priority | `python scripts/measure_prioritised.py` |
 | The maximum overstates | `python scripts/measure_double.py` |
+| When the answer is not a ranking | `python scripts/measure_aliased.py` |
 | Four ways of exploring | `python scripts/measure_exploration.py` |
 | Which loop a discount chooses | `python scripts/measure_average_reward.py` |
 | How large a difference is noise | `python scripts/measure_noise.py --trials 200` |
