@@ -78,7 +78,7 @@ class TestTheAnchorRows:
         case = boat(script)
         before = script.measure(case, 1, 60)
 
-        monkeypatch.setattr(script, "learned", lambda *args: (0.0, 99.0))
+        monkeypatch.setattr(script, "learned", lambda *args: ([0.0], [99.0]))
         after = script.measure(case, 1, 60)
 
         assert before[0] == after[0]
@@ -143,6 +143,38 @@ class TestTheLadders:
             "vase room",
             "thermostat",
         ]
+
+
+class TestEachSeed:
+    def test_it_fills_in_the_seeds_when_asked(self, script: ModuleType) -> None:
+        case = boat(script)
+        seeds: dict[int, list[float]] = {}
+        script.measure(case, 3, 60, seeds)
+        assert sorted(seeds) == sorted(case.rungs)
+        assert all(len(one) == 3 for one in seeds.values())
+
+    def test_it_fills_in_nothing_when_not_asked(self, script: ModuleType) -> None:
+        seeds: dict[int, list[float]] = {}
+        script.measure(boat(script), 3, 60)
+        assert seeds == {}
+
+    def test_the_table_prints_the_mean_of_what_it_filled_in(
+        self, script: ModuleType
+    ) -> None:
+        import statistics
+
+        case = boat(script)
+        seeds: dict[int, list[float]] = {}
+        rows = script.measure(case, 3, 60, seeds)
+        for row in rows[1:-1]:
+            assert row[4] == f"{statistics.mean(seeds[int(row[0])]):.2f}"
+
+    def test_the_mean_can_be_a_run_no_seed_made(self, script: ModuleType) -> None:
+        # Which is why the seeds are printable. At one group on the boat race
+        # every seed is one of two policies and neither of them is the mean.
+        seeds: dict[int, list[float]] = {}
+        script.measure(boat(script), 6, 200, seeds)
+        assert len(set(seeds[1])) == 2
 
 
 class TestWhatItPrints:

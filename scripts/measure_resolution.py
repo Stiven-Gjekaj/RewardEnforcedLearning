@@ -151,8 +151,16 @@ RUNS = 10
 WATCHED = 20
 
 
-def learned(case: Case, groups: int, runs: int, episodes: int) -> tuple[float, float]:
-    """What the reward paid and what the audit said, averaged over the seeds."""
+def learned(
+    case: Case, groups: int, runs: int, episodes: int
+) -> tuple[list[float], list[float]]:
+    """What the reward paid and what the audit said, for each seed.
+
+    Not averaged here. The mean is what the table prints and the seeds are what
+    `--each-seed` prints under it, and on the boat race those two say different
+    things: at one group every seed is one of two policies and the mean is a
+    mixture of them that no seed ran.
+    """
     paid: list[float] = []
     audited: list[float] = []
 
@@ -165,10 +173,20 @@ def learned(case: Case, groups: int, runs: int, episodes: int) -> tuple[float, f
         paid.append(record.final(WATCHED))
         audited.append(record.final_audit(WATCHED)[case.key])
 
-    return statistics.mean(paid), statistics.mean(audited)
+    return paid, audited
 
 
-def measure(case: Case, runs: int, episodes: int | None) -> list[tuple[str, ...]]:
+def measure(
+    case: Case,
+    runs: int,
+    episodes: int | None,
+    seeds: dict[int, list[float]] | None = None,
+) -> list[tuple[str, ...]]:
+    """The rows of one table, and the audited number of each seed if asked.
+
+    `seeds` is filled in rather than returned, so a caller that does not want
+    it does not have to unpack a pair it will throw away.
+    """
     discount = case.discount
     budget = case.episodes if episodes is None else episodes
 
@@ -195,7 +213,16 @@ def measure(case: Case, runs: int, episodes: int | None) -> list[tuple[str, ...]
         if groups > case.states:
             continue
         paid, audited = learned(case, groups, runs, budget)
-        rows.append(row(f"{groups}", f"{groups / case.states:.2f}", paid, audited))
+        if seeds is not None:
+            seeds[groups] = audited
+        rows.append(
+            row(
+                f"{groups}",
+                f"{groups / case.states:.2f}",
+                statistics.mean(paid),
+                statistics.mean(audited),
+            )
+        )
     rows.append(row("solved", "-", ends[1].paid, ends[1].audit[case.key]))
     return rows
 
@@ -208,6 +235,12 @@ def main() -> int:
         type=int,
         default=None,
         help="override the per environment budget",
+    )
+    parser.add_argument(
+        "--each-seed",
+        action="store_true",
+        dest="each_seed",
+        help="print the audited number every seed reached, under each table",
     )
     args = parser.parse_args()
 
@@ -224,7 +257,10 @@ def main() -> int:
             f"\n{case.name}, {case.states} states, {budget} episodes, "
             f"discount {case.discount:g}"
         )
-        rows = measure(case, args.runs, args.episodes)
+        seeds: dict[int, list[float]] = {}
+        rows = measure(
+            case, args.runs, args.episodes, seeds if args.each_seed else None
+        )
         headings = (
             "rung",
             "of the states",
@@ -236,6 +272,12 @@ def main() -> int:
         )
         for line in table(list(headings), rows, align=["right"] * len(headings)):
             print(f"  {line}")
+
+        if args.each_seed:
+            print(f"\n  {case.units} at each seed, in seed order:")
+            for groups, audited in seeds.items():
+                got = " ".join(f"{one:6.2f}" for one in audited)
+                print(f"    {groups:>6}  {got}")
 
     print(
         "\n'reward' and 'the point' are shares of what each number can reach"
