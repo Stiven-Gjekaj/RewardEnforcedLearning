@@ -157,6 +157,15 @@ class TestTheDial:
         with pytest.raises(ValueError, match="no more of them than"):
             AGENTS.make("grouped-q", Rng(1).stream("agent"), an_env(), groups=17)
 
+    def test_fewer_than_none_is_refused_rather_than_read_as_the_default(
+        self,
+    ) -> None:
+        # Zero is the way of asking for one group per state. A negative count
+        # is a mistake, and reading it as the default would hand back a table
+        # to somebody who asked for something impossible.
+        with pytest.raises(ValueError, match="at least one"):
+            AGENTS.make("grouped-q", Rng(1).stream("agent"), an_env(), groups=-5)
+
 
 class TestWhatItRefuses:
     def test_an_observation_that_is_not_a_number_is_refused(self) -> None:

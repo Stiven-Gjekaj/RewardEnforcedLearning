@@ -980,10 +980,15 @@ def _grouped(
         #: Zero means one group for each state, which is a table written as a
         #: coder. A number would have to be right for every environment at
         #: once, and they run from sixteen states to several thousand.
+        #:
+        #: Zero exactly, rather than zero and below. A negative count is a
+        #: mistake and not a way of asking for the default, so it goes to
+        #: `aggregated` and is refused there with the message that names the
+        #: number given and the number of states.
         return cls(
             rng,
             _whole_numbers(env),
-            aggregated(space.n, space.n if groups <= 0 else groups),
+            aggregated(space.n, space.n if groups == 0 else groups),
             step_size=step_size,
             discount=discount,
             epsilon=epsilon,
