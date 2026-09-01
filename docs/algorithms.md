@@ -2037,6 +2037,10 @@ project has.
 can be asked.** A Fourier basis is `(order + 1)` to the power of the
 dimensions, so the same order is a very different number of waves.
 
+<!-- not checked: (order + 1) to the power of the dimensions, worked out
+rather than run. Orders 3, 5 and 7 on the cart pole are the ones no command
+here reaches, which is the point the table is making -->
+
 | order | features on the mountain car | features on the cart pole |
 | ---: | ---: | ---: |
 | 1 | 4 | 16 |
