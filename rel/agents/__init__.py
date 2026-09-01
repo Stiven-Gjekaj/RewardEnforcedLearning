@@ -609,6 +609,7 @@ def _deep_q(
     clip: float = 1.0,
     priority: float = 0.0,
     weighting: float = 0.0,
+    double: bool = False,
 ) -> Agent[Any, Any]:
     #: `replay=0` and `target_refresh=0` are the two ablations, so the four
     #: combinations are settings of one agent rather than four entries. Both
@@ -618,6 +619,11 @@ def _deep_q(
     #: zero it draws evenly, and raising `priority` alone is the mistake worth
     #: being able to run, because it is what makes the agent settle somewhere
     #: else. `scripts/measure_prioritised.py` runs all three.
+    #:
+    #: `double` is the third: the live network names the best action of the
+    #: next state and the target network says what it is worth, so the maximum
+    #: is not taken over the numbers it is then read from.
+    #: `scripts/measure_double.py` measures it.
     encoder, features = encoder_for(env.observation_space)
     return DeepQ(
         rng,
@@ -634,6 +640,7 @@ def _deep_q(
         clip=clip,
         priority=priority,
         weighting=weighting,
+        double=double,
     )
 
 

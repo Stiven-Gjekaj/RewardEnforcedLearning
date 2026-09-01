@@ -10,7 +10,7 @@ environments where the reward is not the point_
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11 and above"/>
   <img src="https://img.shields.io/badge/dependencies-none-427819?style=for-the-badge" alt="No dependencies"/>
-  <img src="https://img.shields.io/badge/tests-3160_passing-427819?style=for-the-badge" alt="3160 tests passing"/>
+  <img src="https://img.shields.io/badge/tests-3168_passing-427819?style=for-the-badge" alt="3168 tests passing"/>
 </p>
 
 <p align="center">
@@ -395,14 +395,14 @@ $ python scripts/lines.py
 | --- | ---: | ---: |
 | Core | 5 | 937 |
 | Environments | 15 | 4295 |
-| Agents | 28 | 9058 |
+| Agents | 28 | 9107 |
 | Network | 4 | 782 |
 | Running | 6 | 1301 |
 | Interface | 6 | 1022 |
 | Command line | 3 | 1674 |
-| **Total** | **67** | **19069** |
+| **Total** | **67** | **19118** |
 
-Not counting 25214 lines of tests and 6680 of measurement scripts. The command
+Not counting 25291 lines of tests and 6680 of measurement scripts. The command
 above prints all of it, and `python scripts/check_numbers.py --doc README.md`
 says whether this table still holds what that command prints.
 
@@ -424,7 +424,7 @@ import statements of every module:
 $ pytest
 ```
 
-3160 tests. Some of what they cover, and why each one is there rather than the
+3168 tests. Some of what they cover, and why each one is there rather than the
 obvious alternative:
 
 **The generator is held to the published output of the reference PCG32.** A

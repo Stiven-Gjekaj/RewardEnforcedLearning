@@ -198,6 +198,83 @@ class TestPriorityIsPassedThrough:
         ]
 
 
+class TestDoubleEstimation:
+    def test_it_is_off_by_default(self) -> None:
+        assert an_agent().double is False
+
+    def test_it_needs_a_target_network_to_value_with(self) -> None:
+        # Without one there is no second opinion to split off, so asking for
+        # it would be Q-learning with extra steps.
+        with pytest.raises(ValueError, match="needs a target network"):
+            an_agent(double=True, target_refresh=0)
+
+    def test_the_live_network_names_the_action_and_the_target_values_it(
+        self,
+    ) -> None:
+        agent = an_agent(double=True, discount=1.0)
+        assert agent.target is not None
+        # Two networks that disagree about which action of state 1 is best.
+        # Plain Q-learning would take the largest of the target's row; double
+        # takes the entry the live network points at.
+        features = one_hot(6)(1)
+        naming = agent.live.values(features)
+        valuing = agent.target.values(features)
+        chosen = naming.index(max(naming))
+
+        target = agent._target_for(go(0, 1, 2.0, 1))
+        assert target == pytest.approx(2.0 + valuing[chosen])
+
+    def test_without_it_the_target_takes_the_largest_of_the_row(self) -> None:
+        agent = an_agent(double=False, discount=1.0)
+        assert agent.target is not None
+        valuing = agent.target.values(one_hot(6)(1))
+        assert agent._target_for(go(0, 1, 2.0, 1)) == pytest.approx(2.0 + max(valuing))
+
+    def test_the_two_differ_once_the_networks_disagree(self) -> None:
+        # If they never differed this setting would be a flag that changes
+        # nothing, which is the failure mode worth a test. They agree while
+        # the two copies are the same, so the live one is moved first.
+        agent = an_agent(double=True, discount=1.0, target_refresh=1000)
+        for number in range(30):
+            agent.observe(go(number % 6, number % 4, float(number % 5), number % 6))
+
+        differ = 0
+        for state in range(6):
+            step = go(0, 1, 0.0, state)
+            splitting = agent._target_for(step)
+            agent.double = False
+            plain = agent._target_for(step)
+            agent.double = True
+            differ += splitting != plain
+        assert differ > 0
+
+    def test_a_terminated_step_has_no_future_either_way(self) -> None:
+        for double in (False, True):
+            agent = an_agent(double=double)
+            assert agent._target_for(go(0, 1, 3.0, 1, terminated=True)) == 3.0
+
+    def test_the_choice_does_not_spend_randomness(self) -> None:
+        # A tie broken by a draw inside a target would make two runs of one
+        # seed differ by how many ties the network happened to have.
+        agent = an_agent(double=True)
+        before = agent.rng.snapshot()
+        agent._target_for(go(0, 1, 1.0, 1))
+        assert agent.rng.snapshot() == before
+
+    def test_the_double_target_is_never_above_the_plain_one(self) -> None:
+        # Which is the whole point: the plain target takes the largest of the
+        # valuing row and the double target takes some entry of it.
+        agent = an_agent(double=True, discount=1.0)
+        assert agent.target is not None
+        for state in range(6):
+            step = go(state, 1, 0.0, state)
+            splitting = agent._target_for(step)
+            agent.double = False
+            plain = agent._target_for(step)
+            agent.double = True
+            assert splitting <= plain
+
+
 class TestTheTarget:
     def test_a_terminated_episode_has_no_future(self) -> None:
         agent = an_agent()

@@ -32,6 +32,26 @@ here too the sides of the comparison are one piece of code.
 `rel/agents/replay.py` says what the correction is for and
 `scripts/measure_prioritised.py` measures what happens without it.
 
+## The maximum is biased, and the target network is already the second opinion
+
+`max Q(s')` takes the largest of several noisy estimates, and the largest of
+several noisy numbers is above the largest true number. The error does not
+average out with more data, because it comes from the choosing rather than from
+any one estimate. `rel/envs/bias.py` is the smallest problem where that matters
+and `rel/agents/td.py` has the tabular answer: two tables, one naming the best
+action and the other saying what it is worth, so neither ever grades its own
+choice.
+
+`double` is the same split with no second table. The live network names the
+best action of the next state and the target network says what it is worth.
+That costs nothing, because a target network is already a second set of weights
+kept apart from the live one, and using it for the valuing alone rather than
+for both is a change of one line.
+
+**It needs `target_refresh` above zero.** Without a target network there is no
+second opinion to split off and `double` would be Q-learning with extra steps,
+so asking for it is refused rather than ignored.
+
 ## Why the loss is squared error
 
 Q-learning's update moves an estimate a fraction of the way towards a target.
@@ -83,6 +103,7 @@ class DeepQ(DiscreteAgent[ObsT]):
         clip: float = 1.0,
         priority: float = 0.0,
         weighting: float = 0.0,
+        double: bool = False,
     ) -> None:
         super().__init__(rng, actions)
 
@@ -92,12 +113,15 @@ class DeepQ(DiscreteAgent[ObsT]):
             raise ValueError("A buffer holds no fewer than no steps.")
         if target_refresh < 0:
             raise ValueError("A refresh interval is not negative.")
+        if double and target_refresh <= 0:
+            raise ValueError("Double estimation needs a target network to value with.")
 
         self.encoder = encoder
         self.discount = discount
         self.epsilon = as_schedule(epsilon)
         self.batch = batch
         self.target_refresh = target_refresh
+        self.double = double
 
         self.live = QNetwork(rng, features, actions.n, hidden)
         self.optimiser = Adam(self.live.parameters(), step_size, clip=clip)
@@ -217,13 +241,31 @@ class DeepQ(DiscreteAgent[ObsT]):
         The value of where it landed comes from the target network when there
         is one. That is the point of having one: between refreshes it does not
         move, so the thing being fitted is not chasing itself.
+
+        With `double` the live network names the best action of where it landed
+        and the target network says what that action is worth. One network is
+        then choosing and the other valuing, so the error in the choice and the
+        error in the value are not the same error, which is what removes the
+        bias in the maximum.
         """
         if transition.terminated:
             return transition.reward
 
         ahead = self.target if self.target is not None else self.live
-        landed = ahead.values(self.encoder(transition.next_observation))
-        return transition.reward + self.discount * max(landed)
+        features = self.encoder(transition.next_observation)
+        landed = ahead.values(features)
+
+        if not self.double:
+            return transition.reward + self.discount * max(landed)
+
+        assert self.target is not None
+        naming = self.live.values(features)
+        best = max(naming)
+        # Ties are broken by the first, and not by a draw. A draw here would
+        # spend randomness inside a target, so two runs of the same seed would
+        # differ by how many ties the network happened to have.
+        chosen = naming.index(best)
+        return transition.reward + self.discount * landed[chosen]
 
     def __repr__(self) -> str:
         return (
