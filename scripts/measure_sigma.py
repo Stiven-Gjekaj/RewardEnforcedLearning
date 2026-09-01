@@ -71,9 +71,13 @@ def best_possible(grid: str) -> tuple[float, float]:
     return value_iteration(env, discount=discount).start_value, discount
 
 
-#: How many steps an episode of the cliff walk takes, near enough. The sigma
-#: schedule is read on steps and written in episodes, so it needs one, and
-#: `linear` clamps at its end rather than running past it.
+#: How many steps an episode takes, near enough. The sigma schedule is read on
+#: steps and written in episodes, so it needs one, and `linear` clamps at its
+#: end rather than running past it.
+#:
+#: One number for both grids, because they are within a step of each other.
+#: Four hundred episodes at a step size of 0.1 takes 11,777 steps on the cliff
+#: walk and 11,433 on the maze, which is 29.4 and 28.6 an episode.
 STEPS_AN_EPISODE = 20
 
 
@@ -83,12 +87,11 @@ def falling(episodes: int) -> Schedule:
     Read on steps rather than episodes, because that is what `current_sigma`
     is given, so the length is an estimate rather than the run.
 
-    It is a low estimate on purpose. Four hundred episodes of the cliff walk
-    at this step size takes about fifteen thousand steps and the schedule is
-    eight thousand long, so sigma reaches nothing about half way through and
-    the second half is tree backup. The alternative is a schedule that never
-    arrives, which would make the row a slower sigma of a half rather than the
-    suggestion it is meant to be.
+    It is a low estimate on purpose. Four hundred episodes takes about twelve
+    thousand steps and the schedule is eight thousand long, so sigma reaches
+    nothing about two thirds of the way through and the rest is tree backup.
+    The alternative is a schedule that never arrives, which would make the row
+    a slower sigma of a half rather than the suggestion it is meant to be.
     """
     return linear(1.0, 0.0, episodes * STEPS_AN_EPISODE)
 
