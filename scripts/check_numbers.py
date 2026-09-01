@@ -79,7 +79,9 @@ import re
 import shlex
 import subprocess
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
@@ -666,6 +668,20 @@ def main() -> int:
     )
     parser.add_argument("--timeout", type=float, default=900.0)
     parser.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        help=(
+            "how many commands to run at once. One by default, so a run that "
+            "asks for nothing is the run it always was. Every command here is "
+            "seeded and prints the same numbers whatever else is running, so "
+            "this changes the wall clock and nothing else. It does interact "
+            "with --timeout: four commands sharing four processors each take "
+            "longer than one alone, so a budget that fits a command by itself "
+            "may not fit it beside three others"
+        ),
+    )
+    parser.add_argument(
         "--cache",
         default="",
         help=(
@@ -822,43 +838,83 @@ def main() -> int:
     broken: list[str] = []
     slow: list[tuple[str, float]] = []
 
+    #: One lock for the cache, the two lists and the counter. They are touched
+    #: once per command and a command takes seconds to minutes, so there is no
+    #: contention to speak of and one lock is simpler to be sure of than four.
+    guard = threading.Lock()
+
     def remember() -> None:
         """Write the cache out, if there is one.
 
         After every command rather than at the end, because a run this long
         is one a person interrupts, and a cache that only exists if the whole
         thing finished is a cache for nobody.
+
+        Called with `guard` held, because two threads writing the same file
+        would leave a half of each.
         """
         if kept is not None:
             kept.write_text(json.dumps({"printed": store}, indent=1, sort_keys=True))
 
-    for number, command in enumerate(commands, start=1):
-        if command in printed:
-            continue
-        print(f"[{number}/{len(commands)}] {command}", flush=True)
+    left = [command for command in commands if command not in printed]
+    done_so_far = 0
+
+    def measure(command: str) -> None:
+        """Run one command and record what it printed.
+
+        The whole report for a command is printed at once and under the lock,
+        so that two commands finishing together do not interleave their lines.
+        The number in front of it is how many have finished rather than where
+        the command sits on the page, because with several running at once
+        there is no other order to count in.
+        """
+        nonlocal done_so_far
+
         if command in already:
-            print(f"    {TIMED_OUT} {already[command]:.0f}s before", flush=True)
-            slow.append((command, already[command]))
-            continue
+            with guard:
+                done_so_far += 1
+                print(f"[{done_so_far}/{len(left)}] {command}")
+                print(f"    {TIMED_OUT} {already[command]:.0f}s before", flush=True)
+                slow.append((command, already[command]))
+            return
+
         output, spent, trouble = run(command, args.timeout)
-        if trouble.startswith(TIMED_OUT):
-            print(f"    {trouble}, so nothing below is checked against it", flush=True)
-            slow.append((command, args.timeout))
+
+        with guard:
+            done_so_far += 1
+            print(f"[{done_so_far}/{len(left)}] {command}")
+            if trouble.startswith(TIMED_OUT):
+                print(
+                    f"    {trouble}, so nothing below is checked against it",
+                    flush=True,
+                )
+                slow.append((command, args.timeout))
+                store[command] = Held(
+                    code=fingerprint(command), numbers=[], gave_up=args.timeout
+                )
+                remember()
+                return
+            if trouble:
+                print(f"    could not run it. {trouble}", flush=True)
+                broken.append(command)
+                return
+            print(f"    {spent:.0f}s", flush=True)
+            printed[command] = NUMBER.findall(output.replace(",", ""))
             store[command] = Held(
-                code=fingerprint(command), numbers=[], gave_up=args.timeout
+                code=fingerprint(command), numbers=printed[command], gave_up=0.0
             )
             remember()
-            continue
-        if trouble:
-            print(f"    could not run it. {trouble}", flush=True)
-            broken.append(command)
-            continue
-        print(f"    {spent:.0f}s", flush=True)
-        printed[command] = NUMBER.findall(output.replace(",", ""))
-        store[command] = Held(
-            code=fingerprint(command), numbers=printed[command], gave_up=0.0
-        )
-        remember()
+
+    if args.jobs > 1 and left:
+        print(f"Running {len(left)} commands, {args.jobs} at a time.\n")
+        with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+            # Consumed rather than left to the garbage collector, so that an
+            # exception inside a command is raised here rather than swallowed.
+            for finished in [pool.submit(measure, one) for one in left]:
+                finished.result()
+    else:
+        for command in left:
+            measure(command)
 
     # Again at the end, so the file holds exactly the commands this page
     # names. Without this a run that had everything already cached would

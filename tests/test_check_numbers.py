@@ -2171,3 +2171,142 @@ class TestStrictFailsOnAStaleNumber:
     ) -> None:
         page = '```console\n$ python -c "print(1.5)"\n```\n\nNo table here.\n'
         assert self.run_with(script, monkeypatch, tmp_path, page) == 0
+
+
+class TestRunningSeveralCommandsAtOnce:
+    """A whole run of the page is about three hours on one processor.
+
+    Every command here is seeded and prints the same numbers whatever else is
+    running, so running four at a time changes the wall clock and nothing
+    else. These hold that: the same report, the same exit code, the same
+    cache, from the same page.
+    """
+
+    def go(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        page: Path,
+        capsys: pytest.CaptureFixture[str],
+        *rest: str,
+    ) -> tuple[int, str]:
+        monkeypatch.setattr(
+            sys, "argv", ["check_numbers", "--doc", str(page), "--all", *rest]
+        )
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        code = int(script.main())
+        return code, capsys.readouterr().out
+
+    def a_page(self, tmp_path: Path) -> Path:
+        return write(
+            tmp_path,
+            "".join(
+                f'```console\n$ python -c "print({value})"\n```\n\n'
+                f"| a | b |\n| --- | --- |\n| x | {value} |\n\n"
+                for value in (1.5, 2.5, 3.5, 4.5, 5.5)
+            ),
+        )
+
+    def test_it_finds_what_one_at_a_time_finds(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        page = self.a_page(tmp_path)
+        one, alone = self.go(script, monkeypatch, page, capsys, "--jobs", "1")
+        many, together = self.go(script, monkeypatch, page, capsys, "--jobs", "4")
+
+        assert one == many
+        assert "5 of 5 tables" in alone
+        assert "5 of 5 tables" in together
+
+    def test_every_command_is_run_exactly_once(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        page = self.a_page(tmp_path)
+        _, printed = self.go(script, monkeypatch, page, capsys, "--jobs", "4")
+        for value in (1.5, 2.5, 3.5, 4.5, 5.5):
+            assert printed.count(f"print({value})") == 1
+
+    def test_the_count_in_front_reaches_the_total(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # It counts how many have finished rather than where a command sits
+        # on the page, because with several running at once there is no other
+        # order to count in. It still has to reach the total exactly once.
+        page = self.a_page(tmp_path)
+        _, printed = self.go(script, monkeypatch, page, capsys, "--jobs", "4")
+        for number in range(1, 6):
+            assert printed.count(f"[{number}/5]") == 1
+
+    def test_a_commands_two_lines_are_not_split_apart(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # The whole report for a command is printed under the lock, so the
+        # line naming it is always followed by the line about it.
+        page = self.a_page(tmp_path)
+        _, printed = self.go(script, monkeypatch, page, capsys, "--jobs", "4")
+        lines = [one for one in printed.splitlines() if one.strip()]
+        for index, line in enumerate(lines):
+            if line.startswith("["):
+                assert lines[index + 1].startswith("    "), lines[index : index + 2]
+
+    def test_the_cache_holds_every_command_afterwards(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # Two threads writing the same file would leave a half of each, so
+        # this is the test that the lock is really around the write.
+        page = self.a_page(tmp_path)
+        kept = tmp_path / "outputs.json"
+        self.go(script, monkeypatch, page, capsys, "--jobs", "4", "--cache", str(kept))
+
+        held = json.loads(kept.read_text())["printed"]
+        assert len(held) == 5
+        for value in (1.5, 2.5, 3.5, 4.5, 5.5):
+            name = f'python -c "print({value})"'
+            assert held[name]["numbers"] == [str(value)]
+
+    def test_a_cache_written_by_four_is_read_by_one(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        page = self.a_page(tmp_path)
+        kept = tmp_path / "outputs.json"
+        self.go(script, monkeypatch, page, capsys, "--jobs", "4", "--cache", str(kept))
+        _, again = self.go(
+            script, monkeypatch, page, capsys, "--jobs", "1", "--cache", str(kept)
+        )
+        assert "5 of 5 commands come from" in again
+
+    def test_one_at_a_time_is_what_it_does_unasked(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # So a run that asks for nothing is the run it always was.
+        page = self.a_page(tmp_path)
+        _, printed = self.go(script, monkeypatch, page, capsys)
+        assert "at a time" not in printed
