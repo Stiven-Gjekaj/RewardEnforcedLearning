@@ -25,6 +25,13 @@ Both are settings rather than separate agents, so the four combinations are one
 class and the difference between them is a number.
 `scripts/measure_value_network.py` runs all four.
 
+**The buffer draws evenly, and it need not.** `priority` draws a step in
+proportion to the size of the error the agent last made on it, and `weighting`
+corrects the bias that introduces. Both are settings on the same buffer, so
+here too the sides of the comparison are one piece of code.
+`rel/agents/replay.py` says what the correction is for and
+`scripts/measure_prioritised.py` measures what happens without it.
+
 ## Why the loss is squared error
 
 Q-learning's update moves an estimate a fraction of the way towards a target.
@@ -74,6 +81,8 @@ class DeepQ(DiscreteAgent[ObsT]):
         batch: int = 8,
         target_refresh: int = 200,
         clip: float = 1.0,
+        priority: float = 0.0,
+        weighting: float = 0.0,
     ) -> None:
         super().__init__(rng, actions)
 
@@ -104,7 +113,7 @@ class DeepQ(DiscreteAgent[ObsT]):
         #: took and nothing else. `replay=0` is the ablation.
         self.memory: Replay[ObsT] | None = None
         if replay > 0:
-            self.memory = Replay(rng, replay)
+            self.memory = Replay(rng, replay, priority, weighting)
 
         #: How many times the target network has been refreshed.
         self.refreshes = 0
@@ -146,38 +155,57 @@ class DeepQ(DiscreteAgent[ObsT]):
     def observe(self, transition: Transition[ObsT, int]) -> None:
         super().observe(transition)
 
-        batch: Sequence[Transition[ObsT, int]]
         if self.memory is not None:
             self.memory.add(transition)
-            batch = self.memory.sample(self.batch).steps
+            drawn = self.memory.sample(self.batch)
+            if drawn:
+                errors = self._fit(drawn.steps, drawn.weights)
+                # Before anything else is added, because a place means a
+                # different step once the buffer has written over it.
+                self.memory.reprioritise(drawn.places, errors)
         else:
             # No buffer, so the only step to learn from is the one just taken.
             # Learning from it `batch` times would be the same gradient added
             # up, which is a larger step and not a larger batch.
-            batch = (transition,)
-
-        if batch:
-            self._fit(batch)
+            self._fit((transition,), (1.0,))
 
         if self.target is not None and self.steps % self.target_refresh == 0:
             self.target.copy_from(self.live)
             self.refreshes += 1
 
-    def _fit(self, batch: Sequence[Transition[ObsT, int]]) -> None:
+    def _fit(
+        self, batch: Sequence[Transition[ObsT, int]], weights: Sequence[float]
+    ) -> list[float]:
+        """One gradient step over a batch, returning the error of each step.
+
+        A weight below one counts that step for less, which is how a buffer
+        that drew it more often than it should have puts the average back
+        where it belongs. Every weight is one when the draw was even, and
+        multiplying by one is exact, so an even draw takes the same step it
+        always did.
+
+        The errors that come back are what the priorities are set from. They
+        are measured before the step, because after it they belong to weights
+        the batch was not drawn against.
+        """
         loss: Tensor | None = None
-        for transition in batch:
+        errors: list[float] = []
+        for transition, weight in zip(batch, weights, strict=True):
             predicted = select(
                 self.live(self.encoder(transition.observation)),
                 transition.action - self.actions.start,
             )
             wanted = Tensor([self._target_for(transition)])
-            error = square(add(predicted, scale(wanted, -1.0)))
+            difference = add(predicted, scale(wanted, -1.0))
+            errors.append(difference.item())
+            error = scale(square(difference), weight)
             loss = error if loss is None else add(loss, error)
 
         assert loss is not None
         self.optimiser.zero_grad()
         scale(loss, 1.0 / len(batch)).backward()
         self.optimiser.step()
+        return errors
 
     def _target_for(self, transition: Transition[ObsT, int]) -> float:
         """What this step says the action taken was worth.

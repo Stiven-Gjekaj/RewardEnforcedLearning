@@ -607,10 +607,17 @@ def _deep_q(
     batch: int = 8,
     target_refresh: int = 200,
     clip: float = 1.0,
+    priority: float = 0.0,
+    weighting: float = 0.0,
 ) -> Agent[Any, Any]:
     #: `replay=0` and `target_refresh=0` are the two ablations, so the four
     #: combinations are settings of one agent rather than four entries. Both
     #: sides of a comparison are then the same code.
+    #:
+    #: `priority` and `weighting` are the same arrangement for the buffer: at
+    #: zero it draws evenly, and raising `priority` alone is the mistake worth
+    #: being able to run, because it is what makes the agent settle somewhere
+    #: else. `scripts/measure_prioritised.py` runs all three.
     encoder, features = encoder_for(env.observation_space)
     return DeepQ(
         rng,
@@ -625,6 +632,8 @@ def _deep_q(
         batch=batch,
         target_refresh=target_refresh,
         clip=clip,
+        priority=priority,
+        weighting=weighting,
     )
 
 

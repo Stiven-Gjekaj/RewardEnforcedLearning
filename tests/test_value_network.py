@@ -138,6 +138,66 @@ class TestTheBuffer:
         assert agent.live.values(one_hot(6)(0)) != before
 
 
+class TestPriorityIsPassedThrough:
+    def test_the_buffer_draws_evenly_by_default(self) -> None:
+        agent = an_agent()
+        assert agent.memory is not None
+        assert agent.memory.priority == 0.0
+        assert agent.memory.weighting == 0.0
+
+    def test_the_settings_reach_the_buffer(self) -> None:
+        agent = an_agent(priority=0.7, weighting=0.4)
+        assert agent.memory is not None
+        assert agent.memory.priority == 0.7
+        assert agent.memory.weighting == 0.4
+
+    def test_a_bad_setting_is_refused_where_it_is_meant(self) -> None:
+        with pytest.raises(ValueError, match="priority power"):
+            an_agent(priority=2.0)
+
+    def test_the_priorities_are_told_what_the_errors_were(self) -> None:
+        agent = an_agent(priority=1.0, replay=10, batch=4)
+        assert agent.memory is not None
+        # A step worth ten against steps worth nothing. Once the agent has
+        # been wrong about it, its priority must stand above the rest.
+        agent.observe(go(0, 1, 0.0, 1))
+        for _ in range(6):
+            agent.observe(go(2, 0, 0.0, 2))
+        agent.observe(go(0, 1, 10.0, 1))
+
+        weights = agent.memory.priorities()
+        for place, held in enumerate(agent.memory.steps()):
+            if held.reward == 10.0:
+                assert weights[place] == max(weights)
+
+    def test_a_priority_draw_changes_the_run(self) -> None:
+        def learned(**extra: object) -> list[float]:
+            agent = an_agent(replay=50, batch=4, **extra)
+            for number in range(40):
+                agent.observe(go(number % 6, number % 4, float(number % 3), 1))
+            return list(agent.live.values(one_hot(6)(0)))
+
+        even = learned()
+        assert learned() == even
+        assert learned(priority=1.0) != even
+        assert learned(priority=1.0, weighting=1.0) != learned(priority=1.0)
+
+    def test_the_even_draw_takes_the_same_step_it_always_did(self) -> None:
+        # The weights are all one when the draw is even, and multiplying by
+        # one is exact, so nothing recorded before this setting existed moves.
+        agent = an_agent(replay=50, batch=4)
+        for number in range(20):
+            agent.observe(go(number % 6, number % 4, float(number % 3), 1))
+        # Taken from the agent as it stood before priority existed, and asked
+        # for exactly rather than nearly, because that is the claim.
+        assert agent.live.values(one_hot(6)(0)) == [
+            2.4250550281318835,
+            1.808761350592422,
+            1.7114970493054495,
+            1.913814023247627,
+        ]
+
+
 class TestTheTarget:
     def test_a_terminated_episode_has_no_future(self) -> None:
         agent = an_agent()
