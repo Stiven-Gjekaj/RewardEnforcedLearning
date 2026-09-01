@@ -2310,3 +2310,123 @@ class TestRunningSeveralCommandsAtOnce:
         page = self.a_page(tmp_path)
         _, printed = self.go(script, monkeypatch, page, capsys)
         assert "at a time" not in printed
+
+
+class TestTheLongestGoFirst:
+    """Four at a time finishes when the last one does.
+
+    A command that takes twenty five minutes and starts last adds twenty five
+    minutes to the whole run. Over the times of a real run of this page, page
+    order takes 74 minutes on four processors and longest first takes 62,
+    which is the total divided by four and therefore the floor.
+
+    The times come from the cache and are read whatever the code stamp says,
+    which the numbers beside them are not. That is the point: the usual reason
+    for a whole run is that something changed, so every output is stale, and
+    if the times went stale with them there would be nothing to order by.
+    """
+
+    PAGE = "".join(
+        f'```console\n$ python -c "print({value})"\n```\n\n'
+        f"| a | b |\n| --- | --- |\n| x | {value} |\n\n"
+        for value in (1.5, 2.5, 3.5)
+    )
+
+    def go(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        page: Path,
+        cache: Path,
+    ) -> None:
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["check_numbers", "--doc", str(page), "--all", "--cache", str(cache)],
+        )
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        script.main()
+
+    def test_a_run_records_how_long_each_took(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        page = write(tmp_path, self.PAGE)
+        cache = tmp_path / "kept.json"
+        self.go(script, monkeypatch, page, cache)
+        capsys.readouterr()
+
+        held = json.loads(cache.read_text())["printed"]
+        assert len(held) == 3
+        for entry in held.values():
+            assert "spent" in entry
+            assert entry["spent"] >= 0.0
+
+    def test_the_time_is_read_even_when_the_code_has_moved(
+        self, script: ModuleType
+    ) -> None:
+        entry = {"code": "a stamp from another version", "numbers": [], "spent": 12.5}
+        assert script.seconds_of(entry) == 12.5
+
+    def test_an_entry_from_before_this_says_nothing(self, script: ModuleType) -> None:
+        assert script.seconds_of({"code": "x", "numbers": []}) == 0.0
+
+    def test_the_slowest_is_run_first(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        page = write(tmp_path, self.PAGE)
+        cache = tmp_path / "kept.json"
+
+        # A cache whose outputs are all stale and whose times say the middle
+        # command is the slow one.
+        names = [f'python -c "print({value})"' for value in (1.5, 2.5, 3.5)]
+        cache.write_text(
+            json.dumps(
+                {
+                    "printed": {
+                        names[0]: {"code": "moved", "numbers": [], "spent": 1.0},
+                        names[1]: {"code": "moved", "numbers": [], "spent": 99.0},
+                        names[2]: {"code": "moved", "numbers": [], "spent": 5.0},
+                    }
+                }
+            )
+        )
+
+        self.go(script, monkeypatch, page, cache)
+        printed = capsys.readouterr().out
+
+        ran = [
+            line.split("] ", 1)[1]
+            for line in printed.splitlines()
+            if line.startswith("[")
+        ]
+        assert ran[0] == names[1], ran
+
+    def test_a_first_run_keeps_the_order_the_page_has(
+        self,
+        script: ModuleType,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # With no cache nothing is known about any of them, so the ordering is
+        # paid for by a run that has already happened.
+        page = write(tmp_path, self.PAGE)
+        monkeypatch.setattr(sys, "argv", ["check_numbers", "--doc", str(page), "--all"])
+        monkeypatch.setattr(script, "ROOT", page.parent)
+        script.main()
+
+        printed = capsys.readouterr().out
+        ran = [
+            line.split("] ", 1)[1]
+            for line in printed.splitlines()
+            if line.startswith("[")
+        ]
+        assert ran == [f'python -c "print({value})"' for value in (1.5, 2.5, 3.5)]

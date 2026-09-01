@@ -265,11 +265,28 @@ class Held(TypedDict):
     code: str
     numbers: list[str]
     gave_up: NotRequired[float]
+    spent: NotRequired[float]
 
 
 def budget_of(entry: Held) -> float:
     """The budget this command ran out of, or zero if it finished."""
     return entry.get("gave_up", 0.0)
+
+
+def seconds_of(entry: Held) -> float:
+    """How long this command took, or nothing known.
+
+    Read from an entry whatever its code stamp says, which the numbers beside
+    it are not. What a command prints depends on the code and is worthless
+    once the code moves. How long it takes is a fact about the machine and
+    about the size of the work, and editing a module rarely changes it.
+
+    That difference is what makes the ordering below possible at all. The
+    usual reason for a whole run is that something changed, so the outputs in
+    the cache are all stale, and if the times went with them there would be
+    nothing left to order by.
+    """
+    return entry.get("spent", 0.0)
 
 
 @dataclass
@@ -802,8 +819,16 @@ def main() -> int:
     #: this run's. Empty when there is no cache, which is when every command
     #: is run and nothing is known about any of them yet.
     already: dict[str, float] = {}
+    #: How long each command took when it was last run. Empty with no cache,
+    #: which is when nothing is known and the order below stays as the page
+    #: has it.
+    took: dict[str, float] = {}
     if kept is not None and kept.exists():
         was = json.loads(kept.read_text())["printed"]
+        # How long each took last time, whatever its code stamp says. See
+        # `seconds_of`: the outputs go stale when the code moves and the times
+        # do not, and the times are what the order below needs.
+        took = {name: seconds_of(entry) for name, entry in was.items()}
         # Only the commands this page still asks for, and only those whose
         # code has not moved since. A cache that outlived either would
         # account for a table with the output of something nobody runs any
@@ -857,6 +882,23 @@ def main() -> int:
             kept.write_text(json.dumps({"printed": store}, indent=1, sort_keys=True))
 
     left = [command for command in commands if command not in printed]
+    #: Longest first, for the runs where anything is known about the lengths.
+    #:
+    #: Four at a time finishes when the last one does, so a command that takes
+    #: twenty five minutes and starts last adds twenty five minutes to the
+    #: whole run. Starting the longest first is the ordinary answer to that
+    #: and it is worth twelve minutes here: over the times of a whole run,
+    #: page order takes 74 minutes on four processors and longest first takes
+    #: 62, which is the total divided by four and therefore the floor.
+    #:
+    #: A command nothing is known about goes first rather than last, because
+    #: the one that hurts is a long one found late, and an unknown command is
+    #: as likely to be long as short.
+    #:
+    #: With no cache nothing is known about any of them, so a first run is in
+    #: page order and this does nothing. That is the honest shape of it: the
+    #: ordering is paid for by a run that has already happened.
+    left.sort(key=lambda name: -took.get(name, float("inf")))
     done_so_far = 0
 
     def measure(command: str) -> None:
@@ -890,7 +932,10 @@ def main() -> int:
                 )
                 slow.append((command, args.timeout))
                 store[command] = Held(
-                    code=fingerprint(command), numbers=[], gave_up=args.timeout
+                    code=fingerprint(command),
+                    numbers=[],
+                    gave_up=args.timeout,
+                    spent=args.timeout,
                 )
                 remember()
                 return
@@ -901,7 +946,10 @@ def main() -> int:
             print(f"    {spent:.0f}s", flush=True)
             printed[command] = NUMBER.findall(output.replace(",", ""))
             store[command] = Held(
-                code=fingerprint(command), numbers=printed[command], gave_up=0.0
+                code=fingerprint(command),
+                numbers=printed[command],
+                gave_up=0.0,
+                spent=spent,
             )
             remember()
 
