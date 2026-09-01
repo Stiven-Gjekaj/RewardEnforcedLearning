@@ -61,11 +61,19 @@ DEFAULT_ENVIRONMENT = "cliff"
 #: rather than working them out from a box, so the tag they share with the
 #: agents over a tile coder points at the wrong environment for them. Baird's
 #: counterexample is the one that carries a table.
+#:
+#: `grouped-sarsa` and `grouped-q` are the same mismatch for their own reason.
+#: They are over a coder like the tile agents, and their coder reads a state
+#: number rather than a point in a box, so the box the `linear` tag points at
+#: is the one thing they cannot be given. Any tabular grid does, and the
+#: default one is a grid.
 INSTEAD = {
     "mcts": "maze",
     "linear-td": "baird",
     "gradient-td": "baird",
     "gaussian-actor-critic": "pendulum",
+    "grouped-sarsa": DEFAULT_ENVIRONMENT,
+    "grouped-q": DEFAULT_ENVIRONMENT,
 }
 
 
