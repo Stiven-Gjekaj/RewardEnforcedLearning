@@ -815,7 +815,7 @@ Ordered replay stops, and stopping is what makes the answer final.
 
 ```console
 $ rel train mcts --env maze
-$ rel train mcts --env maze --set reuse=off
+$ rel train mcts --env maze --set reuse=off --episodes 40
 $ python scripts/measure_search.py --episodes 40 --runs 3
 ```
 
@@ -855,10 +855,10 @@ agent that was handed the answer is the one to beat.
 model steps beside it are the currency this section counts in -->
 | agent | settled | policy found | stuck | model steps | time |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `mcts`, 10 simulations | 16 | 0.4633 | | 94,296 | 2s |
-| `mcts`, 25 simulations | 16 | 0.4633 | | 180,736 | 4s |
-| `mcts`, 50 simulations | 16 | 0.4633 | | 309,069 | 7s |
-| `mcts`, 50, `reuse=off` | 330 | - | 3 | 42,345,425 | 815s |
+| `mcts`, 10 simulations | 16 | 0.4633 | | 94,296 | 1s |
+| `mcts`, 25 simulations | 16 | 0.4633 | | 180,736 | 2s |
+| `mcts`, 50 simulations | 16 | 0.4633 | | 309,069 | 3s |
+| `mcts`, 50, `reuse=off` | 330 | - | 3 | 42,345,425 | 288s |
 | `dyna-q`, 5 planning steps | 15 | **0.5133** | | **7,345** | 0s |
 | `dyna-q`, 20 planning steps | 16 | **0.5133** | | 26,480 | 0s |
 | `prioritised-sweeping` | 17 | **0.5133** | | **3,575** | 0s |
@@ -897,6 +897,14 @@ that reaches the goal at all, and forty two million model steps to fail.
 memory and it behaves like the other planners. Without it, the same code with
 the same model is worse than Q-learning with no model at all.
 
+The console block above says `--episodes 40` on that row alone, and the reason
+is the row itself. `rel train` runs 500 episodes by default, and 500 episodes
+of an agent that cannot learn are 500 walks of a few hundred steps each with a
+fresh search at every one of them. That run was still going at fifty minutes
+when the number checker gave up on it, which made this the one command on the
+page nothing had ever run to the end. Forty is what the table beside it uses,
+and it takes six minutes and shows the same failure.
+
 ### Why the rollout cannot carry it
 
 A simulation that stops at the depth limit is worth what it collected and
@@ -923,7 +931,7 @@ $ python scripts/measure_search.py --env cliff --episodes 10 --runs 3 \
 model steps beside it are the currency this section counts in -->
 | agent | settled | policy found | stuck | model steps | time |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `mcts`, 50 simulations | **500** | - | 3 | **15,000,000** | 324s |
+| `mcts`, 50 simulations | **500** | - | 3 | **15,000,000** | 129s |
 | `dyna-q`, 5 planning steps | 56 | - | 3 | 2,815 | 0s |
 | `prioritised-sweeping` | 44 | **-13.0000** | | 2,201 | 0s |
 
@@ -3783,10 +3791,10 @@ was where its numbers came from, and it had that wrong in a dozen places.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **682 of this
+- **Any number written in a sentence.** It reads tables, and **686 of this
   page's numbers are in prose rather than in a cell**, against 1792 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 682 are settings, seed counts and episode caps rather than anything a
+  those 686 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
