@@ -24,6 +24,26 @@ list of the subject.
 
 ## Built since that table was written
 
+**Two findings about Q(sigma) were reading a step size rather than a sigma.**
+The sweep offered 0.05 to 0.4, and five of the six rows at a window of three
+and every row at a window of five chose 0.05, the smallest there was. A row
+read at the end of its sweep is read at the edge of what it was allowed. The
+sweep now runs from 0.003125, which nothing chooses at any window, so every row
+of every window is a bracketed best for the first time.
+
+Every window improved. Tree backup goes from -14.800 to -13.000 at a window of
+five, a move of 1.8, which is exactly as large as the largest difference
+between two sigmas this section had ever measured. At a window of ten, three
+rows had intervals clear of zero and now none does. At a window of three the
+best row of the family is a middle sigma reaching the optimum of -13.000, where
+tree backup reaches -13.200.
+
+**So the window barely matters and sigma matters a little more than it.** Tree
+backup spans 0.6 across windows of one, three, five and ten, and sigma spans
+1.4 inside the window of three alone. This page said the reverse. Three
+intervals of twenty are still clear of zero and all three are still against
+sampling, so the one thing that survives is the direction.
+
 **Every table on the algorithms page is accounted for by a command that page
 names.** 64 of 64, which had never happened. Six tables had never been checked
 at all, because four commands ran out of the default budget of 900 seconds and
@@ -99,14 +119,15 @@ said one grid and one n. Neither script could be pointed anywhere else, so both
 notes were statements about the scripts rather than about the subject.
 `measure_fourier.py --env` and `measure_sigma.py --steps` fix that.
 
-The sigma answer is clean and the shortest window gives it before the
+The sigma answer starts clean and the shortest window gives it before the
 measurement does: at n of one the term sigma multiplies is the base case minus
-itself, so one step Q(sigma) is expected SARSA at every sigma. Past that, sigma
-matters more the longer the window and every time it is decided it is decided
-against sampling. **The larger finding is that the window matters more than
-sigma does.** The whole spread across sigma at any window is smaller than the
-spread across the window at sigma of nothing, and the family is presented as a
-question about sigma.
+itself, so one step Q(sigma) is expected SARSA at every sigma. Past that, every
+time sigma is decided it is decided against sampling.
+
+**Two of the findings written here did not survive their own step size sweep,
+and the entry above says what replaced them.** They read that sigma mattered
+more the longer the window, and that the window mattered more than sigma. Both
+were reading a sweep that stopped at 0.05.
 
 The Fourier answer is that the environment cannot give one. A Fourier basis
 reaches the cart pole's cap of 500 at both orders that finish and at a quarter
@@ -309,10 +330,11 @@ a fixed step wins only at the small ones.
 
 **n-step Q(sigma)**, as `q-sigma`, which is the family with tree backup at one
 end and sampling at the other. Sutton and Barto raise the middle as a question
-and leave it open, and on the cliff walk over ten seeds the answer is no: tree
-backup reaches -13.800 and every other sigma is behind it, with 0.75 behind by
-1.600 on an interval clear of zero. The schedule the book suggests, sigma
-falling from one to nothing, lands with the middle rather than with either end.
+and leave it open. The answer written here was that the middle loses, and it
+was measured over a sweep of step sizes that stopped at 0.05, which most rows
+chose. Widened downwards the answer is that the middle and tree backup are
+within a fifth of each other at every window, which on this grid and ten seeds
+is not a difference at all. The entry at the top of this page has the tables.
 
 The collapse to tree backup at sigma of nothing is exact against a greedy target
 and the last bits against an averaged one. Writing it found a fault of its own:
