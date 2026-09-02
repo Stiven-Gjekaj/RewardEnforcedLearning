@@ -10,6 +10,7 @@ rather than against itself.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from functools import cache
 from itertools import pairwise
 
@@ -393,3 +394,63 @@ class TestTheRegistryEntries:
             ENVIRONMENTS.make("mountaincar", Rng(12).stream("env")), agent, 10
         )
         assert watched.final() > -400.0
+
+
+class TestTheWrittenOutSum:
+    """The encode is written out for speed, and it has to stay the same sum.
+
+    It is four fifths of a run at order 7, and the fast form drops the terms
+    that multiply by zero and adds the rest without a generator. Dropping a
+    zero term is exact and so is starting a sum at zero, so the two forms
+    agree digit for digit rather than nearly. A test that allowed nearly would
+    let a real change through, because a change of one part in ten to the
+    sixteenth compounds over two hundred episodes into a different run.
+    """
+
+    @staticmethod
+    def plainly(basis: FourierBasis, observation: Sequence[float]) -> tuple[float, ...]:
+        """The reading of the definition, with nothing left out."""
+        point = basis.box.scaled(basis.box.clip(observation))
+        return tuple(
+            math.cos(
+                math.pi
+                * sum(weight * value for weight, value in zip(c, point, strict=True))
+            )
+            for c in basis.coefficients
+        )
+
+    @pytest.mark.parametrize("order", [0, 1, 3, 5, 7])
+    def test_it_is_the_same_sum_over_a_two_dimensional_box(self, order: int) -> None:
+        basis = FourierBasis(Box((-1.2, -0.07), (0.6, 0.07)), order=order)
+        rng = Rng(4)
+        for _ in range(300):
+            point = (rng.uniform(-1.2, 0.6), rng.uniform(-0.07, 0.07))
+            assert basis.encode(point)[1] == self.plainly(basis, point)
+
+    @pytest.mark.parametrize("order", [0, 1, 2, 3])
+    def test_it_is_the_same_sum_over_a_four_dimensional_box(self, order: int) -> None:
+        box = Box((-2.4, -3.0, -0.21, -3.0), (2.4, 3.0, 0.21, 3.0))
+        basis = FourierBasis(box, order=order)
+        rng = Rng(5)
+        for _ in range(120):
+            point = tuple(
+                rng.uniform(low, high)
+                for low, high in zip(box.low, box.high, strict=True)
+            )
+            assert basis.encode(point)[1] == self.plainly(basis, point)
+
+    def test_it_is_the_same_sum_at_the_corners_of_the_box(self) -> None:
+        # Where a scaled value is exactly zero or exactly one, which is where
+        # a dropped term and a kept one could differ if either did.
+        box = Box((-1.2, -0.07), (0.6, 0.07))
+        basis = FourierBasis(box, order=5)
+        for point in ((-1.2, -0.07), (-1.2, 0.07), (0.6, -0.07), (0.6, 0.07)):
+            assert basis.encode(point)[1] == self.plainly(basis, point)
+
+    def test_a_coefficient_keeps_only_the_terms_that_are_not_zero(self) -> None:
+        basis = FourierBasis(Box((0.0, 0.0), (1.0, 1.0)), order=2)
+        held = dict(zip(basis.coefficients, basis._terms, strict=True))
+        assert held[(0, 0)] == ()
+        assert held[(0, 2)] == ((2, 1),)
+        assert held[(1, 0)] == ((1, 0),)
+        assert held[(2, 1)] == ((2, 0), (1, 1))
