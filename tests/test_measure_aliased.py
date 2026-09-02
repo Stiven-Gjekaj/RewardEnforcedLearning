@@ -130,3 +130,75 @@ class TestWhatItPrintsAboutTheArithmetic:
         # like the cost rises in one direction, and it rises in both.
         best = AliasedCorridor.best_share()
         assert min(script.SHARES) < best < max(script.SHARES)
+
+
+class TestWhereTheCriticsSignalIs:
+    """The section that explains why the actor critic ends near a fixed choice.
+
+    Its argument is that the corridor's one observation makes every weight in
+    an episode the same except the one at the end, so the ablations are the
+    load bearing part: `flat` removes the one step that differs and `end only`
+    removes everything else. If `cribbed` did not do what it says, both rows
+    would still print and the explanation would be decoration.
+    """
+
+    def test_flat_gives_every_step_the_first_weight(self, script: ModuleType) -> None:
+        assert script.cribbed([2.0, 3.0, 9.0], "flat") == [2.0, 2.0, 2.0]
+
+    def test_end_only_keeps_the_last_and_zeroes_the_rest(
+        self, script: ModuleType
+    ) -> None:
+        assert script.cribbed([2.0, 3.0, 9.0], "end only") == [0.0, 0.0, 9.0]
+
+    def test_as_built_changes_nothing(self, script: ModuleType) -> None:
+        assert script.cribbed([2.0, 3.0, 9.0], "as built") == [2.0, 3.0, 9.0]
+
+    def test_an_episode_of_one_step_is_left_alone_by_every_mode(
+        self, script: ModuleType
+    ) -> None:
+        # There is nothing to flatten or to zero, and a mode that emptied it
+        # would hand the actor no gradient at all on the shortest episodes.
+        for mode in script.CRIBS:
+            assert script.cribbed([4.0], mode) == [4.0]
+
+    def test_a_mode_it_does_not_have_is_refused(self, script: ModuleType) -> None:
+        with pytest.raises(ValueError, match="is not one of"):
+            script.cribbed([1.0, 2.0], "backwards")
+
+    def test_a_share_past_the_cap_says_so_rather_than_printing_a_number(
+        self, script: ModuleType
+    ) -> None:
+        assert script.steps_or_never(1.0, 1000) == "never"
+        assert script.steps_or_never(0.999999, 1000) == "over 1000"
+        assert script.steps_or_never(0.5, 1000) == "12.00"
+
+    def test_one_run_counts_two_weights_and_one_ending_action(
+        self, script: ModuleType
+    ) -> None:
+        # This is the whole explanation, counted. One observation means the
+        # value of the next state is the value of this one at every step that
+        # did not end the episode, so the weights take two values, and the
+        # corridor only ever ends one way.
+        share, distinct, enders = script.one_critic_run(
+            "as built", 0.05, 1, 40, "aliased"
+        )
+        assert distinct == 2
+        assert enders == 1
+        assert 0.0 <= share <= 1.0
+
+    def test_a_flat_weight_leaves_the_policy_where_the_bonus_puts_it(
+        self, script: ModuleType
+    ) -> None:
+        # With the one step that differs taken away, nothing pushes either
+        # action, and the entropy bonus is the only force left.
+        share, _, _ = script.one_critic_run("flat", 0.05, 1, 200, "aliased")
+        assert share == pytest.approx(0.5, abs=0.02)
+
+    def test_the_section_prints_a_row_for_each_mode_and_bonus(
+        self, script: ModuleType, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        script.critic_section(1, 20, "aliased", ("as built", "flat"))
+        printed = capsys.readouterr().out
+        assert "Where the actor critic's signal is" in printed
+        assert printed.count("as built") == 2
+        assert printed.count("flat") >= 2

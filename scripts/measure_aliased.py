@@ -31,6 +31,14 @@ all. This is the number `rel train` prints as the return of the greedy policy.
 **Share of right** is the probability its policy puts on going right, against
 the `2 - sqrt 2` that is best.
 
+## The last section is about one agent
+
+`actor-critic` ends nearly on a fixed choice here and its policy is worth less
+than the agents that cannot represent the answer at all. The last section says
+why, by counting rather than arguing: how many different weights an episode
+hands the actor, how many different actions ever end an episode, and what the
+policy does when the one step that differs is taken away.
+
 The gap between the first two columns is the whole point of the script. An
 agent whose action values have not settled acts as a mixture, because the two
 values keep crossing, and the mixture is not a policy anybody chose and is not
@@ -45,6 +53,7 @@ import argparse
 import statistics
 import sys
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -225,6 +234,148 @@ def agents_section(
         print(f"  {line}")
 
 
+#: The three ways the actor critic's weights are handed to the actor, and what
+#: each one is for.
+#:
+#: `as built` is the agent. `flat` gives every step of an episode the weight
+#: the first step got, which throws away the one step that differs. `end only`
+#: keeps that step and zeroes the rest. Between them they say which part of an
+#: episode the actor is learning from.
+CRIBS = ("as built", "flat", "end only")
+
+#: The entropy bonuses the ablation runs at. The registry default is 0.05 and
+#: nothing is a comparison, because a policy with no signal is moved by the
+#: bonus alone and the two rows say so.
+ENTROPIES = (0.05, 0.0)
+
+
+def cribbed(weights: list[float], mode: str) -> list[float]:
+    """The weights an ablation hands to the actor in place of the real ones."""
+    if len(weights) < 2 or mode == "as built":
+        return weights
+    if mode == "flat":
+        return [weights[0]] * len(weights)
+    if mode == "end only":
+        return [0.0] * (len(weights) - 1) + [weights[-1]]
+    raise ValueError(f"{mode!r} is not one of {', '.join(CRIBS)}.")
+
+
+def one_critic_run(
+    mode: str, entropy: float, seed: int, episodes: int, env_name: str
+) -> tuple[float, int, int]:
+    """One seed of the actor critic, and three numbers off it.
+
+    The share of right it ended on, the largest number of different weights
+    any episode of it produced, and how many different actions ended an
+    episode. The last two are what the explanation rests on, and they are
+    counted rather than argued.
+    """
+    root = Rng(seed)
+    env = ENVIRONMENTS.make(env_name, root.stream("env"))
+    agent = AGENTS.make("actor-critic", root.stream("agent"), env, entropy=entropy)
+
+    original = agent._targets_and_weights
+    distinct = 1
+    enders: set[int] = set()
+
+    def instead(features: Sequence[Sequence[float]]) -> tuple[list[float], list[float]]:
+        nonlocal distinct
+        targets, weights = original(features)
+        distinct = max(distinct, len({round(one, 9) for one in weights}))
+        enders.add(agent._episode[-1].action)
+        return targets, cribbed(weights, mode)
+
+    agent._targets_and_weights = instead  # type: ignore[method-assign]
+    train(env, agent, episodes)
+    return share_of_right(agent), distinct, len(enders)
+
+
+def critic_section(
+    runs: int, episodes: int, env_name: str, modes: tuple[str, ...]
+) -> None:
+    """Where the actor critic's signal is, and what happens without it.
+
+    The corridor is one observation, so the value network holds one number and
+    `r + discount * V(s') - V(s)` is the same number at every step that did not
+    end the episode. A weight that is the same whatever action was taken
+    carries nothing: the expected policy gradient under it is zero, because the
+    expected gradient of a log probability is zero.
+
+    So the only step of an episode that says anything is the one that ended it,
+    and on this corridor the action that ends an episode is always the same
+    one. The actor is pushed towards taking it always, which is a fixed choice,
+    and a fixed choice never reaches the goal here at all.
+    """
+    made = ENVIRONMENTS.make(env_name, Rng(1).stream("env"))
+    cap = made.spec.max_episode_steps or 1000
+
+    print(
+        f"\n\nWhere the actor critic's signal is. {env_name}, {runs} seeds,"
+        f" {episodes} episodes.\n'flat' gives every step the weight the first"
+        f" step got. 'end only' keeps the last\nstep's weight and zeroes the"
+        f" rest. The best share is {AliasedCorridor.best_share():.4f}.\n"
+    )
+
+    rows = []
+    for mode in modes:
+        for entropy in ENTROPIES:
+            shares = []
+            distinct = 0
+            enders = 0
+            for seed in range(1, runs + 1):
+                share, apart, ended = one_critic_run(
+                    mode, entropy, seed, episodes, env_name
+                )
+                shares.append(share)
+                distinct = max(distinct, apart)
+                enders = max(enders, ended)
+            middle = statistics.median(shares)
+            rows.append(
+                [
+                    mode,
+                    f"{entropy:g}",
+                    f"{middle:.3f}",
+                    f"{min(shares):.3f}",
+                    f"{max(shares):.3f}",
+                    f"{distinct}",
+                    f"{enders}",
+                    steps_or_never(middle, cap),
+                ]
+            )
+
+    for line in table(
+        [
+            "weights",
+            "entropy",
+            "share, median",
+            "least",
+            "most",
+            "different weights in an episode",
+            "actions that end one",
+            "steps",
+        ],
+        rows,
+        align=["left", "right", "right", "right", "right", "right", "right", "right"],
+    ):
+        print(f"  {line}")
+
+
+def steps_or_never(share: float, cap: int) -> str:
+    """What a share is worth, or that it is worth more than an episode holds.
+
+    A share of exactly one never reaches the goal, and a share a millionth
+    below one reaches it in half a million steps, which on a run that stops at
+    `cap` is the same thing seen from the outside. Printing the closed form
+    beside a share rounded to three digits would read as a mistake, so
+    anything past the cap says so instead.
+    """
+    try:
+        steps = AliasedCorridor.steps_from_start(share)
+    except ValueError:
+        return "never"
+    return f"{steps:.2f}" if steps <= cap else f"over {cap}"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env", default=ENVIRONMENT)
@@ -232,11 +383,20 @@ def main() -> int:
     parser.add_argument("--runs", type=int, default=RUNS, help="seeds per agent")
     parser.add_argument("--epsilon", type=float, default=EPSILON)
     parser.add_argument("--agents", nargs="+", default=list(AGENT_NAMES))
+    parser.add_argument("--critic-runs", type=int, default=5, dest="critic_runs")
+    parser.add_argument(
+        "--skip-critic",
+        action="store_true",
+        dest="skip_critic",
+        help="run only the sections about every agent",
+    )
     args = parser.parse_args()
 
     started = time.perf_counter()
     closed_form_section(SHARES, args.epsilon)
     agents_section(tuple(args.agents), args.env, args.runs, args.episodes, args.epsilon)
+    if not args.skip_critic:
+        critic_section(args.critic_runs, args.episodes, args.env, CRIBS)
     print(f"\nTook {time.perf_counter() - started:.0f}s.")
     return 0
 
