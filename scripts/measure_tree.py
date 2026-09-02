@@ -186,7 +186,9 @@ def agreement_section(sizes: tuple[int, ...], seed: int) -> None:
                 f"1 in {1.0 / share:.1e}" if share > 0.0 else "never",
                 f"{places}",
                 f"{widest:.2e}",
-                f"{narrowest / widest:.1e}",
+                # A buffer small enough that the two structures add the same
+                # weights in the same order has no gap to be narrower than.
+                f"{narrowest / widest:.1e}" if widest > 0.0 else "no gap",
             ]
         )
 

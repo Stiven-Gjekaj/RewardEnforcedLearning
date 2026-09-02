@@ -116,6 +116,16 @@ class TestWhatItCounts:
         _, _, widest, narrowest = script.disagreement(256, 5)
         assert narrowest > widest * 1e6
 
+    def test_a_buffer_too_small_to_disagree_reports_no_gap(
+        self, script: ModuleType, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # Four weights are added in the same order by both structures, so
+        # there is no gap and nothing to divide the narrowest place by.
+        script.agreement_section((4,), 5)
+        printed = capsys.readouterr().out
+        assert "never" in printed
+        assert "no gap" in printed
+
     def test_weights_of_the_same_seed_are_the_same_weights(
         self, script: ModuleType
     ) -> None:
