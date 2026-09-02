@@ -203,7 +203,10 @@ class TestPriority:
     def test_it_says_what_it_holds(self) -> None:
         buffer: Replay[int] = Replay(Rng(1), 4, priority=0.6, weighting=0.4)
         buffer.add(step(0))
-        assert repr(buffer) == "Replay(1 of 4, seen 1, priority=0.6, weighting=0.4)"
+        assert (
+            repr(buffer)
+            == "Replay(1 of 4, seen 1, priority=0.6, weighting=0.4, tree=False)"
+        )
 
 
 class TestWeighting:
@@ -288,3 +291,72 @@ class TestWeighting:
 
     def test_an_empty_buffer_gives_no_weights(self) -> None:
         assert Replay[int](Rng(1), 10, priority=1.0).sample(4).weights == ()
+
+
+class TestTree:
+    def test_a_tree_without_a_priority_draw_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="needs one"):
+            Replay[int](Rng(1), 4, tree=True)
+
+    def test_it_draws_from_everything_it_holds(self) -> None:
+        buffer: Replay[int] = Replay(Rng(1), 5, priority=1.0, tree=True)
+        for number in range(5):
+            buffer.add(step(number))
+        drawn = {one.observation for _ in range(50) for one in buffer.sample(4).steps}
+        assert drawn == {0, 1, 2, 3, 4}
+
+    def test_a_short_buffer_never_draws_past_what_it_holds(self) -> None:
+        buffer: Replay[int] = Replay(Rng(2), 64, priority=1.0, tree=True)
+        for number in range(3):
+            buffer.add(step(number))
+        places = [place for _ in range(200) for place in buffer.sample(4).places]
+        assert set(places) <= {0, 1, 2}
+
+    def test_a_larger_error_is_drawn_more_often(self) -> None:
+        buffer: Replay[int] = Replay(Rng(4), 4, priority=1.0, tree=True)
+        for number in range(4):
+            buffer.add(step(number))
+        buffer.reprioritise([0, 1, 2, 3], [1.0, 1.0, 1.0, 7.0])
+        drawn = [one.observation for _ in range(200) for one in buffer.sample(4).steps]
+        assert drawn.count(3) > drawn.count(0) * 3
+
+    def test_the_tree_forgets_a_step_that_was_written_over(self) -> None:
+        buffer: Replay[int] = Replay(Rng(5), 2, priority=1.0, tree=True)
+        buffer.add(step(0))
+        buffer.add(step(1))
+        buffer.reprioritise([0], [100.0])
+        buffer.add(step(2))
+        drawn = [one.observation for _ in range(100) for one in buffer.sample(4).steps]
+        assert set(drawn) == {1, 2}
+
+    def test_it_draws_where_the_scan_draws(self) -> None:
+        scan: Replay[int] = Replay(Rng(3), 512, priority=0.6, weighting=0.4)
+        tree: Replay[int] = Replay(Rng(3), 512, priority=0.6, weighting=0.4, tree=True)
+        errors = Rng(9)
+        for number in range(1536):
+            scan.add(step(number))
+            tree.add(step(number))
+            one = scan.sample(8)
+            other = tree.sample(8)
+            assert one.places == other.places
+            assert one.weights == other.weights
+            measured = [errors.uniform(0.0, 5.0) for _ in one.places]
+            scan.reprioritise(one.places, measured)
+            tree.reprioritise(other.places, measured)
+
+    def test_the_correction_reads_the_smallest_weight_in_the_buffer(self) -> None:
+        buffer: Replay[int] = Replay(Rng(6), 4, priority=1.0, weighting=1.0, tree=True)
+        for number in range(4):
+            buffer.add(step(number))
+        buffer.reprioritise([0, 1, 2, 3], [1.0, 3.0, 7.0, 15.0])
+        drawn = buffer.sample(8)
+        for place, weight in zip(drawn.places, drawn.weights, strict=True):
+            assert weight == pytest.approx((1.0 + FLOOR) / buffer.priorities()[place])
+
+    def test_it_says_that_it_has_a_tree(self) -> None:
+        buffer: Replay[int] = Replay(Rng(1), 4, priority=0.6, tree=True)
+        buffer.add(step(0))
+        assert (
+            repr(buffer)
+            == "Replay(1 of 4, seen 1, priority=0.6, weighting=0, tree=True)"
+        )

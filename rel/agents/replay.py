@@ -86,6 +86,19 @@ batch, so a batch of eight out of two thousand costs two thousand additions
 rather than eight. A sum per draw instead of per batch would cost eight times
 that, and a running total kept across updates would drift. The cumulative sums
 are built once and each of the eight draws is a binary search over them.
+
+`tree` on pays that cost differently. `rel.agents.sums` keeps the totals
+between batches and mends them where they changed, so a draw walks down from
+the root and a change walks up from a leaf: `log2(n)` either way, against `n`
+per batch and nothing per change. The correction goes the same way, through a
+second tree holding the smallest weight rather than the total.
+
+The default is off, and not because the scan is better. Two sums of the same
+weights in different orders round differently, so a tree and a scan can
+straddle a target and return neighbouring places from one random number. That
+would move numbers this project has already recorded.
+`scripts/measure_tree.py` counts how often it happens and where the two cross
+over on cost.
 """
 
 from __future__ import annotations
@@ -96,6 +109,7 @@ from dataclasses import dataclass
 from typing import Generic
 
 from rel.agents.base import Transition
+from rel.agents.sums import Smallest, Sums
 from rel.core import ObsT
 from rel.rng import Rng
 
@@ -131,11 +145,14 @@ class Replay(Generic[ObsT]):
         "_cursor",
         "_kept",
         "_largest",
+        "_least",
+        "_sums",
         "_weight",
         "capacity",
         "priority",
         "rng",
         "seen",
+        "tree",
         "weighting",
     )
 
@@ -145,6 +162,7 @@ class Replay(Generic[ObsT]):
         capacity: int,
         priority: float = 0.0,
         weighting: float = 0.0,
+        tree: bool = False,
     ) -> None:
         if capacity < 1:
             raise ValueError("A buffer holds at least one step.")
@@ -154,15 +172,22 @@ class Replay(Generic[ObsT]):
             raise ValueError("A weighting power runs from zero to one.")
         if weighting > 0.0 and priority <= 0.0:
             raise ValueError("Weighting corrects a priority draw, so it needs one.")
+        if tree and priority <= 0.0:
+            raise ValueError("A tree answers a priority draw, so it needs one.")
 
         self.rng = rng
         self.capacity = capacity
         self.priority = priority
         self.weighting = weighting
+        self.tree = tree
         self._kept: list[Transition[ObsT, int]] = []
         self._weight: list[float] = []
         self._largest = 1.0
         self._cursor = 0
+        #: Built only when the draw goes through them, because a buffer of a
+        #: hundred thousand is two more arrays of that size again.
+        self._sums = Sums(capacity) if tree else None
+        self._least = Smallest(capacity) if tree else None
         #: How many steps have ever been put in, including the ones dropped.
         self.seen = 0
 
@@ -176,10 +201,12 @@ class Replay(Generic[ObsT]):
         if len(self._kept) < self.capacity:
             self._kept.append(transition)
             self._weight.append(self._largest)
+            self._mend(len(self._kept) - 1, self._largest)
             return
 
         self._kept[self._cursor] = transition
         self._weight[self._cursor] = self._largest
+        self._mend(self._cursor, self._largest)
         self._cursor = (self._cursor + 1) % self.capacity
 
     def sample(self, size: int) -> Batch[ObsT]:
@@ -225,6 +252,7 @@ class Replay(Generic[ObsT]):
             weight = (abs(error) + FLOOR) ** self.priority
             self._weight[place] = weight
             self._largest = max(self._largest, weight)
+            self._mend(place, weight)
 
     def priorities(self) -> Sequence[float]:
         """The drawing weight of each held step, in the order `steps` gives."""
@@ -241,7 +269,7 @@ class Replay(Generic[ObsT]):
         return (
             f"Replay({len(self._kept)} of {self.capacity}, "
             f"seen {self.seen}, priority={self.priority:g}, "
-            f"weighting={self.weighting:g})"
+            f"weighting={self.weighting:g}, tree={self.tree})"
         )
 
     # -- Internals -----------------------------------------------------------
@@ -252,14 +280,23 @@ class Replay(Generic[ObsT]):
         The cumulative sums are built once for the whole batch, so the cost is
         one pass over the buffer and then a binary search for each draw.
         """
+        last = len(self._kept) - 1
+        drawn: list[int] = []
+
+        sums = self._sums
+        if sums is not None:
+            total = sums.total()
+            for _ in range(size):
+                place = sums.find(self.rng.random() * total)
+                drawn.append(place if place <= last else last)
+            return drawn
+
         running: list[float] = []
         total = 0.0
         for weight in self._weight:
             total += weight
             running.append(total)
 
-        last = len(running) - 1
-        drawn: list[int] = []
         for _ in range(size):
             # Rounding can put the target at the total itself, which would fall
             # off the end of the sums.
@@ -279,8 +316,16 @@ class Replay(Generic[ObsT]):
         if self.weighting <= 0.0:
             return [1.0] * len(places)
 
-        smallest = min(self._weight)
+        least = self._least
+        smallest = min(self._weight) if least is None else least.least()
         return [(smallest / self._weight[place]) ** self.weighting for place in places]
+
+    def _mend(self, place: int, weight: float) -> None:
+        """Put a changed weight into the trees, when there are trees."""
+        if self._sums is None or self._least is None:
+            return
+        self._sums[place] = weight
+        self._least[place] = weight
 
 
 __all__ = ["FLOOR", "Batch", "Replay"]
