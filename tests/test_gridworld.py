@@ -527,3 +527,50 @@ class TestTheModelAgreesWithTheSteps:
             f"{name}: the environment stopped in {sorted(stopped - listed)}, "
             f"which terminal_states() does not list"
         )
+
+
+class TestItWorksEachTransitionOutOnce:
+    """The answer is remembered, and it has to stay the same answer.
+
+    A tree search asks for a transition on every simulated step, which on the
+    Dyna maze is over two million questions per three episodes for two hundred
+    and sixteen distinct answers. Remembering them makes that affordable, and
+    the risk it brings is the usual one: an answer handed out twice that
+    somebody changes in between.
+
+    So the answer is a tuple, and these check that two grids do not share one
+    and that remembering does not change what is said.
+    """
+
+    def test_the_same_question_gives_the_same_answer(self) -> None:
+        grid = PRESETS["cliff"](Rng(3))
+        first = grid.transitions(20, 1)
+        assert grid.transitions(20, 1) == first
+
+    def test_the_answer_cannot_be_changed_by_whoever_gets_it(self) -> None:
+        grid = PRESETS["cliff"](Rng(3))
+        assert isinstance(grid.transitions(20, 1), tuple)
+
+    def test_two_grids_do_not_share_an_answer(self) -> None:
+        # The shortcut measurement builds a second grid where a wall has
+        # opened. If the remembering were shared the second grid would answer
+        # for the first, and the wall would never open.
+        walled = GridWorld(Rng(1), ("S#G",))
+        opened = GridWorld(Rng(1), ("S.G",))
+        assert walled.transitions(0, 1)[0].observation == 0
+        assert opened.transitions(0, 1)[0].observation == 1
+
+    def test_it_says_the_same_as_working_it_out_every_time(self) -> None:
+        for name in sorted(PRESETS):
+            grid = PRESETS[name](Rng(5))
+            for state in range(grid.observation_space.n):
+                for action in range(grid.action_space.n):
+                    assert grid.transitions(state, action) == grid._work_out(
+                        state, action
+                    )
+
+    def test_it_remembers_only_what_it_was_asked(self) -> None:
+        grid = PRESETS["cliff"](Rng(3))
+        assert grid._branches == {}
+        grid.transitions(7, 2)
+        assert list(grid._branches) == [(7, 2)]

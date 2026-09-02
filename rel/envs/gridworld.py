@@ -159,6 +159,11 @@ class GridWorld(TabularEnv):
         self.at = self._starts[0]
         self._pit_entries = 0
 
+        #: Every branch of every step, worked out the first time it is asked
+        #: for. A tuple rather than a list, so that a caller who is handed the
+        #: same answer twice cannot change it for everybody who comes after.
+        self._branches: dict[tuple[int, int], tuple[Outcome, ...]] = {}
+
     # -- Building -----------------------------------------------------------
 
     def _check_layout(self) -> None:
@@ -308,12 +313,32 @@ class GridWorld(TabularEnv):
         return [(share, state) for state in self._starts]
 
     def transitions(self, state: int, action: int) -> Sequence[Outcome]:
+        """Every branch of one step, and how likely each of them is.
+
+        Worked out once for each state and action and then remembered. The
+        answer is a property of the layout, the wind and the slip, and none of
+        those changes after a grid is built: the shortcut measurement, which is
+        the one place a wall opens mid-run, builds a second grid rather than
+        moving a wall in the first.
+
+        Remembering it is what makes a tree search affordable. `mcts` asks for
+        a transition on every simulated step, which on the Dyna maze is over
+        two million questions for three episodes, and the answer is one of two
+        hundred and sixteen.
+        """
+        held = self._branches.get((state, action))
+        if held is None:
+            held = self._work_out(state, action)
+            self._branches[state, action] = held
+        return held
+
+    def _work_out(self, state: int, action: int) -> tuple[Outcome, ...]:
         if self.is_goal(state) or (self.pit_ends_episode and self.is_pit(state)):
-            return [Outcome(1.0, state, 0.0, terminated=True)]
+            return (Outcome(1.0, state, 0.0, terminated=True),)
         if self.is_wall(state):
             # Nothing stands here, so nothing happens here. The entry exists so
             # that a table can be indexed by every state without a gap.
-            return [Outcome(1.0, state, 0.0, terminated=True)]
+            return (Outcome(1.0, state, 0.0, terminated=True),)
 
         gathered: dict[tuple[int, float, bool], float] = {}
         for probability, chosen in self._slip_over(action):
@@ -322,10 +347,10 @@ class GridWorld(TabularEnv):
                 key = (landed, reward, terminated)
                 gathered[key] = gathered.get(key, 0.0) + probability * wind_share
 
-        return [
+        return tuple(
             Outcome(share, landed, reward, terminated)
             for (landed, reward, terminated), share in gathered.items()
-        ]
+        )
 
     def _slip_over(self, action: int) -> list[tuple[float, int]]:
         """The action that is really taken, and how likely each one is."""
