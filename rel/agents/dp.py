@@ -464,17 +464,19 @@ def _start_value(env: TabularEnv, values: Sequence[float]) -> float:
 def _model(env: TabularEnv) -> Model:
     """Every branch of every state and action, read once.
 
-    `transitions` builds a fresh tuple of outcomes on every call, and a sweep
-    asks for the same ones again on every pass. On the thousand cell walk that
-    is a hundred branches for each of a thousand states, twice, and the
-    building of them was very nearly the whole cost: reading them once takes a
-    sweep of that walk from 147 seconds to 13.
+    Most environments here build a fresh tuple of outcomes on every call, and
+    a sweep asks for the same ones again on every pass. On the thousand cell
+    walk that is a hundred branches for each of a thousand states, twice, and
+    the building of them was very nearly the whole cost: reading them once
+    takes a sweep of that walk from 147 seconds to 13. A grid remembers its
+    own, for the tree search rather than for this, and reading it once here
+    costs a grid nothing.
 
     A model is a description of the environment rather than of where it is
     standing, so reading it once is not an assumption. Nothing steps an
-    environment during a sweep, and
-    `tests/test_model_agrees_with_stepping.py` holds every environment here to
-    a model that does not move while it is stepped either.
+    environment during a sweep, and `TestTheModelAgreesWithTheSteps` in
+    `tests/test_gridworld.py` holds every grid to a model that does not move
+    while it is stepped either.
     """
     return {
         (state, action): env.transitions(state, action)

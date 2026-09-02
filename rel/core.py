@@ -269,10 +269,13 @@ class TabularEnv(DiscreteEnv[int], ABC):
     rather than from a number somebody remembered.
 
     Writing the model out is extra work for the environment, and it earns its
-    keep twice: `rel.agents.dp` solves the environment exactly, and
-    `tests/test_model_agrees_with_stepping.py` drives the environment for
-    thousands of steps and checks that what it does matches what it says it
-    does. A model that drifts from the code is worse than no model.
+    keep twice: `rel.agents.dp` solves the environment exactly, and a test
+    drives the environment for thousands of steps and checks that what it does
+    matches what it says it does. A model that drifts from the code is worse
+    than no model. `TestTheModelAgreesWithTheSteps` in
+    `tests/test_gridworld.py` is that test for every grid and
+    `TestTheModelAgreesWithStepping` in `tests/test_rental.py` is the one for
+    the largest model here.
     """
 
     observation_space: Discrete
