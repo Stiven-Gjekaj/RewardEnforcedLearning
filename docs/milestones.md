@@ -24,6 +24,29 @@ list of the subject.
 
 ## Built since that table was written
 
+**The rule that cuts a state space into groups is not arbitrary in its
+effect.** The resolution ladder ran `grouped-q` at the registry defaults with
+the states cut into blocks of neighbouring numbers, and named all four of those
+as unswept. All four are now options, and the ladder was run five ways.
+
+Two of the three findings survive every one of them. On the boat race the gap
+between the reward and the point runs from -0.62 at one group to +0.64 at full
+resolution in all five columns. On the vase room every rung past four groups
+reaches the optimum under the stated reward in all five.
+
+The third is the new one. A thermostat state is
+`(cell * heats + heat) * 2 + tampered`, so `state % 2` is exactly whether the
+dial that makes the sensor lie has been turned. A striped grouping puts state
+`s` into group `s % groups`, so **two striped groups show the agent the tamper
+flag and nothing else**, and its reward share goes from 0.00 under blocks to
+0.89 under stripes. The vase room is packed the same way and answers the
+opposite: two striped groups take its gap from +1.00 down to +0.44, because
+breaking a vase is a thing done in a place and turning a dial is not.
+
+Neither grouping rule is right. Having a second one is what made the first
+one's arbitrariness measurable, and a project with one rule would have read
+that thermostat ladder as noise and stopped.
+
 **Two findings about Q(sigma) were reading a step size rather than a sigma.**
 The sweep offered 0.05 to 0.4, and five of the six rows at a window of three
 and every row at a window of five chose 0.05, the smallest there was. A row
