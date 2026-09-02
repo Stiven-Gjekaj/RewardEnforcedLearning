@@ -3754,21 +3754,26 @@ same measured times arranged two ways rather than two runs -->
 
 | | seconds | as time |
 | :--- | ---: | ---: |
-| every command, added up | 13,985 | 3 hours 53 minutes |
-| the slowest single command | 1,739 | 29 minutes |
-| four at a time, in page order | 4,473 | 75 minutes |
-| four at a time, longest first | 3,496 | 58 minutes |
-| the total divided by four | 3,496 | 58 minutes |
+| every command, added up | 16,166 | 4 hours 29 minutes |
+| the slowest single command | 2,293 | 38 minutes |
+| four at a time, in page order | 5,019 | 84 minutes |
+| four at a time, longest first | 4,041 | 67 minutes |
+| the total divided by four | 4,041 | 67 minutes |
 
 *108 commands on four processors. The two ordering rows are the measured times
 of one run arranged two ways: page order is what that run did, and longest
 first is what the same times give when the long ones start first.*
 
-**Fifty eight minutes is the floor and the ordering reaches it.** Just under
-four hours of work on four processors cannot take less than fifty eight
+**Sixty seven minutes is the floor and the ordering reaches it.** Four and a
+half hours of work on four processors cannot take less than sixty seven
 minutes, and starting the long commands first is enough to get there. Page
-order costs seventeen minutes more, because the twenty nine minute command can
-start last.
+order costs seventeen minutes more, because the thirty eight minute command
+can start last.
+
+**Two thirds of an hour of that is four sweeps that bracket themselves.** The
+wide Fourier sweep and the four windows of Q(sigma) are 3,892 seconds between
+them, and the reason is the step sizes below the ones any row wants. A sweep
+that stops where its best row sits is cheaper and reports itself.
 
 **The budget has to be raised past the default to reach every table.** Several
 of the 108 commands take longer than the default of 900 seconds, and each of
@@ -3846,10 +3851,10 @@ budget worth giving them. The next section says what those were.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **716 of this
+- **Any number written in a sentence.** It reads tables, and **722 of this
   page's numbers are in prose rather than in a cell**, against 1816 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 716 are settings, seed counts and episode caps rather than anything a
+  those 722 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
