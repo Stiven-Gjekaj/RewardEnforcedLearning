@@ -130,10 +130,16 @@ def budget_section(
     env_name: str,
     rng: Rng,
 ) -> None:
+    made = ENVIRONMENTS.make(env_name, Rng(1).stream("env"))
+    cap = float(made.spec.max_episode_steps or 0)
+
     print(
         f"Reusing an episode against collecting another one. {env_name},"
         f" {runs} seeds.\n'steps' is gradient steps and 'episodes' is what the"
-        f" environment was asked for.\nThe best possible return is 500.\n"
+        f" environment was asked for.\n'seeds at the cap' is how many of them"
+        f" reached the best possible return of {cap:.0f}, which is\nthe"
+        f" statistic the mean is a noisy version of: a seed either solves this"
+        f" or does not.\n"
     )
 
     got: dict[str, list[float]] = {}
@@ -156,6 +162,7 @@ def budget_section(
             f"{episodes}",
             f"{statistics.median(got[label]):.1f}",
             f"{statistics.mean(got[label]):.1f}",
+            f"{sum(1 for one in got[label] if one >= cap)}",
             f"{shares[label]:.4f}",
             f"{seconds[label]:.0f}",
         ]
@@ -177,6 +184,7 @@ def budget_section(
             "episodes",
             "median",
             "mean",
+            "seeds at the cap",
             "share clipped",
             "seconds",
             f"mean minus {against}",
@@ -184,7 +192,7 @@ def budget_section(
             "p",
         ],
         printed,
-        align=["left"] + ["right"] * 9,
+        align=["left"] + ["right"] * 10,
     ):
         print(f"  {line}")
 
@@ -295,6 +303,12 @@ def main() -> int:
     parser.add_argument("--pendulum-runs", type=int, default=PENDULUM_RUNS)
     parser.add_argument("--pendulum-episodes", type=int, default=PENDULUM_EPISODES)
     parser.add_argument(
+        "--skip-sweep",
+        action="store_true",
+        dest="skip_sweep",
+        help="run only the budget comparison and the pendulum",
+    )
+    parser.add_argument(
         "--skip-pendulum",
         action="store_true",
         dest="skip_pendulum",
@@ -305,13 +319,14 @@ def main() -> int:
     started = time.perf_counter()
     rng = Rng(11).stream("compare")
     budget_section(BUDGETS, args.runs, args.env, rng)
-    sweep_section(
-        tuple(args.ranges),
-        tuple(args.passes),
-        args.sweep_runs,
-        args.sweep_episodes,
-        args.env,
-    )
+    if not args.skip_sweep:
+        sweep_section(
+            tuple(args.ranges),
+            tuple(args.passes),
+            args.sweep_runs,
+            args.sweep_episodes,
+            args.env,
+        )
     if not args.skip_pendulum:
         pendulum_section(
             PENDULUM_AGENTS, args.pendulum_runs, args.pendulum_episodes, PENDULUM

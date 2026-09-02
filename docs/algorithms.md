@@ -3539,6 +3539,154 @@ a network in pure Python.
 
 ---
 
+## Reusing an episode, with a clip on how far that goes
+
+```console
+$ python scripts/measure_clipped.py
+$ rel train clipped-policy --env cartpole --set passes=4 --set clip_range=0.2
+```
+
+`reinforce` takes one gradient step from an episode and throws the episode
+away. The episode cost real steps of a real environment and one step of
+gradient is very little to get for them, so the obvious thing is to take
+several.
+
+The obvious thing is also wrong. After the first step the policy is no longer
+the one that collected the episode, and the returns in it belong to a policy
+that no longer exists. The correction for that is the ratio of the two
+probabilities of the action taken, and `Learning about one policy while
+following another` above is this project measuring what ratios do: a ratio of
+ten is a step ten times too large made on the evidence of one episode.
+
+`clipped-policy` bounds the ratio instead of trusting it. Where the ratio has
+moved past `clip_range` in the direction that would make the update larger, the
+objective stops improving, so the gradient is nothing and that pass leaves that
+step alone.
+
+**There is no clip operation in `rel/nn/autograd.py` and none is needed.** The
+objective has two pieces: on one it is the ratio times the advantage and on the
+other it is a constant, whose gradient is nothing. Which piece applies is read
+off the numbers and the graph is built for that piece alone.
+
+### One pass is REINFORCE, and the table says so
+
+<!-- not checked, column seconds: seconds belong to the machine -->
+
+| run | steps | episodes | median | mean | seeds at the cap | share clipped | seconds | mean minus reinforce, 400 | 95 percent interval | p |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| reinforce, 400 | 400 | 400 | 371.8 | 335.7 | 5 | 0.0000 | 176 | - | - | - |
+| clipped 1 x 400 | 400 | 400 | **371.8** | **335.7** | **5** | 0.0000 | 209 | **+0.0** | **[+0.0, +0.0]** | 1.0000 |
+| reinforce, 100 | 100 | 100 | 224.8 | 301.9 | 3 | 0.0000 | 35 | -33.7 | [-175.7, +100.5] | 0.6875 |
+| clipped 4 x 100 | 400 | **100** | 346.1 | 333.9 | **5** | 0.0125 | 103 | -1.8 | [-190.7, +189.7] | 0.9609 |
+| clipped 4 x 400 | 1600 | 400 | 296.8 | 332.7 | 4 | 0.0132 | 439 | -3.0 | [-128.6, +118.7] | 0.9531 |
+
+*Cart pole, ten seeds, the mean of ten greedy episodes at the end. `steps` is
+gradient steps and `episodes` is what the environment was asked for. The cap is
+500.*
+
+**The second row is the first row.** Before any pass the policy is the one that
+collected the episode, so every ratio is one, and the gradient of
+`weight * exp(logp - logp)` is the gradient of `weight * logp`. The two runs
+agree on the median, on the mean, on which five seeds solved it, and on a
+paired interval of exactly zero width. `tests/test_policy_gradient.py` holds
+the same thing at the level of the digests.
+
+That row is a control rather than a result. It is here because the rest of the
+table means nothing if the ratio is built wrongly, and a wrong constant in
+front of a gradient is a step size, which nothing about a run would report.
+
+### Whether the reuse buys environment steps is not decided here
+
+Four passes over a hundred episodes is four hundred gradient steps on a quarter
+of the environment. It solves five seeds of ten, which is what four hundred
+episodes solve, and a hundred episodes with one pass solves three. The medians
+order the same way: 346.1 against 371.8 and 224.8.
+
+**And none of that is a measured difference.** The paired interval on the mean
+runs to nearly two hundred either side of zero, which is wider than the whole
+distance between any two rows.
+
+The reason is in the cap column. A cart pole seed either solves this problem or
+it does not, so the mean is a solve count wearing the clothes of a performance
+number, and its spread is the distance between the two outcomes rather than
+anything about an agent. **The cart pole cannot decide this question at any
+seed count this project can run.** The interval half-width is 190 at ten seeds
+and narrows with the square root of the seeds, so deciding a difference of 25
+needs about six hundred, and the first row of this table alone takes sixteen
+minutes at ten.
+
+So what the table establishes is the construction and the direction, and what
+it does not establish is the size.
+
+### Where the clip binds
+
+| clip range | passes | share clipped | median | mean |
+| ---: | ---: | ---: | ---: | ---: |
+| 0.05 | 4 | **0.0598** | 500.0 | 451.5 |
+| 0.1 | 4 | 0.0347 | 196.9 | 253.4 |
+| 0.2 | 4 | 0.0126 | 346.1 | 342.2 |
+| 0.4 | 4 | 0.0044 | 495.0 | 373.0 |
+| 1 | 4 | **0.0004** | 158.6 | 185.9 |
+| 0.2 | 1 | **0.0000** | 164.2 | 219.8 |
+| 0.2 | 2 | 0.0001 | 484.4 | 376.2 |
+| 0.2 | 4 | 0.0126 | 346.1 | 342.2 |
+| 0.2 | 8 | **0.0573** | 210.3 | 241.9 |
+
+*Cart pole, six seeds, 100 episodes.*
+
+**The share moves exactly as the two settings say it should.** A hundred and
+fifty times as much clipping at a range of 0.05 as at a range of 1, and nothing
+at all at one pass, rising to 0.0573 at eight. The share at one pass is zero
+rather than nearly zero, because on the first pass every ratio is one.
+
+**The returns in that table are noise.** 196.9 at a range of 0.1 and 495.0 at
+0.4 with 346.1 between them is not a curve, and six seeds on a problem whose
+seeds are bimodal is why. The share is what this table is for.
+
+### The pendulum, where no policy gradient agent here works
+
+| agent | median | mean |
+| :--- | ---: | ---: |
+| random | -1174.2 | **-1190.5** |
+| reinforce | -1339.5 | -1369.6 |
+| actor-critic | -1451.7 | -1384.8 |
+| clipped-policy | -1345.9 | -1332.3 |
+
+*Nine levels of the pendulum, five seeds, 300 episodes.*
+
+**This corrects a sentence above.** `What learns this problem at all` says the
+two policy gradient agents lose to a random policy there and gives their shared
+bootstrapped target as the reason: values that run to several hundred where the
+difference one action makes is about one.
+
+`reinforce` does not bootstrap. Neither does `clipped-policy`: both take the
+return of the rest of the episode and subtract a baseline. Both lose to random
+too, and `reinforce` is the furthest behind of the three by mean. So whatever
+is wrong here is shared by every policy gradient agent in this project and the
+bootstrapped target is not it.
+
+What the four rows have in common is a softmax over nine actions whose values
+differ by about a thousandth of their size. That is a candidate and it is not
+measured, and the honest statement is that the reason this page gave has been
+ruled out and no other has been ruled in.
+
+### Where it is weak
+
+- **One environment for the reuse.** The cart pole, and it is the wrong shape
+  for the question, as the section above says with the arithmetic. An
+  environment whose seeds spread rather than split is what this needs and this
+  project has none for a policy gradient agent.
+- **The clip range and the pass count are the defaults of the method.** 0.2 and
+  4, taken from how it is usually written rather than measured into being
+  defaults here. The sweep says what each does to the share and nothing about
+  what either does to a return.
+- **Six seeds on the sweep.** The floor there is a p of 0.03 and no p is
+  computed, because the returns in that table are not the thing it reports.
+- **The pendulum is five seeds and one budget.** It rules out a reason rather
+  than establishing one.
+
+---
+
 ## Sweeping without writing a script
 
 Every table on this page began as a script. `rel sweep` varies one or two
@@ -3905,10 +4053,10 @@ budget worth giving them. The next section says what those were.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **736 of this
-  page's numbers are in prose rather than in a cell**, against 1858 in cells.
+- **Any number written in a sentence.** It reads tables, and **755 of this
+  page's numbers are in prose rather than in a cell**, against 1967 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 736 are settings, seed counts and episode caps rather than anything a
+  those 755 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -3970,7 +4118,7 @@ written as a console block.
   commands ran out of time, so a resumed run does not spend the budget on them
   again, and it carries what each one took so the next run starts the long
   ones first. With every command cached the whole page answers in a second.
-- **1505 of 1858 numbers are checked.** The rest are in a table or a column that
+- **1614 of 1967 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
@@ -4022,6 +4170,7 @@ which is harmless and still worth spelling one way.
 | Waves over the whole box | `python scripts/measure_fourier.py --runs 10 --step-sizes 0.005 0.01 0.02 0.05 0.1 0.2 0.5 1.0 2.0` |
 | Learning against an answer that is known | `python scripts/measure_blackjack.py` |
 | Part sample and part expectation | `python scripts/measure_sigma.py` |
+| Reusing an episode, with a clip | `python scripts/measure_clipped.py` |
 | Drawing in the log of the buffer | `python scripts/measure_tree.py` |
 
 ### The commands that are behind no table
