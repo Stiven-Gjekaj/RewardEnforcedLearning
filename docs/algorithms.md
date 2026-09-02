@@ -3612,8 +3612,7 @@ number, and its spread is the distance between the two outcomes rather than
 anything about an agent. **The cart pole cannot decide this question at any
 seed count this project can run.** The interval half-width is 190 at ten seeds
 and narrows with the square root of the seeds, so deciding a difference of 25
-needs about six hundred, and the first row of this table alone takes sixteen
-minutes at ten.
+needs about six hundred, and this table takes sixteen minutes at ten.
 
 So what the table establishes is the construction and the direction, and what
 it does not establish is the size.
