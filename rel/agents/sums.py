@@ -1,4 +1,4 @@
-"""Partial sums that answer a weighted draw in the log of their size.
+"""Totals and minima that answer a weighted draw in the log of their size.
 
 Drawing one place out of `n` in proportion to `n` weights needs the running
 totals of those weights. `rel.agents.replay` builds them by adding the whole
@@ -47,9 +47,27 @@ Two different sums of the same numbers can straddle a target. When they do,
 one structure returns the place before the boundary and the other returns the
 place after it, from the same random number. `scripts/measure_tree.py` counts
 how often that happens and checks that every disagreement is a neighbour.
+
+## Why the smallest weight needs a tree of its own
+
+A prioritised draw is corrected by dividing by the largest weight the buffer
+could produce, which belongs to its *smallest* priority. The buffer keeps its
+largest priority in one float, because that number is the largest ever seen
+and never has to come back down.
+
+The smallest cannot be kept that way. The step holding it is written over
+eventually, and then the smallest rises. Nothing short of another pass over
+the buffer knows what it rises to, so a logarithmic draw with a linear
+correction is still linear.
+
+`Smallest` is the same layout with `min` where `Sums` has `+`. It answers in
+one read and changes in one pass up the levels, which puts the correction on
+the same footing as the draw.
 """
 
 from __future__ import annotations
+
+import math
 
 
 class Sums:
@@ -132,4 +150,51 @@ class Sums:
         return f"Sums({self.size} places, total {self.total():g})"
 
 
-__all__ = ["Sums"]
+class Smallest:
+    """The least of the weights at `size` places, kept up to date."""
+
+    __slots__ = ("_cell", "_leaves", "size")
+
+    def __init__(self, size: int) -> None:
+        if size < 1:
+            raise ValueError("A tree holds at least one place.")
+
+        self.size = size
+        self._leaves = 1
+        while self._leaves < size:
+            self._leaves *= 2
+        #: A place that has never been set holds infinity, so that it does not
+        #: pull the answer down. That covers both the padding past `size` and
+        #: the places of a buffer that is not full yet.
+        self._cell = [math.inf] * (2 * self._leaves)
+
+    def __len__(self) -> int:
+        return self.size
+
+    def __getitem__(self, place: int) -> float:
+        """The weight at `place`, or infinity if it was never set."""
+        if not 0 <= place < self.size:
+            raise IndexError(f"No place {place} in a tree of {self.size}.")
+        return self._cell[self._leaves + place]
+
+    def __setitem__(self, place: int, weight: float) -> None:
+        """Set the weight at `place`, and every minimum that contains it."""
+        if not 0 <= place < self.size:
+            raise IndexError(f"No place {place} in a tree of {self.size}.")
+
+        cell = self._leaves + place
+        self._cell[cell] = weight
+        cell //= 2
+        while cell >= 1:
+            self._cell[cell] = min(self._cell[2 * cell], self._cell[2 * cell + 1])
+            cell //= 2
+
+    def least(self) -> float:
+        """The smallest weight set so far, or infinity if none was."""
+        return self._cell[1]
+
+    def __repr__(self) -> str:
+        return f"Smallest({self.size} places, least {self.least():g})"
+
+
+__all__ = ["Smallest", "Sums"]

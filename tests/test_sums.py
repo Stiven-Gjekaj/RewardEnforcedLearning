@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import bisect
+import math
 
 import pytest
 
-from rel.agents.sums import Sums
+from rel.agents.sums import Smallest, Sums
 from rel.rng import Rng
 
 
@@ -145,3 +146,63 @@ class TestCost:
         assert len(Sums(1000)._cell) == 2048
         assert len(Sums(1024)._cell) == 2048
         assert len(Sums(1025)._cell) == 4096
+
+
+class TestSmallest:
+    def test_a_tree_of_nothing_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="at least one place"):
+            Smallest(0)
+
+    def test_a_place_never_set_holds_infinity(self) -> None:
+        tree = Smallest(4)
+        assert tree.least() == math.inf
+        assert tree[2] == math.inf
+
+    def test_it_is_the_size_it_was_asked_for(self) -> None:
+        assert len(Smallest(5)) == 5
+
+    def test_a_place_the_tree_does_not_hold_is_refused(self) -> None:
+        tree = Smallest(3)
+        with pytest.raises(IndexError, match="No place 3"):
+            tree[3] = 1.0
+        with pytest.raises(IndexError, match="No place -1"):
+            _ = tree[-1]
+
+    def test_the_least_is_the_smallest_weight_set(self) -> None:
+        tree = Smallest(4)
+        for place, weight in enumerate([3.0, 1.0, 2.0]):
+            tree[place] = weight
+        assert tree.least() == 1.0
+
+    def test_the_padding_does_not_pull_the_least_down(self) -> None:
+        tree = Smallest(3)
+        for place in range(3):
+            tree[place] = 5.0
+        assert tree.least() == 5.0
+
+    def test_the_least_rises_when_the_place_holding_it_changes(self) -> None:
+        tree = Smallest(3)
+        for place, weight in enumerate([4.0, 1.0, 7.0]):
+            tree[place] = weight
+        assert tree.least() == 1.0
+        tree[1] = 9.0
+        assert tree.least() == 4.0
+
+    def test_it_agrees_with_a_pass_over_the_weights(self) -> None:
+        rng = Rng(11)
+        weights = [rng.uniform(0.1, 3.0) for _ in range(37)]
+        tree = Smallest(len(weights))
+        for place, weight in enumerate(weights):
+            tree[place] = weight
+            assert tree.least() == min(weights[: place + 1])
+
+        for _ in range(200):
+            place = rng.below(len(weights))
+            weights[place] = rng.uniform(0.1, 3.0)
+            tree[place] = weights[place]
+            assert tree.least() == min(weights)
+
+    def test_it_says_what_it_holds(self) -> None:
+        tree = Smallest(4)
+        tree[0] = 2.5
+        assert repr(tree) == "Smallest(4 places, least 2.5)"
