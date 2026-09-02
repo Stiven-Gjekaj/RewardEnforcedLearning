@@ -15,14 +15,39 @@ Nothing, for the first time since this page was written. The one entry that
 was here was continuous actions, and it is below.
 
 That is a statement about this table rather than about the subject. Plenty is
-missing: a policy gradient method that works on a hard problem, an
-environment with images, a buffer that draws in the log of its size rather
-than in its size. None of those is written here, because a list of everything
-not built is a list of the subject.
+missing: a policy gradient method that works on a hard problem, an environment
+with images, a way of learning a model of an environment from what happens in
+it. None of those is written here, because a list of everything not built is a
+list of the subject.
 
 ---
 
 ## Built since that table was written
+
+**A buffer that draws in the log of its size.** This was one of the three
+things the paragraph above named as missing. A priority draw needs the running
+totals of the weights, and the buffer built them from nothing once for each
+batch: two thousand additions for a batch of eight, and twenty times that for a
+buffer twenty times larger. `rel/agents/sums.py` keeps the totals between
+batches and mends the ones a changed weight touches, so a draw walks down from
+the root and a change walks up from a leaf.
+
+The crossover is between a buffer of 512 and one of 2000, and the default
+buffer is 2000. An update at the default costs 82.1 microseconds by the scan
+and 49.6 by the tree, and at 32768 it is 1031.3 against 64.7. A whole run of
+`deep-q` on the cart pole at that buffer goes from 42.3 seconds to 26.1.
+
+**The two draws are not the same arithmetic and they do give the same
+answers.** A scan adds left to right and a tree adds in pairs, so the two
+running totals round differently and a target between them belongs to
+different places by the two readings. That is counted exactly rather than
+sampled for: one uniform draw in 2.4e+11 disagrees at a buffer of 8192, and a
+disagreement can only ever be between neighbouring places, because the
+narrowest place in the buffer is 25 million times the widest gap. The digests
+of a run either way match, which is why the setting could be added without
+rerunning what the algorithms page has recorded. It is off by default all the
+same: almost always is the wrong kind of default for a check that exists to
+catch a change nobody meant.
 
 **A whole run of the number checker, which had never been affordable.** It
 runs every command on the algorithms page and puts each table against every
