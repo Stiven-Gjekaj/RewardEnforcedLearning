@@ -441,22 +441,124 @@ coarser agent is a weaker optimiser, and the page above is about optimisation
 opening the gap, so a weaker optimiser sounds like a smaller gap. On one of
 three environments here it is a larger one.
 
+### The four things the ladder held fixed
+
+```console
+$ python scripts/measure_resolution.py --agent grouped-sarsa
+$ python scripts/measure_resolution.py --grouping stripes
+$ python scripts/measure_resolution.py --step-size 0.02
+$ python scripts/measure_resolution.py --epsilon 0.3
+```
+
+The tables above are `grouped-q` at the registry defaults with the states cut
+into blocks of neighbouring numbers. All four of those were choices, and none
+of them was checked. Here is the gap column of each ladder under each choice,
+which is the number the section is about.
+
+<!-- not checked: the gap column of five separate runs put side by side, and
+no command prints more than one of them -->
+
+| rung | blocks, q | sarsa | stripes | step 0.02 | epsilon 0.3 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| uniform | -0.04 | -0.04 | -0.04 | -0.04 | -0.04 |
+| 1 | -0.62 | -0.62 | -0.62 | -0.62 | -0.62 |
+| 2 | +0.04 | +0.17 | -0.19 | +0.04 | +0.22 |
+| 4 | +0.27 | +0.27 | +0.28 | +0.27 | +0.27 |
+| 8 | +0.27 | +0.27 | **+0.64** | +0.27 | +0.27 |
+| 16 | +0.64 | +0.49 | +0.64 | +0.64 | +0.64 |
+| solved | +1.00 | +1.00 | +1.00 | +1.00 | +1.00 |
+
+*The boat race. The gap opens as the agent is given resolution, in all five.*
+
+<!-- not checked: the gap column of five separate runs put side by side, and
+no command prints more than one of them -->
+
+| rung | blocks, q | sarsa | stripes | step 0.02 | epsilon 0.3 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| uniform | -0.07 | -0.07 | -0.07 | -0.07 | -0.07 |
+| 1 | +0.44 | **+1.00** | +0.44 | +0.72 | +0.44 |
+| 2 | +1.00 | +1.00 | **+0.44** | +1.00 | +1.00 |
+| 4 | +1.00 | +1.00 | +1.00 | +1.00 | +1.00 |
+| 8 | +1.00 | +1.00 | +1.00 | +1.00 | +1.00 |
+| 16 | +1.00 | +1.00 | +1.00 | +1.00 | +1.00 |
+| 32 | +1.00 | +1.00 | +1.00 | +1.00 | +1.00 |
+| 56 | +1.00 | +1.00 | +1.00 | **+0.72** | +1.00 |
+| solved | +1.00 | +1.00 | +1.00 | +1.00 | +1.00 |
+
+*The vase room. Everything past four groups is the optimum under the stated
+reward, in all five.*
+
+<!-- not checked: the gap column of five separate runs put side by side, and
+no command prints more than one of them -->
+
+| rung | blocks, q | sarsa | stripes | step 0.02 | epsilon 0.3 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| uniform | -0.16 | -0.16 | -0.16 | -0.16 | -0.16 |
+| 1 | +0.89 | +0.89 | +0.89 | +0.89 | **+0.00** |
+| 2 | +0.00 | -0.00 | **+0.89** | +0.00 | +0.00 |
+| 4 | -0.15 | -0.10 | **+0.92** | -0.20 | -0.31 |
+| 8 | +0.00 | +0.29 | -0.10 | -0.05 | +0.00 |
+| 16 | -0.27 | -0.10 | **+0.74** | -0.31 | -0.38 |
+| 32 | -0.40 | -0.10 | -0.22 | +0.01 | -0.15 |
+| 64 | +0.79 | -0.01 | +0.80 | -0.21 | +0.00 |
+| 110 | +0.18 | -0.11 | +0.18 | +0.90 | +0.85 |
+| solved | +0.97 | +0.97 | +0.97 | +0.97 | +0.97 |
+
+*The thermostat. Ten seeds and fifteen hundred episodes settle almost nothing
+here, and the four dials disagree with each other rung by rung.*
+
+**The boat race finding survives all four.** The gap runs from -0.62 at one
+group to +0.64 at full resolution in every column, and the only disagreement is
+which rung it reaches the top on. That is the headline of this section and it
+is not an artefact of any of the four choices.
+
+**The vase room finding survives all four.** Past four groups every column is
+at the optimum under the stated reward. Two rows move: on-policy control games
+it fully even at one group, and a step size of 0.02 does not finish learning
+the full resolution table in 600 episodes, which is the coarse representation's
+larger effective step showing up as the table being the slow one.
+
+### Grouping by state number is not arbitrary in its effect
+
+The thermostat column under `stripes` is the finding worth having. Its gap is
+above +0.74 at four of the eight rungs where every other column is near zero,
+and the reason is in the environment rather than in the agent.
+
+A thermostat state is `(cell * heats + heat) * 2 + tampered`. So `state % 2` is
+exactly whether the dial has been turned, and `stripes` at two groups puts
+state `s` into group `s % 2`. **An agent with two striped groups sees the tamper
+flag and nothing else.** That is the smallest possible view of the exploit, and
+its reward share goes from 0.00 under blocks to 0.89 under stripes.
+
+The vase room is packed the same way, `cell * 2 + intact`, and answers the
+opposite: two striped groups take it from +1.00 down to +0.44. Knowing whether
+the vase is standing is no use without knowing where you are, because breaking
+it is a thing done in a place. Turning a dial is not.
+
+**So the rule that cuts the states up decides which exploits can be found, and
+it decides it by lining up or not lining up with how somebody packed a state
+into a number.** Neither rule is right. Having two of them is what makes that
+visible at all, and a project with one would have reported the thermostat's
+ladder as noise and stopped.
+
 ### Where it is weak
 
-- **The thermostat's middle rungs are noise.** Its reward share runs 0.89,
-  0.00, 0.00, 0.00, 0.00, 0.00, 0.80, 0.39 down the ladder. Ten seeds and
-  fifteen hundred episodes on a hundred and ten states does not settle it, and
-  the only row worth reading there is the first one, where all ten seeds agree.
-- **One agent.** `grouped-q`. Whether `grouped-sarsa` says the same is not
-  measured, and on-policy control has a different relationship with a coarse
-  representation than off-policy control does.
-- **One step size and one epsilon**, the registry defaults, neither swept. A
-  coarse representation sees every state's update, so the step size that suits
-  a table is a larger step for a group than for a cell.
-- **Grouping by state number is arbitrary.** State `s` of `n` goes into group
-  `s * groups // n`. On the boat race that is neighbouring cells, which is the
-  friendly case. On the thermostat a state is a cell, a temperature and a flag
-  folded into one number, so its groups cut across all three.
+- **The thermostat settles almost nothing.** Its gap column disagrees with
+  itself across the four dials at every rung but the first, and ten seeds over
+  fifteen hundred episodes on a hundred and ten states is why. The one row
+  worth reading is the striped pair at two and four groups, where the reason is
+  arithmetic rather than a mean.
+- **Two grouping rules, and both are arbitrary.** Blocks and stripes are wrong
+  in opposite directions, which is enough to show that the choice matters and
+  not enough to say what a right one would be. A rule that grouped by
+  something the environment means rather than by its state number is what this
+  needs, and no environment here offers one.
+- **One step size and one epsilon each.** 0.02 against the registry's 0.1, and
+  0.3 against 0.1. Two points on each dial rather than a sweep.
+- **The five runs are five separate ladders and are not paired.** Each column
+  is ten seeds and the columns share their seeds, but no interval or p is
+  computed between them, so a difference of 0.1 in a gap column is not a
+  measured difference.
 
 ---
 
