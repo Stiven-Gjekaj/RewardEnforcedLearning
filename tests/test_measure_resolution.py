@@ -198,3 +198,58 @@ class TestWhatItPrints:
 
 def test_the_seed_gives_the_same_table(script: ModuleType) -> None:
     assert script.measure(boat(script), 1, 60) == script.measure(boat(script), 1, 60)
+
+
+class TestTheSettingsItCanSweep:
+    """Four things the ladder held fixed, and now takes.
+
+    The page named all four as unswept: one agent, one step size, one epsilon
+    and one grouping rule. Each is now an option, and these check that an
+    option actually reaches the agent rather than being accepted and dropped.
+    """
+
+    def test_an_agent_name_it_cannot_build_is_refused(self, script: ModuleType) -> None:
+        with pytest.raises(KeyError):
+            script.learned(script.CASES[0], 2, 1, 2, "grouped-nothing", {})
+
+    def test_it_runs_the_on_policy_agent_when_asked(self, script: ModuleType) -> None:
+        paid, audited = script.learned(
+            script.CASES[0], 4, 2, 30, "grouped-sarsa", {"grouping": "blocks"}
+        )
+        assert len(paid) == 2
+        assert len(audited) == 2
+
+    def test_a_setting_reaches_the_agent(self, script: ModuleType) -> None:
+        # A step size of zero learns nothing, so a run at zero and a run at
+        # the default cannot agree unless the setting was dropped.
+        still = script.learned(
+            script.CASES[0], 4, 2, 30, "grouped-q", {"step_size": 0.0}
+        )
+        moved = script.learned(script.CASES[0], 4, 2, 30, "grouped-q", {})
+        assert still != moved
+
+    def test_the_grouping_reaches_the_coder(self, script: ModuleType) -> None:
+        # A grouping the coder does not have is refused there, so a run that
+        # dropped the setting would quietly succeed under the default.
+        with pytest.raises(ValueError, match="is not a grouping"):
+            script.learned(
+                script.CASES[0], 4, 1, 2, "grouped-q", {"grouping": "diagonal"}
+            )
+
+    def test_one_group_is_the_same_run_under_either_grouping(
+        self, script: ModuleType
+    ) -> None:
+        # At one group there is nothing to arrange, so the two rules have to
+        # give the same run. A difference here would be a fault in the coder.
+        blocks = script.learned(
+            script.CASES[0], 1, 2, 60, "grouped-q", {"grouping": "blocks"}
+        )
+        stripes = script.learned(
+            script.CASES[0], 1, 2, 60, "grouped-q", {"grouping": "stripes"}
+        )
+        assert blocks == stripes
+
+    def test_the_default_grouping_is_the_one_the_page_reports(
+        self, script: ModuleType
+    ) -> None:
+        assert script.GROUPING == "blocks"

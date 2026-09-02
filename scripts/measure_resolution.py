@@ -3,6 +3,8 @@
 
     python scripts/measure_resolution.py
     python scripts/measure_resolution.py --runs 20 --episodes 1200
+    python scripts/measure_resolution.py --agent grouped-sarsa
+    python scripts/measure_resolution.py --grouping stripes
 
 `scripts/measure_pressure.py` asks what happens to the gap between the reward
 and the point as an agent tries harder. It turns one dial: a fixed optimal
@@ -65,6 +67,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from rel.agents import AGENTS
+from rel.agents.lookup import GROUPINGS
 from rel.core import TabularEnv
 from rel.envs.gaming import BoatRace, Thermostat, VaseRoom
 from rel.pressure import Builder, ladder, share
@@ -150,9 +153,21 @@ CASES = (
 RUNS = 10
 WATCHED = 20
 
+#: The agent the ladder runs, and the settings the registry gives it. Both are
+#: options because both were named as unswept: the ladder ran `grouped-q` at
+#: the registry defaults and nothing said whether on-policy control or another
+#: step size would agree.
+AGENT = "grouped-q"
+GROUPING = "blocks"
+
 
 def learned(
-    case: Case, groups: int, runs: int, episodes: int
+    case: Case,
+    groups: int,
+    runs: int,
+    episodes: int,
+    agent_name: str = AGENT,
+    settings: dict[str, object] | None = None,
 ) -> tuple[list[float], list[float]]:
     """What the reward paid and what the audit said, for each seed.
 
@@ -163,11 +178,14 @@ def learned(
     """
     paid: list[float] = []
     audited: list[float] = []
+    extra = {} if settings is None else settings
 
     for seed in range(1, runs + 1):
         root = Rng(seed)
         env = case.gamed(root.stream("env"))
-        agent = AGENTS.make("grouped-q", root.stream("agent"), env, groups=groups)
+        agent = AGENTS.make(
+            agent_name, root.stream("agent"), env, groups=groups, **extra
+        )
         train(env, agent, episodes, discount=case.discount)
         record = evaluate(env, agent, WATCHED, discount=case.discount)
         paid.append(record.final(WATCHED))
@@ -181,6 +199,8 @@ def measure(
     runs: int,
     episodes: int | None,
     seeds: dict[int, list[float]] | None = None,
+    agent_name: str = AGENT,
+    settings: dict[str, object] | None = None,
 ) -> list[tuple[str, ...]]:
     """The rows of one table, and the audited number of each seed if asked.
 
@@ -212,7 +232,7 @@ def measure(
     for groups in case.rungs:
         if groups > case.states:
             continue
-        paid, audited = learned(case, groups, runs, budget)
+        paid, audited = learned(case, groups, runs, budget, agent_name, settings)
         if seeds is not None:
             seeds[groups] = audited
         rows.append(
@@ -242,13 +262,44 @@ def main() -> int:
         dest="each_seed",
         help="print the audited number every seed reached, under each table",
     )
+    parser.add_argument(
+        "--agent",
+        default=AGENT,
+        help="grouped-q or grouped-sarsa, which is off-policy against on",
+    )
+    parser.add_argument(
+        "--grouping",
+        default=GROUPING,
+        choices=GROUPINGS,
+        help="blocks puts neighbouring states together, stripes puts them apart",
+    )
+    parser.add_argument(
+        "--step-size",
+        type=float,
+        default=None,
+        help="override the registry default, which a group may not want",
+    )
+    parser.add_argument(
+        "--epsilon", type=float, default=None, help="override the registry default"
+    )
     args = parser.parse_args()
 
+    settings: dict[str, object] = {"grouping": args.grouping}
+    if args.step_size is not None:
+        settings["step_size"] = args.step_size
+    if args.epsilon is not None:
+        settings["epsilon"] = args.epsilon
+
     started = time.perf_counter()
+    named = " ".join(
+        f"{key}={value:g}" for key, value in settings.items() if key != "grouping"
+    )
     print(
-        f"`grouped-q` down a resolution ladder, {args.runs} seeds at each"
+        f"`{args.agent}` down a resolution ladder, {args.runs} seeds at each"
         f" rung.\nOne group for everything at the top, one for each state at"
-        f" the bottom, where it is\nQ-learning with a table exactly."
+        f" the bottom, where it is\na table exactly. States are grouped by"
+        f" {args.grouping}"
+        f"{', ' + named if named else ' at the registry defaults'}."
     )
 
     for case in CASES:
@@ -259,7 +310,12 @@ def main() -> int:
         )
         seeds: dict[int, list[float]] = {}
         rows = measure(
-            case, args.runs, args.episodes, seeds if args.each_seed else None
+            case,
+            args.runs,
+            args.episodes,
+            seeds if args.each_seed else None,
+            args.agent,
+            settings,
         )
         headings = (
             "rung",
