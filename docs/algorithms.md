@@ -1847,23 +1847,29 @@ raises the middle as a question and leaves it open.
 
 | sigma | at step | greedy, exactly | over tree backup | 95 percent interval | p |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 0 | 0.05 | **-13.800** | - | - | - |
-| 0.25 | 0.05 | -14.400 | -0.600 | [-1.600, +0.400] | 0.453 |
-| 0.5 | 0.05 | -14.400 | -0.600 | [-1.400, +0.400] | 0.453 |
-| 0.75 | 0.05 | -15.400 | -1.600 | [-2.400, -0.800] | 0.016 |
-| 1 | 0.1 | -14.800 | -1.000 | [-1.600, -0.400] | 0.062 |
-| 1 falling to 0 | 0.05 | -14.400 | -0.600 | [-1.400, +0.200] | 0.375 |
+| 0 | 0.025 | -13.200 | - | - | - |
+| 0.25 | 0.025 | -13.200 | +0.000 | [-0.600, +0.600] | 1.000 |
+| 0.5 | 0.05 | -14.400 | -1.200 | [-1.800, -0.600] | **0.031** |
+| 0.75 | 0.0125 | **-13.000** | +0.200 | [+0.000, +0.600] | 1.000 |
+| 1 | 0.0125 | -13.400 | -0.200 | [-0.800, +0.400] | 1.000 |
+| 1 falling to 0 | 0.05 | -14.400 | -1.200 | [-2.000, -0.200] | 0.070 |
 
 *Cliff walk, 400 episodes, ten seeds, n of 3, epsilon 0.1. Every sigma is swept
-over four step sizes and read at its own best. The best possible return is
+over eight step sizes and read at its own best. The best possible return is
 -13.*
 
-**The middle does not beat the ends here. The end this project already had
-does.** Tree backup is ahead of every other row, and the two rows furthest from
-it are the two clear of zero.
+**The best row of the family is a middle sigma, and it reaches the optimum.**
+Sigma of 0.75 learns a policy worth exactly -13.000 where tree backup reaches
+-13.200. It is not a decided difference: the interval touches zero and the p
+is 1.000, which on ten seeds and a score that moves in fifths is what a
+difference of a fifth looks like. But the middle is no longer behind both ends
+here, which is what this table said before its sweep reached far enough down.
 
-The schedule the book suggests, sigma falling from one to nothing over the run,
-lands with the middle rather than with either end.
+**One row of the six is clear of zero and it is against sampling.** Sigma of a
+half is 1.2 behind tree backup at a p of 0.031. The schedule the book
+suggests is the same 1.2 behind at 0.070.
+
+The schedule lands with the worst of the family rather than with the middle.
 
 **The collapse to tree backup is exact and is tested.** Against a greedy target
 the two agents agree bit for bit, because a greedy target has shares of one and
@@ -1912,53 +1918,75 @@ somewhere. It was not. It has nothing to multiply.
 
 | sigma | at step | greedy, exactly | over tree backup | 95 percent interval | p |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 0 | 0.05 | -14.800 | - | - | - |
-| 0.25 | 0.05 | **-14.200** | +0.600 | [-0.200, +1.400] | 0.375 |
-| 0.5 | 0.05 | -14.800 | +0.000 | [-0.600, +0.600] | 1.000 |
-| 0.75 | 0.05 | -15.000 | -0.200 | [-1.000, +0.600] | 1.000 |
-| 1 | 0.1 | -15.000 | -0.200 | [-0.800, +0.400] | 1.000 |
-| 1 falling to 0 | 0.05 | -14.600 | +0.200 | [-0.600, +1.000] | 1.000 |
+| 0 | 0.0125 | **-13.000** | - | - | - |
+| 0.25 | 0.0125 | **-13.000** | +0.000 | [+0.000, +0.000] | 1.000 |
+| 0.5 | 0.0125 | -13.200 | -0.200 | [-0.600, +0.000] | 1.000 |
+| 0.75 | 0.0125 | -13.200 | -0.200 | [-0.600, +0.000] | 1.000 |
+| 1 | 0.0125 | -13.600 | -0.600 | [-1.200, +0.000] | 0.250 |
+| 1 falling to 0 | 0.0125 | -13.800 | -0.800 | [-1.400, -0.200] | 0.125 |
 
-*Cliff walk at a window of five. Nothing here is decided: every interval
-crosses zero and the smallest p is 0.375.*
+*Cliff walk at a window of five. Every row chose the same step size, and the
+two ends of the family are 0.8 apart where the four step sweep put them at
+0.2.*
 
 | sigma | at step | greedy, exactly | over tree backup | 95 percent interval | p |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 0 | 0.05 | **-14.200** | - | - | - |
-| 0.25 | 0.05 | -15.200 | -1.000 | [-2.400, +0.400] | 0.281 |
-| 0.5 | 0.2 | -16.000 | -1.800 | [-3.000, -0.600] | **0.062** |
-| 0.75 | 0.1 | -16.000 | -1.800 | [-2.800, -0.600] | **0.031** |
-| 1 | 0.2 | -16.000 | -1.800 | [-3.000, -0.600] | **0.047** |
-| 1 falling to 0 | 0.4 | -15.600 | -1.400 | [-2.800, +0.200] | 0.172 |
+| 0 | 0.0125 | **-13.600** | - | - | - |
+| 0.25 | 0.0125 | -13.800 | -0.200 | [-1.000, +0.600] | 1.000 |
+| 0.5 | 0.00625 | -14.200 | -0.600 | [-1.600, +0.400] | 0.453 |
+| 0.75 | 0.00625 | -14.000 | -0.400 | [-1.000, +0.000] | 0.500 |
+| 1 | 0.0125 | -14.600 | -1.000 | [-1.800, +0.000] | 0.180 |
+| 1 falling to 0 | 0.0125 | **-13.600** | +0.000 | [-0.600, +0.600] | 1.000 |
 
-*Cliff walk at a window of ten. Three rows clear of zero, and all three
-are worse than tree backup.*
+*Cliff walk at a window of ten. Nothing here is decided. Three rows were, and
+all three of those numbers were the best of a sweep that stopped too high.*
 
 ### What the four windows say together
 
 <!-- not checked: one row taken from each of the four tables above, and the
 last column is read off their intervals rather than printed by anything -->
 
-| n | best row | tree backup | rows whose interval is clear of zero |
-| ---: | ---: | ---: | ---: |
-| 1 | -13.000 | -13.000 | none, and none is possible |
-| 3 | -13.800 | -13.800 | 2 |
-| 5 | -14.200 | -14.800 | 0 |
-| 10 | -14.200 | -14.200 | 3 |
+| n | best row | tree backup | spread across sigma | rows whose interval is clear of zero |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | -13.000 | -13.000 | 0.000 | none, and none is possible |
+| 3 | -13.000 | -13.200 | 1.400 | 2 |
+| 5 | -13.000 | -13.000 | 0.800 | 1 |
+| 10 | -13.600 | -13.600 | 1.000 | 0 |
 
-**Sigma matters more at a longer window, and every time it is decided it is
-decided against sampling.** At one step it cannot matter. At three, two rows
-are clear of zero and both are below tree backup. At five nothing is decided.
-At ten, three rows are clear and all three are 1.8 below it.
+**Sigma matters, and every time it is decided it is decided against sampling.**
+Three intervals of the twenty are clear of zero, at windows of three and five,
+and all three are below tree backup. Only one of the three reaches a p of 0.05.
+At one step sigma cannot matter and that is arithmetic rather than a result.
 
-**And the window itself matters more than sigma does.** Tree backup at one step
-reaches the optimal -13.000 on all ten seeds. At three it reaches -13.800, at
-five -14.800, at ten -14.200. The whole spread across sigma at any window is
-smaller than the spread across the window at sigma of nothing.
+**Tree backup is at or within a fifth of the best row at every window.** The
+middle is ahead of it once, by a fifth, at a window of three, and that is not a
+decided difference on ten seeds and a score that moves in fifths. Nothing here
+says the middle is worth reaching for and nothing says it is worse.
 
-That is worth saying because the family is presented as a question about sigma.
-On this grid the setting that decides the answer is the one the family holds
-fixed.
+**The window barely matters once the step size is allowed to be small enough.**
+Tree backup reaches -13.000, -13.200, -13.000 and -13.600 across the four
+windows, a spread of 0.6, and the spread across sigma inside a single window
+reaches 1.4. That is the reverse of what this section said when its sweep
+stopped at 0.05, where the window looked like the setting that decided the
+answer.
+
+**What the widened sweep changed, in one place.** Every window improved and two
+findings went away.
+
+<!-- not checked: one row taken from each of the four tables above against the
+same four tables at the sweep that stopped at 0.05, which no command prints
+side by side -->
+
+| n | tree backup, four steps | tree backup, eight steps | decided rows, four steps | eight steps |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | -13.000 | -13.000 | 0 | 0 |
+| 3 | -13.800 | -13.200 | 2 | 2 |
+| 5 | -14.800 | -13.000 | 0 | 1 |
+| 10 | -14.200 | -13.600 | 3 | 0 |
+
+The window of five moved by 1.8, which is exactly the largest spread across
+sigma in any table on either sweep. A number read at the edge of its sweep is
+not a small error.
 
 ### Where it is weak
 
@@ -1968,12 +1996,19 @@ fixed.
   one row up and -17 two rows up and little else, so a mean over ten seeds moves
   in steps of a fifth. That is why the interval is printed rather than the mean
   alone.
-- **Most rows are read at the edge of the sweep rather than at a bracketed
-  best.** The four step sizes are 0.05, 0.1, 0.2 and 0.4. At a window of three
-  and of five, five of the six rows chose 0.05, which is the smallest offered,
-  so what those rows would do at a smaller step is not known. At ten, three of
-  six sit at an end. Only the window of one is clear of it, where every row
-  chose 0.1 and every row reached the optimum anyway.
+- **The smallest step size is 0.003125 and nothing wants it.** That is what
+  makes every row above a bracketed best rather than the edge of a sweep, and
+  it is the second range this section has had. The first was 0.05 to 0.4, where
+  five of six rows at a window of three and every row at a window of five chose
+  the smallest offered. Reading a row at the edge of what it is allowed reports
+  the sweep, and the tables above say by how much: a window of five moved 1.8
+  when the range was opened, which is as large as any difference this section
+  ever measured between two sigmas.
+- **Halving is a coarse ladder.** Eight step sizes over a range of 128, so a
+  row that wants something between two of them is read up to a factor of two
+  away from it. Two rows at a window of ten chose 0.00625 and the rest chose
+  0.0125, which is the resolution this can tell apart rather than a difference
+  between those rows.
 
 ---
 
@@ -3804,10 +3839,10 @@ budget worth giving them. The next section says what those were.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **701 of this
-  page's numbers are in prose rather than in a cell**, against 1792 in cells.
+- **Any number written in a sentence.** It reads tables, and **716 of this
+  page's numbers are in prose rather than in a cell**, against 1816 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 701 are settings, seed counts and episode caps rather than anything a
+  those 716 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -3869,7 +3904,7 @@ written as a console block.
   commands ran out of time, so a resumed run does not spend the budget on them
   again, and it carries what each one took so the next run starts the long
   ones first. With every command cached the whole page answers in a second.
-- **1463 of 1792 numbers are checked.** The rest are in a table or a column that
+- **1463 of 1816 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
