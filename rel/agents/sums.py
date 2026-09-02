@@ -181,6 +181,8 @@ class Smallest:
         """Set the weight at `place`, and every minimum that contains it."""
         if not 0 <= place < self.size:
             raise IndexError(f"No place {place} in a tree of {self.size}.")
+        if weight < 0.0:
+            raise ValueError("A weight is not negative.")
 
         cell = self._leaves + place
         self._cell[cell] = weight

@@ -168,6 +168,14 @@ class TestSmallest:
         with pytest.raises(IndexError, match="No place -1"):
             _ = tree[-1]
 
+    def test_a_negative_weight_is_refused(self) -> None:
+        # The same weights go into both trees, so the two refuse the same
+        # things. A weight the sums will not take is not one to hold a
+        # minimum over either.
+        tree = Smallest(3)
+        with pytest.raises(ValueError, match="not negative"):
+            tree[1] = -1.0
+
     def test_the_least_is_the_smallest_weight_set(self) -> None:
         tree = Smallest(4)
         for place, weight in enumerate([3.0, 1.0, 2.0]):
