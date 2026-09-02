@@ -24,6 +24,36 @@ everything not built is a list of the subject.
 
 ## Built since that table was written
 
+**A recheck of the six tracks above, and what it found.** Three defects, all
+three mine and all three in what those tracks added.
+
+**A run's odds of a disagreeing draw were out by a million.** The buffer
+section said a run of a million updates disagrees with probability about two in
+a million million. That was the per draw share written as if it were the whole
+run's, and a million updates draws eight million times. The default buffer of
+two thousand is now a row of that table rather than something to read between
+two others: 6.14e-13 per draw, so such a run disagrees somewhere about five
+times in a million. Still not never, which is still why the default is the
+scan.
+
+**Two tests ran the documented budget.** The clipped policy section is built on
+400 episode runs, and two of its tests called the section with those rows, one
+of them twice. Three minutes of a suite that runs in eight, to check that a
+table has a heading.
+
+**Sixteen minutes was the whole table rather than its first row.** The number
+was right and what it was attached to was not.
+
+Everything else held. Every grid was driven for thirty thousand steps against
+the transitions it now remembers and none disagreed. The Fourier encode was
+held against the definition at four orders on three boxes, both classes, and
+matched to the last bit. The tree and the scan drew thirty two thousand times
+at the default buffer and never once apart. `clipped-policy` at one pass is
+`reinforce` through the registry as well as through the classes. And the
+packing claim the grouping finding rests on was driven rather than read: twenty
+thousand steps of the thermostat and of the vase room, and `state % 2` was the
+flag every time.
+
 **A policy gradient method that reuses an episode, which was one of the three
 things the paragraph above named as missing.** `clipped-policy` walks over the
 same episode several times with a clip on how far any one pass may move a step
