@@ -63,10 +63,12 @@ from rel.rng import Rng
 from rel.training import digest_of, train
 from rel.ui.table import table
 
-#: The buffer sizes the exact count runs over. Each boundary costs a search
-#: over the bit patterns of a float, so this ladder stops where it stops for
-#: time rather than because the answer does anything new past it.
-SIZES: tuple[int, ...] = (256, 1024, 4096, 8192)
+#: The buffer sizes the exact count runs over. 2000 is the default buffer of
+#: `deep-q` and is the row the page reads a run's odds off, and the others are
+#: powers of two so that the trend against size is readable. Each boundary
+#: costs a search over the bit patterns of a float, so this ladder stops where
+#: it stops for time rather than because the answer does anything new past it.
+SIZES: tuple[int, ...] = (256, 1024, 2000, 4096, 8192)
 
 #: The buffer sizes the cost ladder runs over. 2000 is the default buffer of
 #: `deep-q`, so the crossover matters either side of it.

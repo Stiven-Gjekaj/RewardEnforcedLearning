@@ -2782,6 +2782,7 @@ counts it exactly.
 | ---: | ---: | ---: | ---: | ---: |
 | 256 | 2.11e-14 | 4.7e+13 | 5 | 8.0e+10 |
 | 1024 | 2.24e-13 | 4.5e+12 | 6 | 4.9e+09 |
+| 2000 | 6.14e-13 | 1.6e+12 | 10 | 1.3e+08 |
 | 4096 | 2.28e-12 | 4.4e+11 | 16 | 2.8e+07 |
 | 8192 | 4.16e-12 | 2.4e+11 | 17 | 2.5e+07 |
 
@@ -2802,14 +2803,16 @@ makes a disagreement, when one comes, a disagreement about neighbouring
 places: two boundaries can only cross the same target where a place is
 narrower than the gap, and no place is close.
 
-**So a run of a million updates at the default buffer disagrees with
-probability about two in a million million.** The digests match because they
-were never going to do anything else, not because the two draws are the same
+**At the default buffer of two thousand the share is 6.14e-13, one draw in
+1.6e+12.** A run of a million updates draws eight million times, so it
+disagrees somewhere with probability about five in a million: one such run in
+two hundred thousand. The digests match because they were very nearly never
+going to do anything else, not because the two draws are the same
 arithmetic.
 
 ### Why the default is still the scan
 
-Because "about two in a million million" is not "never", and the recorded
+Because "one run in two hundred thousand" is not "never", and the recorded
 digests on this page are the project's own check that it has not changed
 underneath itself. A default that is right almost always is the wrong kind of
 default for that job. `tree=on` is there for the buffer sizes where it is
@@ -4052,10 +4055,10 @@ budget worth giving them. The next section says what those were.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **755 of this
-  page's numbers are in prose rather than in a cell**, against 1967 in cells.
+- **Any number written in a sentence.** It reads tables, and **759 of this
+  page's numbers are in prose rather than in a cell**, against 1975 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 755 are settings, seed counts and episode caps rather than anything a
+  those 759 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -4117,7 +4120,7 @@ written as a console block.
   commands ran out of time, so a resumed run does not spend the budget on them
   again, and it carries what each one took so the next run starts the long
   ones first. With every command cached the whole page answers in a second.
-- **1614 of 1967 numbers are checked.** The rest are in a table or a column that
+- **1622 of 1975 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
