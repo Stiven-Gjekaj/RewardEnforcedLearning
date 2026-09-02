@@ -24,6 +24,28 @@ list of the subject.
 
 ## Built since that table was written
 
+**Every table on the algorithms page is accounted for by a command that page
+names.** 64 of 64, which had never happened. Six tables had never been checked
+at all, because four commands ran out of the default budget of 900 seconds and
+one had never once run to the end.
+
+Two of the six were reached by making the code faster rather than by waiting
+longer. A grid now works out each transition once and remembers it, which is
+what a tree search asks for on every simulated step: over two million questions
+for three episodes of the Dyna maze, and two hundred and sixteen distinct
+answers. The Fourier encode writes its sum out and leaves out the terms that
+multiply by zero, which is exact and four times faster, and it is four fifths
+of a run at order 7. Every number in every table those two touch is unchanged
+and the seconds beside them are a third and a half of what they were.
+
+The last one was `rel train mcts --env maze --set reuse=off`, which is 500
+episodes of an agent that provably cannot learn. The console block now says the
+40 episodes the table beside it uses, and that takes six minutes.
+
+The page's own cost table is remeasured with all of it running: 13,985 seconds
+of work over 108 commands, a floor of 58 minutes on four processors, and 75 in
+page order.
+
 **A buffer that draws in the log of its size.** This was one of the three
 things the paragraph above named as missing. A priority draw needs the running
 totals of the weights, and the buffer built them from nothing once for each
