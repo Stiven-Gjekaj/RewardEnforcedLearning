@@ -3696,7 +3696,7 @@ which.
 ```console
 $ python scripts/check_numbers.py --list
 $ python scripts/check_numbers.py --only tiling
-$ python scripts/check_numbers.py --all --jobs 4 --cache outputs.json
+$ python scripts/check_numbers.py --all --jobs 4 --timeout 2400 --cache outputs.json
 ```
 
 It runs every command on this page once, then puts each table against every
@@ -3712,25 +3712,33 @@ same measured times arranged two ways rather than two runs -->
 
 | | seconds | as time |
 | :--- | ---: | ---: |
-| every command, added up | 14,921 | 4 hours 9 minutes |
-| the slowest single command | 1,800 | 30 minutes |
-| four at a time, in page order | 4,531 | 75 minutes |
-| four at a time, longest first | 3,731 | 62 minutes |
-| the total divided by four | 3,730 | 62 minutes |
+| every command, added up | 13,985 | 3 hours 53 minutes |
+| the slowest single command | 1,739 | 29 minutes |
+| four at a time, in page order | 4,473 | 75 minutes |
+| four at a time, longest first | 3,496 | 58 minutes |
+| the total divided by four | 3,496 | 58 minutes |
 
-*105 commands on four processors. The two ordering rows are the measured times
+*108 commands on four processors. The two ordering rows are the measured times
 of one run arranged two ways: page order is what that run did, and longest
 first is what the same times give when the long ones start first.*
 
-**Sixty two minutes is the floor and the ordering reaches it.** Four hours of
-work on four processors cannot take less than an hour and two minutes, and
-starting the long commands first is enough to get there. Page order costs
-twelve minutes more, because the twenty five minute command can start last.
+**Fifty eight minutes is the floor and the ordering reaches it.** Just under
+four hours of work on four processors cannot take less than fifty eight
+minutes, and starting the long commands first is enough to get there. Page
+order costs seventeen minutes more, because the twenty nine minute command can
+start last.
+
+**The budget has to be raised past the default to reach every table.** Four of
+the 108 commands take longer than the default of 900 seconds, and each of them
+is the only source of a table, so at the default those tables read as
+accounted for by nothing at all. That reads exactly like a table whose numbers
+have moved. `--timeout 2400` is what the console block above says, and it is
+what makes the run below a whole run.
 
 `--jobs` is what makes any of that possible. Every command on this page is
 seeded and prints the same numbers whatever else is running, so it moves the
 wall clock and nothing else: the seven fast ones the continuous integration job
-runs take 16.9 seconds one at a time and 8.4 at four, and account for the same
+runs take 20.4 seconds one at a time and 9.7 at four, and account for the same
 three tables.
 
 **The first run cannot be ordered.** Nothing is known about how long anything
@@ -3773,10 +3781,15 @@ missing. The reason is required, because a table that exempts itself silently
 is how a number that moved would hide.
 
 **Nothing had drifted.** That is the result, and it is the whole run rather
-than a sample: **34 of the 34 tables this page states results in are wholly
+than a sample: **64 of the 64 tables this page states results in are wholly
 accounted for by a command it names, and none by no command at all.** Every
 number that was ever in doubt turned out to be right. What the page had wrong
 was where its numbers came from, and it had that wrong in a dozen places.
+
+That count was 34 of 34 when it was first written and the page has grown since.
+Reaching all 64 took a budget past the default and two pieces of work on the
+speed of the code, because four of the commands could not finish inside any
+budget worth giving them. The next section says what those were.
 
 ### What it cannot see
 
@@ -3791,10 +3804,10 @@ was where its numbers came from, and it had that wrong in a dozen places.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **686 of this
+- **Any number written in a sentence.** It reads tables, and **701 of this
   page's numbers are in prose rather than in a cell**, against 1792 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 686 are settings, seed counts and episode caps rather than anything a
+  those 701 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -3837,19 +3850,25 @@ written as a console block.
 
 ### Where it is weak
 
-- **Two and a half hours.** Three commands take more than half an hour each,
-  and one of them has never finished: `rel train mcts --env maze --set
-  reuse=off` was still going at fifty minutes and gave up there. The cache is
-  what makes a second opinion cheap, and it writes down which commands ran out
-  of time so a resumed run does not spend the budget on them again. With every
-  command cached the whole page answers in a second.
-- **A command can outrun the default budget.** `python
-  scripts/measure_levels.py` takes about fifteen minutes on its own and longer
-  beside anything else, so the first check of its two tables reported them as
-  accounted for by nothing at all. That reads exactly like a table whose
-  numbers have moved, and the difference is one line further down the report,
-  which names the command and the budget it wanted. `--timeout` is what to
-  reach for before believing the first reading.
+- **An hour, and four commands that outran the default budget.** At the
+  default of 900 seconds, `measure_value_network.py --env cliff --runs 10
+  --each-seed`, `measure_lost_seed.py --ladder-all`, `measure_levels.py` and
+  the wide `measure_fourier.py` sweep all ran out of time, and the six tables
+  between them read as accounted for by nothing at all. That reads exactly
+  like a table whose numbers have moved, and the difference is one line
+  further down the report, which names the command and the budget it wanted.
+  `--timeout` is what to reach for before believing the first reading. At 2400
+  seconds the four finish in 1739, 1737, 1532 and 900.
+- **One command could not be reached by raising the budget.** `rel train mcts
+  --env maze --set reuse=off` was still going at fifty minutes at its default
+  of 500 episodes and had never once run to the end. Two things fixed it: a
+  grid now works out each transition once, which took the search to a third of
+  its cost, and the console block now says the 40 episodes the table beside it
+  uses. It takes six minutes.
+- **The cache is what makes a second opinion cheap.** It writes down which
+  commands ran out of time, so a resumed run does not spend the budget on them
+  again, and it carries what each one took so the next run starts the long
+  ones first. With every command cached the whole page answers in a second.
 - **1463 of 1792 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
@@ -3877,7 +3896,7 @@ which is harmless and still worth spelling one way.
 | Every seed behind a mean | `python scripts/measure_agents.py --env cliff --agents reinforce --runs 12 --episodes 400 --each-seed` |
 | The tile coder offsets | `python scripts/measure_tiling_offsets.py` |
 | Tile coding against a radial basis | `python scripts/measure_approximation.py --runs 10` |
-| Whether this page still says what the code does | `python scripts/check_numbers.py --all --jobs 4 --cache outputs.json` |
+| Whether this page still says what the code does | `python scripts/check_numbers.py --all --jobs 4 --timeout 2400 --cache outputs.json` |
 | What importance sampling costs | `python scripts/measure_importance.py --episodes 1200` |
 | Ordered replay against uniform | `python scripts/measure_sweeping.py --episodes 400` |
 | The seed that gets lost | `python scripts/measure_lost_seed.py --entropies 0.05 0.1 0.2 --ladder-all` |
