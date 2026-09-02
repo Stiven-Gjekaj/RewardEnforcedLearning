@@ -910,8 +910,27 @@ buffer. Putting one on this critic is the test that is still not run.
 
 ## Things that would be nice and are not milestones
 
-- A `--out` that writes a run to a file, and a `rel replay` that reads one.
-- Sweeping a setting from the command line, with the table falling out.
-- An environment described entirely by a text file, so that a new grid needs no
-  Python at all.
-- A confidence band on the compare chart rather than a mean line.
+All four entries this list had are built, and they are worth naming as a list
+that went stale rather than deleting quietly. They were: a `--out` that writes
+a run to a file and a `rel replay` that reads one, sweeping a setting from the
+command line, an environment described entirely by a text file, and a
+confidence band on the compare chart. `rel replay`, `rel sweep`, `--env-file`
+and the band on `rel compare` are all in the project.
+
+A list of nice things is only useful while it is a list of things that are not
+there. Here are four that are not.
+
+- **A second grouping rule that groups by something an environment means**
+  rather than by its state number. The resolution ladder now runs blocks and
+  stripes, and both are arbitrary. What that section wants is a rule an
+  environment supplies, and no environment here supplies one.
+- **An environment whose policy gradient seeds spread rather than split.** The
+  cart pole cannot decide whether reusing an episode buys anything, because a
+  seed either solves it or does not and the mean is a solve count. Every
+  interval in that section is wider than the whole table.
+- **A target network on the actor critic's own value network.** The reading
+  above says that critic is behind because its target is bootstrapped from a
+  network that is still wrong. `deep-q` has a target network and this does not,
+  and that is still the test that is not run.
+- **A reason the pendulum defeats every policy gradient agent here.** The one
+  this page gave has been ruled out and none has been ruled in.
