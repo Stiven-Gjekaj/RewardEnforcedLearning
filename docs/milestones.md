@@ -24,6 +24,34 @@ list of the subject.
 
 ## Built since that table was written
 
+**Why the actor critic fails on the aliased corridor, which this page recorded
+and did not explain.** It ends at a share of 0.963 on going right, nearly a
+fixed choice, and its policy is worth less than the agents that cannot
+represent the answer at all.
+
+The corridor is one observation, so the value network holds one number and the
+weight the actor gets is `r + discount * V(s') - V(s)` with the same `V` on
+both sides: a constant, whatever action was taken. A constant weight has an
+expected update of zero however large it is, because the expected gradient of a
+log probability is zero. The only step of an episode that says anything is the
+one that ended it, and on this corridor the action that ends an episode is
+always the same one, so the actor is driven towards a fixed choice. A fixed
+choice never reaches the goal here.
+
+Three measurements rather than an argument. Every episode of every run hands
+the actor exactly two different weights whatever its length, against one per
+step for `reinforce`. Flatten them and the policy sits at 0.500 on every seed,
+which is where the entropy bonus alone puts it. Turn that bonus off and the
+agent reaches 1.000 on all five seeds, which cannot finish an episode inside
+the step limit. **The 0.963 is not an agent that half learned the answer. It is
+an agent driven at a wall and held off it by a term that has nothing to do with
+the corridor.**
+
+None of that is a fault in the method. Replacing the tail of the return with
+what a critic says loses whatever the tail was carrying, and here the tail
+carries all of it, because the states the agent passes through differ and its
+observations do not.
+
 **The rule that cuts a state space into groups is not arbitrary in its
 effect.** The resolution ladder ran `grouped-q` at the registry defaults with
 the states cut into blocks of neighbouring numbers, and named all four of those
