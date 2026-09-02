@@ -27,6 +27,14 @@ walk policy is worth -13 along the edge, -15 one row up, -17 two rows up, and
 little else, so a mean over ten seeds moves in steps of a fifth. That is what
 makes the paired interval worth reading rather than the mean alone.
 
+**The sweep has to reach past what any row wants, and once it did not.** The
+first version offered 0.05 to 0.4, and five of the six rows at a window of
+three chose 0.05. Those rows were read at the edge of what they were allowed,
+which is a statement about the sweep rather than about sigma, and the numbers
+moved by more than the whole difference between the rows when the range was
+opened. The sweep now runs from 0.003125, which nothing chooses at any
+window.
+
 `docs/algorithms.md` has the table.
 """
 
@@ -54,7 +62,27 @@ from rel.ui.table import table
 SIGMAS: tuple[float, ...] = (0.0, 0.25, 0.5, 0.75, 1.0)
 
 #: The step sizes each sigma is swept over. All of them see all of these.
-STEP_SIZES: tuple[float, ...] = (0.05, 0.1, 0.2, 0.4)
+#:
+#: This was 0.05, 0.1, 0.2 and 0.4, and five of the six rows at a window of
+#: three and every row at a window of five chose 0.05, the smallest offered.
+#: A row read at the end of its sweep is read at the edge of what it was
+#: allowed rather than at a best, and the table was then a statement about the
+#: sweep. Halving downwards four more times moved every window: tree backup
+#: goes from -14.800 to -13.000 at a window of five, and the row that beat it
+#: at a window of three is a middle sigma rather than an end.
+#:
+#: Nothing chooses 0.003125 at any window, which is what makes the range a
+#: bracket rather than a floor moved down.
+STEP_SIZES: tuple[float, ...] = (
+    0.003125,
+    0.00625,
+    0.0125,
+    0.025,
+    0.05,
+    0.1,
+    0.2,
+    0.4,
+)
 
 ENVIRONMENT = "cliff"
 EPISODES = 400

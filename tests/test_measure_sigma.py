@@ -13,6 +13,7 @@ importing it as one would be a different arrangement than the one that runs.
 from __future__ import annotations
 
 import importlib.util
+import itertools
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -416,3 +417,39 @@ class TestTheSweepSaysWhenItDidNotBracketARow:
         )
         script.sigma_section("cliff", (0.0, 1.0), (0.1, 0.5, 0.9), 10, 2, Rng(1))
         assert "did not" not in capsys.readouterr().out
+
+
+class TestTheSweepBracketsItsOwnAnswer:
+    """The step sizes offered have to reach past what any row wants.
+
+    A row whose best sits at an end of the sweep is read at the edge of what
+    it was allowed rather than at a best, and the number is then a statement
+    about the sweep. The first version offered 0.05 to 0.4 and five of six
+    rows at a window of three chose 0.05, which moved every table when the
+    range was opened.
+
+    `at_an_end` is what reports that, and these hold the default against it
+    rather than against a remembered list.
+    """
+
+    def test_the_sweep_reaches_far_below_the_step_size_a_row_once_wanted(
+        self, script: ModuleType
+    ) -> None:
+        assert min(script.STEP_SIZES) < 0.05
+
+    def test_the_sweep_still_reaches_the_largest_step_it_did(
+        self, script: ModuleType
+    ) -> None:
+        assert max(script.STEP_SIZES) == 0.4
+
+    def test_every_step_size_is_offered_once(self, script: ModuleType) -> None:
+        assert len(set(script.STEP_SIZES)) == len(script.STEP_SIZES)
+
+    def test_the_step_sizes_rise(self, script: ModuleType) -> None:
+        assert list(script.STEP_SIZES) == sorted(script.STEP_SIZES)
+
+    def test_each_step_is_twice_the_one_below_it(self, script: ModuleType) -> None:
+        # A ladder rather than a list, so a row that wants something between
+        # two of them is at most a factor of two from what it got.
+        for smaller, larger in itertools.pairwise(script.STEP_SIZES):
+            assert larger == pytest.approx(smaller * 2.0)
