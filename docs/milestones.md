@@ -15,14 +15,48 @@ Nothing, for the first time since this page was written. The one entry that
 was here was continuous actions, and it is below.
 
 That is a statement about this table rather than about the subject. Plenty is
-missing: a policy gradient method that works on a hard problem, an environment
-with images, a way of learning a model of an environment from what happens in
-it. None of those is written here, because a list of everything not built is a
-list of the subject.
+missing: an environment with images, a way of learning a model of an
+environment from what happens in it, a method that learns from a demonstration
+rather than from a reward. None of those is written here, because a list of
+everything not built is a list of the subject.
 
 ---
 
 ## Built since that table was written
+
+**A policy gradient method that reuses an episode, which was one of the three
+things the paragraph above named as missing.** `clipped-policy` walks over the
+same episode several times with a clip on how far any one pass may move a step
+whose probability has already moved. There is no clip operation in the gradient
+engine and none is needed: the objective is the ratio times the advantage on
+one piece and a constant on the other, so which piece applies is read off the
+numbers and the graph is built for that piece alone.
+
+**One pass is `reinforce` with a baseline, digit for digit**, because every
+ratio is one before the policy has moved. That is the control the rest of it
+rests on, and the measurement reproduces it as a whole run: the same median,
+the same mean, the same five seeds solved, and a paired interval of exactly
+zero width.
+
+The clip behaves exactly as its two settings say. The share of step updates it
+binds on falls from 0.0598 at a range of 0.05 to 0.0004 at a range of 1, and
+rises from nothing at one pass to 0.0573 at eight. Nothing at one pass is
+arithmetic rather than a measurement.
+
+**Whether reusing an episode buys environment steps is not decided.** Four
+passes over a hundred episodes solves five seeds of ten, which is what one pass
+over four hundred solves, and one pass over a hundred solves three. Every
+paired interval crosses zero by more than a hundred, because a cart pole seed
+either solves the problem or does not and the mean is a solve count in
+disguise. The interval half-width is 190 at ten seeds, so deciding a difference
+of 25 needs about six hundred of them. **The environment cannot answer the
+question this agent was built to ask.**
+
+**And the page's explanation of the pendulum was wrong.** It said the two
+policy gradient agents lose to a random policy there because both bootstrap
+their target from a value network. `reinforce` does not bootstrap and neither
+does `clipped-policy`. Both lose to random too, and `reinforce` is the furthest
+behind of the three. A reason has been ruled out and none has been ruled in.
 
 **Why the actor critic fails on the aliased corridor, which this page recorded
 and did not explain.** It ends at a share of 0.963 on going right, nearly a
