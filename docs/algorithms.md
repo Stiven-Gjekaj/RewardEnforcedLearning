@@ -2015,7 +2015,7 @@ not a small error.
 ## Waves over the whole box
 
 ```console
-$ python scripts/measure_fourier.py --runs 10 --step-sizes 0.02 0.05 0.1 0.2 0.5 1.0 2.0
+$ python scripts/measure_fourier.py --runs 10 --step-sizes 0.005 0.01 0.02 0.05 0.1 0.2 0.5 1.0 2.0
 $ rel train fourier-sarsa --env mountaincar --set order=5
 ```
 
@@ -2045,7 +2045,7 @@ thing said about this basis that is not the basis itself.
 | 7 | 64 | **-131.2** | 0.1 | -140.1 | 1 | +8.9 | [-5.2, +20.5] | 0.213 |
 
 *Mountain car, ten seeds, 200 episodes, greedy return afterwards. Both sides
-swept over seven step sizes and each read at its own best.*
+swept over nine step sizes and each read at its own best.*
 
 **The sign flips.** Scaling loses at order one, wins at order three, loses at
 order five and is not told apart at order seven. Three of those four intervals
@@ -2063,10 +2063,17 @@ The two sides want very different step sizes. At order three the scaled side is
 best at 0.02 and the flat side at 0.5, twenty five times apart, which is what
 the scaling does and why a shared step size cannot compare them.
 
-**One row is a floor rather than a best.** At order three the scaled side wants
-the smallest step the sweep offered, so its 46.0 is what scaling bought inside
-the range rather than what it can buy. The script names such rows rather than
-letting them read as findings.
+**No row is a floor, and one of them was.** The sweep used to start at 0.02
+and the scaled side at order three wanted exactly that, so its 46.0 was what
+scaling bought inside the range rather than what it could buy. Two more step
+sizes below it, at 0.01 and 0.005, and the row still wants 0.02 and every
+number in the table above is the same to the last digit.
+
+That is worth saying beside the Q(sigma) section, which had the same defect and
+where widening the sweep moved a whole window by 1.8 and took two findings
+away. The same fault in two places, and it mattered in one of them. Neither
+outcome was knowable without running it, which is the argument for the script
+naming a row at an end rather than a reader noticing.
 
 ### The cart pole cannot answer this, and that is the answer
 
@@ -3731,7 +3738,7 @@ which.
 ```console
 $ python scripts/check_numbers.py --list
 $ python scripts/check_numbers.py --only tiling
-$ python scripts/check_numbers.py --all --jobs 4 --timeout 2400 --cache outputs.json
+$ python scripts/check_numbers.py --all --jobs 4 --timeout 3600 --cache outputs.json
 ```
 
 It runs every command on this page once, then puts each table against every
@@ -3763,11 +3770,11 @@ minutes, and starting the long commands first is enough to get there. Page
 order costs seventeen minutes more, because the twenty nine minute command can
 start last.
 
-**The budget has to be raised past the default to reach every table.** Four of
-the 108 commands take longer than the default of 900 seconds, and each of them
-is the only source of a table, so at the default those tables read as
+**The budget has to be raised past the default to reach every table.** Several
+of the 108 commands take longer than the default of 900 seconds, and each of
+them is the only source of a table, so at the default those tables read as
 accounted for by nothing at all. That reads exactly like a table whose numbers
-have moved. `--timeout 2400` is what the console block above says, and it is
+have moved. `--timeout 3600` is what the console block above says, and it is
 what makes the run below a whole run.
 
 `--jobs` is what makes any of that possible. Every command on this page is
@@ -3931,7 +3938,7 @@ which is harmless and still worth spelling one way.
 | Every seed behind a mean | `python scripts/measure_agents.py --env cliff --agents reinforce --runs 12 --episodes 400 --each-seed` |
 | The tile coder offsets | `python scripts/measure_tiling_offsets.py` |
 | Tile coding against a radial basis | `python scripts/measure_approximation.py --runs 10` |
-| Whether this page still says what the code does | `python scripts/check_numbers.py --all --jobs 4 --timeout 2400 --cache outputs.json` |
+| Whether this page still says what the code does | `python scripts/check_numbers.py --all --jobs 4 --timeout 3600 --cache outputs.json` |
 | What importance sampling costs | `python scripts/measure_importance.py --episodes 1200` |
 | Ordered replay against uniform | `python scripts/measure_sweeping.py --episodes 400` |
 | The seed that gets lost | `python scripts/measure_lost_seed.py --entropies 0.05 0.1 0.2 --ladder-all` |
@@ -3953,7 +3960,7 @@ which is harmless and still worth spelling one way.
 | What the van is worth | `python scripts/measure_rental.py` |
 | An action that is a number | `python scripts/measure_levels.py` |
 | The smallest approximation there is | `python scripts/measure_aggregation.py` |
-| Waves over the whole box | `python scripts/measure_fourier.py --runs 10 --step-sizes 0.02 0.05 0.1 0.2 0.5 1.0 2.0` |
+| Waves over the whole box | `python scripts/measure_fourier.py --runs 10 --step-sizes 0.005 0.01 0.02 0.05 0.1 0.2 0.5 1.0 2.0` |
 | Learning against an answer that is known | `python scripts/measure_blackjack.py` |
 | Part sample and part expectation | `python scripts/measure_sigma.py` |
 | Drawing in the log of the buffer | `python scripts/measure_tree.py` |
