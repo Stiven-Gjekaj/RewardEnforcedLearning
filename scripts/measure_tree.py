@@ -257,7 +257,13 @@ def cost_section(sizes: tuple[int, ...], batch: int, work: int) -> None:
         )
 
     for line in table(
-        ["buffer", "updates timed", "scan, us", "tree, us", "scan over tree"],
+        [
+            "buffer",
+            "updates timed",
+            "scan microseconds",
+            "tree microseconds",
+            "scan over tree",
+        ],
         rows,
         align=["right"] * 5,
     ):
@@ -319,8 +325,8 @@ def agent_section(
     for line in table(
         [
             "buffer",
-            "scan, seconds",
-            "tree, seconds",
+            "scan seconds",
+            "tree seconds",
             "scan over tree",
             "same digests",
             "digest, the path",

@@ -2622,9 +2622,8 @@ seconds becomes 69 and then 98. Half of that second step is the priority draw
 and half is that the better rows survive longer episodes, which are more steps.
 
 The alternative is a sum tree, which draws and updates in the log of the buffer
-size rather than in the buffer size. It is not here. The buffer is a list with a
-cursor and the cost of the draw is the cost of a pass over it, which is the
-right cost for a project whose networks are pure Python.
+size rather than in the buffer size. It is the next section, and at the default
+buffer of two thousand it is already ahead.
 
 ### Where it is weak
 
@@ -2638,6 +2637,148 @@ right cost for a project whose networks are pure Python.
   and might well be a different result.
 - **Ten seeds.** Enough to decide the corrected row and not enough to decide
   the uncorrected one. The floor at ten seeds is a p of 0.002.
+
+---
+
+## Drawing in the log of the buffer
+
+```console
+$ python scripts/measure_tree.py
+$ python scripts/measure_tree.py --skip-agent
+$ rel train deep-q --env cartpole --set priority=0.6 --set tree=on
+```
+
+A priority draw needs the running totals of the weights. The scan builds them
+from nothing once for each batch, so a buffer of two thousand costs two
+thousand additions whether the batch is one step or eight, and a buffer twenty
+times larger costs twenty times as much for the same eight steps.
+
+A tree keeps those totals between batches. The leaves are the weights and every
+other cell is the sum of the two below it, so the root is the total. A draw
+walks down from the root, going left where the target fits inside the left
+child and going right on the remainder, and a changed weight walks up from its
+leaf mending one cell per level. Both are `log2(n)` where the scan is `n`.
+
+`tree` is a setting on the same buffer, so the two sides below are one piece of
+code with one flag changed.
+
+### What one update costs
+
+<!-- not checked, column scan microseconds,tree microseconds,scan over tree: timings belong to the machine, and so does a ratio of two of them -->
+
+| buffer | scan microseconds | tree microseconds | scan over tree |
+| ---: | ---: | ---: | ---: |
+| 128 | 21.7 | 38.8 | 0.56 |
+| 512 | 33.3 | 42.7 | 0.78 |
+| 2000 | 82.1 | 49.6 | **1.66** |
+| 8192 | 299.4 | 52.2 | 5.73 |
+| 32768 | 1031.3 | 64.7 | 15.94 |
+| 131072 | 4035.0 | 74.9 | 53.84 |
+
+*One update is a batch of eight drawn and its errors put back. Each reading
+averages over at least 200 updates and over more where the buffer is small.*
+
+**The crossover is between 512 and 2000, and the default buffer is 2000.** So
+the tree is already the cheaper draw at the setting `deep-q` ships with, by
+two thirds, and the reason it is not the default is in the next table rather
+than in this one.
+
+The tree column is the shape to read. It goes from 38.8 to 74.9 while the
+buffer goes up by a factor of a thousand: seven levels become seventeen, and
+the cost roughly doubles. The scan column multiplies by 186 over the same
+range.
+
+Below 512 the tree loses, and it loses for a reason worth stating plainly. A
+scan of 128 weights is one tight loop that Python runs quickly, and a descent
+of seven levels is seven rounds of index arithmetic in the interpreter. The
+tree wins on the count of operations from the start and it wins on the clock
+only once the count is large enough to pay for what each one costs here.
+
+### What an agent collects
+
+<!-- not checked, column scan seconds,tree seconds,scan over tree: timings belong to the machine, and so does a ratio of two of them -->
+
+| buffer | scan seconds | tree seconds | scan over tree | same digests |
+| ---: | ---: | ---: | ---: | :--- |
+| 2000 | 5.6 | 5.3 | 1.05 | yes |
+| 32768 | 42.3 | 26.1 | **1.62** | yes |
+
+*`deep-q` on the cart pole, 600 episodes, seed 1, priority 0.6.*
+
+A draw is a small part of an update, because the batch it draws is then run
+forward and backward through a network. So the agent collects less of the
+saving than the update table promises: at the default buffer, 1.66 on the draw
+becomes 1.05 on the run. At 32768 it becomes 1.62, which is most of an hour off
+a day of sweeps.
+
+**The two runs at each buffer have the same two digests.** That is the claim
+that matters more than the seconds. The tree is a cost and not a behaviour, so
+turning it on does not oblige a rerun of anything this page has written down.
+
+### The digests agree, and it is not obvious that they should
+
+Both structures add the same weights and neither adds them in the same order. A
+scan accumulates left to right, so the running total before place `k` carries
+one chain of `k` roundings. A tree adds in pairs, so the same total is
+assembled from about `log2(k)` subtotals rounded separately. Two different sums
+of the same numbers can straddle a target, and then one structure returns the
+place before the boundary and the other returns the place after it, from one
+random number.
+
+That is not an argument that it never happens. The first section of the script
+counts it exactly.
+
+| buffer | share that disagree | one draw in | widest gap, last places | narrowest place over it |
+| ---: | ---: | ---: | ---: | ---: |
+| 256 | 2.11e-14 | 4.7e+13 | 5 | 8.0e+10 |
+| 1024 | 2.24e-13 | 4.5e+12 | 6 | 4.9e+09 |
+| 4096 | 2.28e-12 | 4.4e+11 | 16 | 2.8e+07 |
+| 8192 | 4.16e-12 | 2.4e+11 | 17 | 2.5e+07 |
+
+*Weights drawn evenly from 1e-06, which is the floor a priority can be left
+at, to 5, which is about the largest error a network makes early. Seed 5.*
+
+**Nothing there is sampled.** For each boundary the script searches the bit
+patterns of a double for the first target the tree sends past that place. The
+distance from there to the running total the scan compares against is the exact
+width of the band where the two differ, and the widths added and divided by the
+total are the chance that one uniform draw disagrees. A sampling run would need
+a hundred billion draws to see one, and would then have measured it to one
+significant figure.
+
+At 8192 the widest gap is 17 of the smallest steps a double can take, and the
+narrowest place in the buffer is 25 million of those gaps wide. That is what
+makes a disagreement, when one comes, a disagreement about neighbouring
+places: two boundaries can only cross the same target where a place is
+narrower than the gap, and no place is close.
+
+**So a run of a million updates at the default buffer disagrees with
+probability about two in a million million.** The digests match because they
+were never going to do anything else, not because the two draws are the same
+arithmetic.
+
+### Why the default is still the scan
+
+Because "about two in a million million" is not "never", and the recorded
+digests on this page are the project's own check that it has not changed
+underneath itself. A default that is right almost always is the wrong kind of
+default for that job. `tree=on` is there for the buffer sizes where it is
+worth turning on, and those are exactly the sizes nothing on this page uses.
+
+### Where it is weak
+
+- **One shape of weight.** Drawn evenly between the floor and 5. A real
+  priority draw has most of its weight near the floor and a long tail, and how
+  that changes the roundings is not measured.
+- **One machine, one interpreter.** The crossover at 512 to 2000 is where the
+  count of operations crosses the cost of an operation in CPython. A faster
+  interpreter moves it left and there is no measurement of by how much.
+- **The exact count stops at 8192.** Each boundary costs a search over bit
+  patterns, so the ladder ends for time rather than because the answer settles.
+  The trend over the four rows is between `n` and `n` and a half, which is
+  enough to say the answer stays negligible and not enough to fit a law to.
+- **The agent table is one seed.** It is a timing, not a result, and the
+  digests either side of it are what carries the claim.
 
 ---
 
@@ -3642,10 +3783,10 @@ was where its numbers came from, and it had that wrong in a dozen places.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **653 of this
-  page's numbers are in prose rather than in a cell**, against 1752 in cells.
+- **Any number written in a sentence.** It reads tables, and **682 of this
+  page's numbers are in prose rather than in a cell**, against 1792 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 653 are settings, seed counts and episode caps rather than anything a
+  those 682 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -3701,7 +3842,7 @@ written as a console block.
   numbers have moved, and the difference is one line further down the report,
   which names the command and the budget it wanted. `--timeout` is what to
   reach for before believing the first reading.
-- **1423 of 1752 numbers are checked.** The rest are in a table or a column that
+- **1463 of 1792 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
@@ -3753,6 +3894,7 @@ which is harmless and still worth spelling one way.
 | Waves over the whole box | `python scripts/measure_fourier.py --runs 10 --step-sizes 0.02 0.05 0.1 0.2 0.5 1.0 2.0` |
 | Learning against an answer that is known | `python scripts/measure_blackjack.py` |
 | Part sample and part expectation | `python scripts/measure_sigma.py` |
+| Drawing in the log of the buffer | `python scripts/measure_tree.py` |
 
 ### The commands that are behind no table
 
