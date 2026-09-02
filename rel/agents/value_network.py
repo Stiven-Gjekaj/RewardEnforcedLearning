@@ -30,7 +30,9 @@ proportion to the size of the error the agent last made on it, and `weighting`
 corrects the bias that introduces. Both are settings on the same buffer, so
 here too the sides of the comparison are one piece of code.
 `rel/agents/replay.py` says what the correction is for and
-`scripts/measure_prioritised.py` measures what happens without it.
+`scripts/measure_prioritised.py` measures what happens without it. `tree`
+draws the same way through partial sums kept between batches, which costs the
+log of the buffer rather than the buffer.
 
 ## The maximum is biased, and the target network is already the second opinion
 
@@ -103,6 +105,7 @@ class DeepQ(DiscreteAgent[ObsT]):
         clip: float = 1.0,
         priority: float = 0.0,
         weighting: float = 0.0,
+        tree: bool = False,
         double: bool = False,
     ) -> None:
         super().__init__(rng, actions)
@@ -137,7 +140,7 @@ class DeepQ(DiscreteAgent[ObsT]):
         #: took and nothing else. `replay=0` is the ablation.
         self.memory: Replay[ObsT] | None = None
         if replay > 0:
-            self.memory = Replay(rng, replay, priority, weighting)
+            self.memory = Replay(rng, replay, priority, weighting, tree)
 
         #: How many times the target network has been refreshed.
         self.refreshes = 0

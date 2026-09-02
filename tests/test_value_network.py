@@ -375,3 +375,25 @@ class TestBothPiecesAreNeededOnTheCartPole:
 
     def test_a_target_network_alone_is_not_enough(self) -> None:
         assert self._kept_up(0, 200) < 15.0
+
+
+class TestTheTree:
+    def test_a_tree_without_a_priority_draw_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="needs one"):
+            an_agent(tree=True)
+
+    def test_the_tree_draw_learns_what_the_scan_draw_learns(self) -> None:
+        settings = {"priority": 0.6, "weighting": 0.4, "replay": 64, "batch": 4}
+        scan = an_agent(**settings)
+        tree = an_agent(tree=True, **settings)
+        for number in range(300):
+            step = go(number % 6, number % 4, float(number % 3), (number + 1) % 6)
+            scan.observe(step)
+            tree.observe(step)
+        assert scan.action_values(0) == tree.action_values(0)
+        assert scan.action_values(5) == tree.action_values(5)
+
+    def test_the_buffer_it_builds_has_the_tree(self) -> None:
+        agent = an_agent(priority=0.6, tree=True)
+        assert agent.memory is not None
+        assert agent.memory.tree

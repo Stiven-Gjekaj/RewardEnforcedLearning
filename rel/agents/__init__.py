@@ -609,6 +609,7 @@ def _deep_q(
     clip: float = 1.0,
     priority: float = 0.0,
     weighting: float = 0.0,
+    tree: bool = False,
     double: bool = False,
 ) -> Agent[Any, Any]:
     #: `replay=0` and `target_refresh=0` are the two ablations, so the four
@@ -619,6 +620,11 @@ def _deep_q(
     #: zero it draws evenly, and raising `priority` alone is the mistake worth
     #: being able to run, because it is what makes the agent settle somewhere
     #: else. `scripts/measure_prioritised.py` runs all three.
+    #:
+    #: `tree` draws the same distribution through partial sums that are kept
+    #: between batches rather than added up again, which costs the log of the
+    #: buffer. It is off by default because the two orders of addition round
+    #: differently. `scripts/measure_tree.py` measures both sides of that.
     #:
     #: `double` is the third: the live network names the best action of the
     #: next state and the target network says what it is worth, so the maximum
@@ -640,6 +646,7 @@ def _deep_q(
         clip=clip,
         priority=priority,
         weighting=weighting,
+        tree=tree,
         double=double,
     )
 
