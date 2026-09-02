@@ -107,10 +107,23 @@ class TestWhatOneSettingReturns:
 
 
 class TestItRuns:
+    """The sections print, on budgets small enough to be a test.
+
+    Not `BUDGETS`, which carries the 400 episodes the page reports. Running
+    those here cost this file three minutes of a suite that runs in eight, to
+    check that a table has a heading.
+    """
+
+    #: Two rows shaped like the real ones and small enough to run twice.
+    TINY = (
+        ("reinforce, 6", "reinforce", 6, {}),
+        ("clipped 2 x 3", "clipped-policy", 3, {"passes": 2}),
+    )
+
     def test_the_short_run_prints_all_three_sections(
         self, script: ModuleType, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        script.budget_section(script.BUDGETS[:2], 2, "cartpole", script.Rng(1))
+        script.budget_section(self.TINY, 2, "cartpole", script.Rng(1))
         script.sweep_section((0.2,), (1,), 1, 6, "cartpole")
         script.pendulum_section(("random",), 1, 5, "pendulum-levels")
         printed = capsys.readouterr().out
@@ -121,5 +134,15 @@ class TestItRuns:
     def test_it_says_when_the_seeds_cannot_reach_a_p(
         self, script: ModuleType, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        script.budget_section(script.BUDGETS[:2], 2, "cartpole", script.Rng(1))
+        script.budget_section(self.TINY, 2, "cartpole", script.Rng(1))
         assert "cannot give a p below" in capsys.readouterr().out
+
+    def test_the_two_rows_it_tests_with_are_shaped_like_the_real_ones(
+        self, script: ModuleType
+    ) -> None:
+        # Same four fields in the same order, so a change to the real rows
+        # that broke the section would break these too.
+        assert [len(row) for row in self.TINY] == [
+            len(row) for row in script.BUDGETS[:2]
+        ]
+        assert all(row[1] in {"reinforce", "clipped-policy"} for row in self.TINY)
