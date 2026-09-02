@@ -201,3 +201,73 @@ class TestGroupingStatesTogether:
     def test_an_optimistic_start_works_because_the_rows_agree(self) -> None:
         # Every row adds up to one, so the share is the value itself.
         assert aggregated(100, 5).starting_weight(0.4) == pytest.approx(0.4)
+
+
+class TestTheTwoGroupingRules:
+    """Blocks put neighbouring states together and stripes put them apart.
+
+    Both are arbitrary, which is why there are two. The measurable claim is
+    that they differ only in which states share: the same number of groups,
+    the same number of states behind each of them to within one, and every
+    state in exactly one.
+    """
+
+    def test_blocks_put_neighbours_together(self) -> None:
+        table = aggregated(11, 3)
+        assert [row.index(1.0) for row in table.rows] == [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            2,
+            2,
+            2,
+        ]
+
+    def test_stripes_put_neighbours_apart(self) -> None:
+        table = aggregated(11, 3, grouping="stripes")
+        assert [row.index(1.0) for row in table.rows] == [
+            0,
+            1,
+            2,
+            0,
+            1,
+            2,
+            0,
+            1,
+            2,
+            0,
+            1,
+        ]
+
+    @pytest.mark.parametrize("grouping", ["blocks", "stripes"])
+    def test_every_state_is_in_exactly_one_group(self, grouping: str) -> None:
+        table = aggregated(37, 5, grouping=grouping)
+        for row in table.rows:
+            assert sum(row) == 1.0
+            assert row.count(1.0) == 1
+
+    @pytest.mark.parametrize("grouping", ["blocks", "stripes"])
+    def test_the_groups_are_the_same_size_to_within_one(self, grouping: str) -> None:
+        table = aggregated(37, 5, grouping=grouping)
+        sizes = [sum(row[group] for row in table.rows) for group in range(5)]
+        assert max(sizes) - min(sizes) <= 1
+
+    @pytest.mark.parametrize("grouping", ["blocks", "stripes"])
+    def test_a_group_for_each_state_is_a_table_either_way(self, grouping: str) -> None:
+        # At full resolution the two rules cannot differ: each state is alone.
+        assert aggregated(9, 9, grouping=grouping).rows == aggregated(9, 9).rows
+
+    def test_one_group_is_the_same_either_way(self) -> None:
+        assert aggregated(9, 1, grouping="stripes").rows == aggregated(9, 1).rows
+
+    def test_the_two_rules_disagree_in_between(self) -> None:
+        assert aggregated(9, 3).rows != aggregated(9, 3, grouping="stripes").rows
+
+    def test_a_grouping_that_is_not_one_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="is not a grouping"):
+            aggregated(9, 3, grouping="diagonal")

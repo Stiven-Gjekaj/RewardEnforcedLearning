@@ -966,12 +966,19 @@ def _grouped(
     runs the gaming environments down this dial, and the question it asks is
     whether an agent that cannot see a place clearly can still find the way to
     game it.
+
+    `grouping` says which states share. `blocks` puts neighbouring state
+    numbers together and `stripes` puts them apart, and both give the same
+    number of weights with the same number of states behind each. Grouping by
+    state number is arbitrary either way, which is the reason for having two of
+    them rather than one.
     """
 
     def build(
         rng: Rng,
         env: Env[Any, Any],
         groups: int = 0,
+        grouping: str = "blocks",
         step_size: float | Schedule = 0.1,
         discount: float = 1.0,
         epsilon: float | Schedule = 0.1,
@@ -995,7 +1002,7 @@ def _grouped(
         return cls(
             rng,
             _whole_numbers(env),
-            aggregated(space.n, space.n if groups == 0 else groups),
+            aggregated(space.n, space.n if groups == 0 else groups, grouping=grouping),
             step_size=step_size,
             discount=discount,
             epsilon=epsilon,

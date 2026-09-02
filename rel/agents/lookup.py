@@ -134,7 +134,21 @@ class Lookup:
         return f"Lookup(states={self.states}, features={self.features})"
 
 
-def aggregated(states: int, groups: int) -> Lookup:
+#: How the states are shared out between the groups.
+#:
+#: `blocks` puts neighbouring states together and `stripes` puts them apart.
+#: Both give the same number of weights and the same number of states behind
+#: each of them, so the only thing that changes is which states share.
+#:
+#: That difference is the point. Grouping by state number is arbitrary and this
+#: page says so, and the honest answer to an arbitrary choice is a second one
+#: that is arbitrary in the opposite direction. An exploit that survives blocks
+#: and dies under stripes needed its neighbours; one that survives both did
+#: not.
+GROUPINGS = ("blocks", "stripes")
+
+
+def aggregated(states: int, groups: int, grouping: str = "blocks") -> Lookup:
     """One weight for each group of states, and every state in exactly one.
 
     The friendly use of this class, and the smallest approximation there is.
@@ -144,10 +158,23 @@ def aggregated(states: int, groups: int) -> Lookup:
 
     ## Where the boundaries go
 
-    State `s` of `n` goes into group `s * groups // n`, so the groups are as
-    even as whole numbers allow and the remainder is spread rather than piled
-    onto the last one. Eleven states in three groups gives four, four and
-    three, and not four, four and three the other way round.
+    Under `blocks`, state `s` of `n` goes into group `s * groups // n`, so the
+    groups are as even as whole numbers allow and the remainder is spread
+    rather than piled onto the last one. Eleven states in three groups gives
+    four, four and three, and not four, four and three the other way round.
+
+    Under `stripes`, state `s` goes into group `s % groups`. The group sizes
+    are the same to within one and neighbouring states are never together.
+    Eleven states in three groups gives four, four and three again, and the
+    four is states 0, 3, 6 and 9 rather than 0, 1, 2 and 3.
+
+    ## Why there are two rules and not one
+
+    Grouping by state number is arbitrary. On a grid it is neighbouring cells,
+    which is the friendly case, and on an environment whose state number folds
+    several things together it cuts across all of them. Neither rule is right,
+    so the useful thing is to have a second one that is wrong in the opposite
+    way. `scripts/measure_resolution.py` runs both.
 
     ## What it can and cannot say
 
@@ -156,7 +183,8 @@ def aggregated(states: int, groups: int) -> Lookup:
     the best a staircase can do is a known amount of error, and how much
     depends only on how many steps it has. `scripts/measure_aggregation.py`
     measures the error an agent reaches against the error the staircase cannot
-    do better than.
+    do better than. That is a statement about `blocks`: a striped grouping of
+    a straight line is not a staircase and has no such floor.
     """
     if states < 1:
         raise ValueError("There is nothing to group.")
@@ -165,13 +193,17 @@ def aggregated(states: int, groups: int) -> Lookup:
             f"{groups} groups for {states} states. There is at least one "
             f"group and no more of them than there are states."
         )
+    if grouping not in GROUPINGS:
+        raise ValueError(
+            f"{grouping!r} is not a grouping. Use one of {', '.join(GROUPINGS)}."
+        )
 
     rows = []
     for state in range(states):
         row = [0.0] * groups
-        row[state * groups // states] = 1.0
+        row[state * groups // states if grouping == "blocks" else state % groups] = 1.0
         rows.append(row)
     return Lookup(rows)
 
 
-__all__ = ["Lookup", "aggregated"]
+__all__ = ["GROUPINGS", "Lookup", "aggregated"]
