@@ -3181,16 +3181,66 @@ every agent on this environment and says nothing about any of them. The
 environment is the one place in this project where that number is the wrong one
 to read.
 
-### The actor critic does not find it
+### The actor critic does not find it, and the reason is the one observation
 
 `actor-critic` can hold the answer. Its policy is a probability like
 `reinforce`'s and 0.5858 is inside the range. It ends at 0.963, which is
 nearly a fixed choice, and its policy is worth -68.9, which is worse than the
 agents that cannot represent the answer at all.
 
-That is consistent with what
-[the actor critic section](#the-two-agents-that-learn-a-policy-directly) below
-already reports about it and is not explained here.
+**The weight it hands the actor is `r + discount * V(s') - V(s)`, and there is
+one `V`.** The corridor is one observation, so `V(s')` and `V(s)` are the same
+number at every step that did not end the episode, and the weight is
+`-1 - (1 - discount) * V`: the same number whatever action was taken.
+
+A weight that does not depend on the action carries nothing. The expected
+gradient of a log probability is zero, so a constant weight has an expected
+update of zero however large it is. The only step of an episode that says
+anything is the one that ended it, **and on this corridor the action that ends
+an episode is always the same one**, because the goal is at the right hand end.
+
+So the actor is pushed towards going right always, which is a fixed choice, and
+a fixed choice never reaches the goal here at all.
+
+| weights | entropy | share, median | least | most | different weights in an episode | actions that end one | steps |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| as built | 0.05 | 0.977 | 0.938 | 0.981 | 2 | 1 | 92.09 |
+| as built | 0 | **1.000** | 1.000 | 1.000 | 2 | 1 | **over 1000** |
+| flat | 0.05 | **0.500** | 0.500 | 0.502 | 2 | 1 | 12.00 |
+| flat | 0 | 0.489 | 0.481 | 0.541 | 2 | 1 | 12.09 |
+| end only | 0.05 | 0.956 | 0.943 | 0.963 | 2 | 1 | 49.61 |
+| end only | 0 | **1.000** | 1.000 | 1.000 | 2 | 1 | **over 1000** |
+
+*Five seeds, 600 episodes. `flat` gives every step of an episode the weight the
+first step got, and `end only` keeps the last step's weight and zeroes the
+rest. The best share is 0.5858 and the step limit is 1000.*
+
+**Two columns are the argument and they are counted rather than asserted.**
+Every episode of every run hands the actor exactly two different weights,
+whatever its length, and exactly one action ever ends an episode.
+
+**Take the one step that differs away and the policy does not move.** `flat` at
+the registry's entropy bonus sits at 0.500 on every seed, which is where the
+bonus alone puts a two action softmax. With the bonus off it wanders between
+0.481 and 0.541 over five seeds, which is the random walk a zero mean update
+gives.
+
+**Keep only that step and the agent behaves as it does.** `end only` reaches
+0.956 against the real agent's 0.977. So the last step of an episode is doing
+all of the learning, and the other ninety are noise around a constant.
+
+**The entropy bonus is the only thing holding it short of a policy that cannot
+finish.** With the bonus off, `as built` reaches 1.000 on all five seeds, which
+takes more steps than an episode is allowed. The 0.963 in the table above is not
+an agent that half learned the answer. It is an agent driven at a wall and held
+off it by a term that has nothing to do with the corridor.
+
+**None of this is a fault in the actor critic.** It is what a one step method
+is for: replace the tail of the return with what the critic says, and lose
+whatever the tail was carrying. Here the tail carries the whole signal, because
+the states the agent passes through differ and its observations do not.
+`reinforce` waits for the return and gets a different weight at every step: 33
+different weights on an episode of 33 steps, against this agent's two.
 
 ### Where it is weak
 
@@ -3205,6 +3255,10 @@ already reports about it and is not explained here.
 - **No seeds column.** The table is means over ten seeds and the spread is not
   printed. The finding is a factor of three and a half, which is far outside
   anything ten seeds hide, and a smaller finding here would need more.
+- **The actor critic section is five seeds and one environment.** The argument
+  is arithmetic and the counts confirm it here, and whether a one step method
+  loses its whole signal on every environment with one observation is not
+  measured. This project has one such environment.
 
 ---
 
@@ -3851,10 +3905,10 @@ budget worth giving them. The next section says what those were.
 - **Half a table.** A command has to account for half a table before it is
   called its source. Below that it is a coincidence: a small integer that every
   output happens to print is enough to win when nothing else matches anything.
-- **Any number written in a sentence.** It reads tables, and **722 of this
-  page's numbers are in prose rather than in a cell**, against 1816 in cells.
+- **Any number written in a sentence.** It reads tables, and **736 of this
+  page's numbers are in prose rather than in a cell**, against 1858 in cells.
   A table cell is a result by construction and a sentence is not: most of
-  those 722 are settings, seed counts and episode caps rather than anything a
+  those 736 are settings, seed counts and episode caps rather than anything a
   run produced, so matching them against the outputs would bury the report in
   noise. Two of the wrong numbers found while building this were in prose, and
   both were found by reading rather than by the tool. A test holds this count,
@@ -3916,7 +3970,7 @@ written as a console block.
   commands ran out of time, so a resumed run does not spend the budget on them
   again, and it carries what each one took so the next run starts the long
   ones first. With every command cached the whole page answers in a second.
-- **1463 of 1816 numbers are checked.** The rest are in a table or a column that
+- **1505 of 1858 numbers are checked.** The rest are in a table or a column that
   says why it cannot be, and `--list` prints the split. A test holds this
   sentence against what `--list` says, because a count written in prose is
   exactly the kind of number this whole exercise is about.
