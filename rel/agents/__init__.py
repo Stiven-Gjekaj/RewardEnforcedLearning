@@ -65,7 +65,7 @@ from rel.agents.lookup import Lookup, aggregated
 from rel.agents.monte_carlo import MonteCarloControl
 from rel.agents.off_policy import Estimator, OffPolicyMonteCarlo
 from rel.agents.options import IntraOptionQ, OptionsQ
-from rel.agents.policy import ActorCritic, Reinforce
+from rel.agents.policy import ActorCritic, ClippedPolicy, Reinforce
 from rel.agents.prediction import (
     MonteCarloPrediction,
     NStepTD,
@@ -685,6 +685,53 @@ def _policy_gradient(cls: type[Reinforce[Any]]) -> AgentBuilder:
             entropy=entropy,
             normalise=normalise,
             clip=clip,
+        )
+
+    return build
+
+
+def _clipped() -> AgentBuilder:
+    """`reinforce` with the episode used several times behind a clip.
+
+    A separate builder rather than a setting on `_policy_gradient`, because
+    `passes` and `clip_range` mean nothing to the other two and a registry
+    entry that accepts settings its agent ignores is a way of writing a
+    command that quietly does something else.
+
+    The defaults are 4 passes and a clip range of 0.2, which are the ones the
+    method is usually written with. `scripts/measure_clipped.py` sweeps both
+    and says what they do here, and neither is a number this project measured
+    into being a default.
+    """
+
+    def build(
+        rng: Rng,
+        env: Env[Any, Any],
+        hidden: int = 16,
+        step_size: float = 0.02,
+        value_step_size: float = 0.05,
+        discount: float = 0.99,
+        entropy: float = 0.05,
+        normalise: bool = True,
+        clip: float = 1.0,
+        passes: int = 4,
+        clip_range: float = 0.2,
+    ) -> Agent[Any, Any]:
+        encoder, features = encoder_for(env.observation_space)
+        return ClippedPolicy(
+            rng,
+            _whole_numbers(env),
+            encoder,
+            features,
+            hidden=hidden,
+            step_size=step_size,
+            value_step_size=value_step_size,
+            discount=discount,
+            entropy=entropy,
+            normalise=normalise,
+            clip=clip,
+            passes=passes,
+            clip_range=clip_range,
         )
 
     return build
@@ -1315,6 +1362,12 @@ AGENTS: Registry[Agent[Any, Any]] = Registry(
             "reinforce",
             "Waits for the episode, then pushes up whatever led to a good return.",
             _policy_gradient(Reinforce),
+            tags=("network", "on-policy"),
+        ),
+        Entry(
+            "clipped-policy",
+            "Uses an episode several times, with a clip on how far each pass moves.",
+            _clipped(),
             tags=("network", "on-policy"),
         ),
         Entry(
