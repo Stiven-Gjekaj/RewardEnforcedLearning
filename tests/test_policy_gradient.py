@@ -21,7 +21,7 @@ import math
 import pytest
 
 from rel.agents.features import centred, encoder_for, one_hot
-from rel.agents.policy import ActorCritic, Reinforce, standardised
+from rel.agents.policy import ActorCritic, ClippedPolicy, Reinforce, standardised
 from rel.envs.classic import cliff_walk
 from rel.envs.control import CartPole
 from rel.rng import Rng
@@ -306,3 +306,109 @@ def test_reinforce_keeps_the_cart_pole_up() -> None:
 
     watched = evaluate(CartPole(Rng(105).stream("env")), agent, 10, discount=0.99)
     assert watched.final() > 300.0
+
+
+class TestTheClip:
+    """When the clip stops a step moving, and when it leaves it alone.
+
+    The whole method is this rule. Get it backwards and the agent still runs,
+    still learns, and pushes hardest exactly where it has least evidence.
+    """
+
+    @staticmethod
+    def agent(**extra: object) -> ClippedPolicy[int]:
+        _, made = build(ClippedPolicy, **extra)  # type: ignore[arg-type]
+        return made  # type: ignore[return-value]
+
+    def test_a_good_step_is_stopped_once_the_ratio_is_too_large(self) -> None:
+        made = self.agent(clip_range=0.2)
+        assert made.binds(1.3, 1.0)
+        assert not made.binds(1.1, 1.0)
+        assert not made.binds(0.1, 1.0)
+
+    def test_a_bad_step_is_stopped_once_the_ratio_is_too_small(self) -> None:
+        made = self.agent(clip_range=0.2)
+        assert made.binds(0.7, -1.0)
+        assert not made.binds(0.9, -1.0)
+        assert not made.binds(9.0, -1.0)
+
+    def test_the_boundary_itself_is_not_stopped(self) -> None:
+        made = self.agent(clip_range=0.2)
+        assert not made.binds(1.2, 1.0)
+        assert not made.binds(0.8, -1.0)
+
+    def test_an_advantage_of_nothing_is_never_stopped(self) -> None:
+        # It moves the policy nowhere either way, so there is nothing to stop.
+        made = self.agent(clip_range=0.2)
+        assert not made.binds(9.0, 0.0)
+        assert not made.binds(0.1, 0.0)
+
+    def test_a_wider_range_stops_less(self) -> None:
+        assert self.agent(clip_range=0.2).binds(1.3, 1.0)
+        assert not self.agent(clip_range=0.5).binds(1.3, 1.0)
+
+    def test_a_run_of_no_passes_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="at least once"):
+            self.agent(passes=0)
+
+    def test_a_clip_range_of_nothing_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="above nothing"):
+            self.agent(clip_range=0.0)
+
+
+class TestOnePassIsReinforce:
+    """One pass over an episode is REINFORCE with a baseline, exactly.
+
+    Before any pass the policy is the one that collected the episode, so every
+    ratio is one, and the gradient of `weight * exp(logp - logp)` is `weight`
+    where REINFORCE's `weight * logp` is also `weight`. That is not an
+    approximation and the digests hold it to the last bit.
+
+    It is the load bearing test of this class. If the ratio were built wrongly
+    the agent would still learn, because a wrong constant in front of the
+    gradient is a step size, and nothing about a run would say so.
+    """
+
+    @staticmethod
+    def run(cls: type[Reinforce[int]], **extra: object) -> tuple[str, str]:
+        env, agent = build(cls, seed=4, entropy=0.05, **extra)
+        record = train(env, agent, 20, discount=0.99)
+        return record.digest.hexdigest(), "".join(agent.learned())
+
+    def test_the_two_runs_are_the_same_run(self) -> None:
+        assert self.run(ClippedPolicy, passes=1) == self.run(Reinforce, baseline=True)
+
+    def test_two_passes_are_a_different_run(self) -> None:
+        assert self.run(ClippedPolicy, passes=2) != self.run(ClippedPolicy, passes=1)
+
+
+class TestWhatItCounts:
+    def test_nothing_considered_is_a_share_of_nothing(self) -> None:
+        _, agent = build(ClippedPolicy)
+        assert agent.share_clipped == 0.0
+
+    def test_the_first_pass_never_clips(self) -> None:
+        # Every ratio is one before the policy has moved, so a run of one pass
+        # cannot clip however narrow the range is.
+        env, agent = build(ClippedPolicy, passes=1, clip_range=1e-9)
+        train(env, agent, 5, discount=0.99)
+        assert agent.considered > 0
+        assert agent.clipped == 0
+
+    def test_a_narrow_range_clips_more_than_a_wide_one(self) -> None:
+        shares = []
+        for width in (0.02, 2.0):
+            env, agent = build(ClippedPolicy, passes=4, clip_range=width)
+            train(env, agent, 12, discount=0.99)
+            shares.append(agent.share_clipped)
+        assert shares[0] > shares[1]
+
+    def test_it_counts_one_step_of_every_pass(self) -> None:
+        env, agent = build(ClippedPolicy, passes=3)
+        record = train(env, agent, 4, discount=0.99)
+        assert agent.considered == 3 * sum(record.lengths)
+
+    def test_it_says_how_it_is_set(self) -> None:
+        _, agent = build(ClippedPolicy, passes=6, clip_range=0.3)
+        assert "passes=6" in repr(agent)
+        assert "clip_range=0.3" in repr(agent)

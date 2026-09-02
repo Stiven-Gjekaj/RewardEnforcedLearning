@@ -277,14 +277,26 @@ class Reinforce(DiscreteAgent[ObsT]):
 
             loss.backward()
         self.optimiser.step()
+        self._fit_value(features, targets)
 
-        if self.value is not None and self.value_optimiser is not None:
-            self.value_optimiser.zero_grad()
-            for x, target in zip(features, targets, strict=True):
-                predicted = self.value(x)
-                difference = add(predicted, scale(Tensor([target]), -1.0))
-                total(square(difference)).backward()
-            self.value_optimiser.step()
+    def _fit_value(
+        self, features: Sequence[Sequence[float]], targets: Sequence[float]
+    ) -> None:
+        """One squared error step on the baseline, if there is one.
+
+        Separate from `_learn` because `ClippedPolicy` reuses an episode
+        several times for the policy and once for this, and the two would
+        otherwise be the same six lines in two places.
+        """
+        if self.value is None or self.value_optimiser is None:
+            return
+
+        self.value_optimiser.zero_grad()
+        for x, target in zip(features, targets, strict=True):
+            predicted = self.value(x)
+            difference = add(predicted, scale(Tensor([target]), -1.0))
+            total(square(difference)).backward()
+        self.value_optimiser.step()
 
     def learned(self) -> Iterator[str]:
         # Every weight of every layer, the baseline included. A network keeps
@@ -300,6 +312,177 @@ class Reinforce(DiscreteAgent[ObsT]):
 
     def __repr__(self) -> str:
         return f"Reinforce({self.policy!r}, baseline={self.value is not None})"
+
+
+class ClippedPolicy(Reinforce[ObsT]):
+    """Reuses an episode several times, with a clip on how far any pass moves.
+
+    `reinforce` takes one gradient step from an episode and throws it away. The
+    episode cost real steps of a real environment and one step of gradient is
+    very little to get for them, so the obvious thing is to take several. The
+    obvious thing is also wrong: after the first step the policy is no longer
+    the one that collected the episode, and the returns in it are the returns
+    of a policy that no longer exists.
+
+    ## What the clip is for
+
+    The correction for using data from another policy is the ratio of the two
+    probabilities of the action taken, and off-policy corrections built out of
+    ratios are the thing this project measures going wrong elsewhere: a ratio
+    of ten is a step ten times too large made on the evidence of one episode.
+
+    A clipped objective bounds the ratio instead of trusting it. Where the
+    ratio has moved past `clip_range` in the direction that would make the
+    update larger, the objective stops improving, so the gradient is nothing
+    and the pass leaves that step alone. Where it has not, the update is the
+    ratio times the advantage, which is the off-policy gradient as written.
+
+    So a pass can move any one step by a bounded amount, and the passes after
+    the first only move the steps the earlier ones have not already moved far.
+
+    ## Why there is no clip operation in the engine
+
+    `min(ratio * A, clip(ratio) * A)` is a function of the ratio with two
+    pieces. On one piece it is `ratio * A` and on the other it is a constant,
+    and the gradient of a constant is nothing. So which piece applies is read
+    off the numbers and the graph is built for that piece alone, which is the
+    same gradient with no operation added to `rel.nn.autograd`.
+
+    The clip binds when the advantage is positive and the ratio is above
+    `1 + clip_range`, or the advantage is negative and the ratio is below
+    `1 - clip_range`. Both mean the same thing: this pass would push further
+    in a direction earlier passes have already pushed far.
+
+    ## The old probabilities are read once
+
+    An episode is collected under one policy, because these agents learn at the
+    end of an episode and not during one. So the probabilities to compare
+    against are the ones the policy has when `_learn` starts, read once before
+    any pass, and they are the collecting policy exactly rather than an
+    approximation of it.
+
+    ## What it counts
+
+    `clipped` and `considered` are how many step updates had the clip bind and
+    how many there were. That share is the setting's own diagnostic: at zero
+    the clip is doing nothing and the agent is plain repeated gradient, and
+    near one it is doing everything and the passes past the first are wasted.
+    `scripts/measure_clipped.py` reads it.
+    """
+
+    def __init__(
+        self,
+        rng: Rng,
+        actions: Discrete,
+        encoder: Encoder,
+        features: int,
+        *,
+        hidden: int = 16,
+        step_size: float = 0.02,
+        value_step_size: float = 0.05,
+        discount: float = 0.99,
+        normalise: bool = True,
+        episodic_weighting: bool = False,
+        entropy: float = 0.01,
+        clip: float = 1.0,
+        passes: int = 4,
+        clip_range: float = 0.2,
+    ) -> None:
+        if passes < 1:
+            raise ValueError("An episode is used at least once.")
+        if clip_range <= 0.0:
+            raise ValueError("A clip range above nothing is what makes this a clip.")
+
+        super().__init__(
+            rng,
+            actions,
+            encoder,
+            features,
+            hidden=hidden,
+            step_size=step_size,
+            value_step_size=value_step_size,
+            discount=discount,
+            baseline=True,
+            normalise=normalise,
+            episodic_weighting=episodic_weighting,
+            entropy=entropy,
+            clip=clip,
+        )
+        #: How many times each episode is walked over.
+        self.passes = passes
+        #: How far the ratio may move before the objective stops improving.
+        self.clip_range = clip_range
+        #: How many step updates had the clip bind, and how many there were.
+        self.clipped = 0
+        self.considered = 0
+
+    @property
+    def share_clipped(self) -> float:
+        """The share of step updates the clip has bound on so far."""
+        if self.considered == 0:
+            return 0.0
+        return self.clipped / self.considered
+
+    def binds(self, ratio: float, weight: float) -> bool:
+        """Whether the clip stops this step moving any further this pass."""
+        if weight > 0.0:
+            return ratio > 1.0 + self.clip_range
+        if weight < 0.0:
+            return ratio < 1.0 - self.clip_range
+        # An advantage of exactly nothing moves the policy nowhere either way,
+        # so there is nothing for a clip to stop.
+        return False
+
+    def _learn(self) -> None:
+        features = [self.encoder(step.observation) for step in self._episode]
+        targets, weights = self._targets_and_weights(features)
+
+        if self.episodic_weighting:
+            weights = [
+                weight * self.discount**step for step, weight in enumerate(weights)
+            ]
+
+        if self.normalise and len(weights) > 1:
+            weights = standardised(weights)
+
+        chosen = [step.action - self.actions.start for step in self._episode]
+        before = [
+            select(self.policy(x), action).item()
+            for x, action in zip(features, chosen, strict=True)
+        ]
+
+        for _ in range(self.passes):
+            self.optimiser.zero_grad()
+            for x, action, weight, was in zip(
+                features, chosen, weights, before, strict=True
+            ):
+                shares = self.policy(x)
+                here = select(shares, action)
+                ratio = math.exp(here.item() - was)
+
+                self.considered += 1
+                stopped = self.binds(ratio, weight)
+                if stopped:
+                    self.clipped += 1
+
+                loss = (
+                    None if stopped else scale(exp(add(here, Tensor([-was]))), -weight)
+                )
+                if self.entropy > 0.0:
+                    bonus = scale(total(multiply(exp(shares), shares)), self.entropy)
+                    loss = bonus if loss is None else add(loss, bonus)
+
+                if loss is not None:
+                    loss.backward()
+            self.optimiser.step()
+
+        self._fit_value(features, targets)
+
+    def __repr__(self) -> str:
+        return (
+            f"ClippedPolicy({self.policy!r}, passes={self.passes}, "
+            f"clip_range={self.clip_range:g})"
+        )
 
 
 class ActorCritic(Reinforce[ObsT]):
@@ -397,4 +580,4 @@ def standardised(values: Sequence[float]) -> list[float]:
     return [value - mean for value in values]
 
 
-__all__ = ["ActorCritic", "Reinforce", "standardised"]
+__all__ = ["ActorCritic", "ClippedPolicy", "Reinforce", "standardised"]
