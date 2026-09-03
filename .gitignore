@@ -11,6 +11,13 @@ dist/
 venv/
 env/
 
+# A lock file from a package manager this project does not use. Continuous
+# integration installs with pip and `pyproject.toml` names no other tool, so a
+# lock file here would pin versions nothing reads. It appears when somebody
+# runs the suite under `uv`, which is a choice about a machine rather than
+# about the project.
+uv.lock
+
 # Test and type checker output
 .pytest_cache/
 .mypy_cache/
