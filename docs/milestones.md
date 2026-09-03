@@ -24,6 +24,20 @@ everything not built is a list of the subject.
 
 ## Built since that table was written
 
+**A red build, and what it found.** Six pushes ran red before anybody looked,
+on Python 3.12 and 3.13 and never on 3.11, which is the version this session
+was working on. Three tests of the Fourier encode failed there, and the reason
+is worth more than the fix: CPython 3.12 changed the built in `sum()` to
+compensate for the error it accumulates over floats, and the tests used `sum()`
+as the reference for an encode that adds left to right. The entry below has
+what that says about every Fourier number on the algorithms page.
+
+The lesson is about the checking rather than about the arithmetic. **This
+project runs its suite on three Pythons in continuous integration and had not
+looked at it for six pushes**, and a session that runs one of the three locally
+cannot see the other two. Checking a red build costs a minute and this one had
+a finding in it.
+
 **A recheck of the six tracks above, and what it found.** Three defects, all
 three mine and all three in what those tracks added.
 
@@ -172,6 +186,16 @@ answers. The Fourier encode writes its sum out and leaves out the terms that
 multiply by zero, which is exact and four times faster, and it is four fifths
 of a run at order 7. Every number in every table those two touch is unchanged
 and the seconds beside them are a third and a half of what they were.
+
+**The Fourier one turned out to fix something nobody was looking for.** It used
+the built in `sum()`, and CPython 3.12 changed `sum()` to compensate for the
+error it accumulates over floats. So the features of a point were one thing on
+Python 3.11 and another on 3.12, and every number this project recorded from a
+Fourier agent was a number about one interpreter. Measured: the same point at
+order 3 gives two different tuples on the two versions before the change and
+one after it. Nothing said so, and no test could have caught it, because every
+test compared the code against itself. The tests now hold three recorded
+features as values.
 
 The last one was `rel train mcts --env maze --set reuse=off`, which is 500
 episodes of an agent that provably cannot learn. The console block now says the
