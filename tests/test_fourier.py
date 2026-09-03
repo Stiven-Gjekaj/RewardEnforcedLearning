@@ -405,19 +405,36 @@ class TestTheWrittenOutSum:
     agree digit for digit rather than nearly. A test that allowed nearly would
     let a real change through, because a change of one part in ten to the
     sixteenth compounds over two hundred episodes into a different run.
+
+    ## The reference adds up by hand, and it has to
+
+    The obvious reference is `sum()`, and that is what this test used until it
+    failed on Python 3.12. CPython 3.12 changed the built in `sum()` to
+    compensate for the error it accumulates over floats, so `sum()` there is
+    more accurate than adding left to right, and on a four dimensional box it
+    differs from a plain loop about one time in eight.
+
+    That is the whole point of `TestTheEncodeDoesNotFollowThePython` below.
+    The numbers this project has recorded were made by adding left to right,
+    which is what `sum()` did on Python 3.11 and what the encode does on every
+    version now. So the reference here is written out too.
     """
 
     @staticmethod
     def plainly(basis: FourierBasis, observation: Sequence[float]) -> tuple[float, ...]:
-        """The reading of the definition, with nothing left out."""
+        """The definition, adding left to right and leaving nothing out.
+
+        Not `sum()`: see the class docstring. This is what `sum()` used to be
+        and what the recorded numbers were made with.
+        """
         point = basis.box.scaled(basis.box.clip(observation))
-        return tuple(
-            math.cos(
-                math.pi
-                * sum(weight * value for weight, value in zip(c, point, strict=True))
-            )
-            for c in basis.coefficients
-        )
+        waves = []
+        for c in basis.coefficients:
+            angle = 0.0
+            for weight, value in zip(c, point, strict=True):
+                angle += weight * value
+            waves.append(math.cos(math.pi * angle))
+        return tuple(waves)
 
     @pytest.mark.parametrize("order", [0, 1, 3, 5, 7])
     def test_it_is_the_same_sum_over_a_two_dimensional_box(self, order: int) -> None:
@@ -454,3 +471,48 @@ class TestTheWrittenOutSum:
         assert held[(0, 2)] == ((2, 1),)
         assert held[(1, 0)] == ((1, 0),)
         assert held[(2, 1)] == ((2, 0), (1, 1))
+
+
+class TestTheEncodeDoesNotFollowThePython:
+    """The features of a point are the same on every Python, and once were not.
+
+    CPython 3.12 changed the built in `sum()` to compensate for the error it
+    accumulates over floats. While the encode used `sum()`, that made the
+    features of a point different on 3.11 and on 3.12, which made every number
+    this project recorded from a Fourier agent a number about one interpreter.
+    Nothing said so and no test could have caught it, because every test
+    compared the code against itself.
+
+    The values below were recorded on Python 3.11, which is what the tables in
+    `docs/algorithms.md` were made with, and they are what 3.12 and 3.13 print
+    now. Written out rather than computed, so this test is a record and not
+    another comparison of the code with itself.
+    """
+
+    #: Three features of one point of the cart pole's box at order 3, taken
+    #: from a run on Python 3.11 before 3.12 existed to disagree with it.
+    POINT = (0.31, -1.7, 0.08, 2.2)
+    EXPECTED = (
+        -0.2015053223256171,
+        -0.9187912101488983,
+        0.571787960227612,
+    )
+
+    @staticmethod
+    def basis() -> FourierBasis:
+        box = Box((-2.4, -3.0, -0.21, -3.0), (2.4, 3.0, 0.21, 3.0))
+        return FourierBasis(box, order=3)
+
+    def test_the_features_are_the_ones_the_page_was_written_with(self) -> None:
+        got = self.basis().encode(self.POINT)[1]
+        assert got[1:4] == self.EXPECTED
+
+    def test_the_constant_feature_is_one_wherever_the_point_is(self) -> None:
+        assert self.basis().encode(self.POINT)[1][0] == 1.0
+
+    def test_every_feature_is_a_cosine_of_something(self) -> None:
+        # A weak claim on purpose. The strong one is the recorded values above,
+        # and this is here so that a change which moved every feature at once
+        # still has to produce cosines rather than whatever it liked.
+        for value in self.basis().encode(self.POINT)[1]:
+            assert -1.0 <= value <= 1.0

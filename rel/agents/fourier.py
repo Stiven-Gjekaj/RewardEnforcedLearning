@@ -96,10 +96,25 @@ class FourierBasis:
 
         This is the hot loop of every agent over this basis, four fifths of a
         run at order 7. The written out sum below is four times faster than
-        the same sum over a generator, and it is the same arithmetic: the
-        terms are added in the same order, and the ones left out are the ones
-        that multiply by zero. `tests/test_fourier.py` holds it digit for
-        digit against the plain reading.
+        the same sum over a generator, and it adds the same terms in the same
+        order: the ones left out are the ones that multiply by zero, and
+        leaving those out is exact.
+
+        **It is not what the built in `sum()` computes, and that is the
+        point.** CPython 3.12 changed `sum()` to compensate for the error it
+        accumulates over floats, so on 3.12 and later `sum()` is more accurate
+        than adding left to right and differs from it about one time in eight
+        on a four dimensional box. While this used `sum()`, the features of a
+        point were one thing on Python 3.11 and another on 3.12, which made
+        every number this project recorded from a Fourier agent a number about
+        one interpreter. Nothing said so, and no test could have caught it,
+        because every test compared the code against itself.
+
+        Adding left to right is what `sum()` did on 3.11, which is what the
+        tables in `docs/algorithms.md` were made with, and it is now what every
+        version does. `tests/test_fourier.py` holds this against a written out
+        reading digit for digit, and holds three recorded features against the
+        values 3.11 gave before 3.12 existed to disagree with them.
         """
         point = self.box.scaled(self.box.clip(observation))
         waves = []
