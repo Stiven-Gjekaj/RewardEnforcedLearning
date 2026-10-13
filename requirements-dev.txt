@@ -1,4 +1,4 @@
 # The package itself needs nothing. These are the tools that the gate runs.
-ruff==0.16.10
+ruff==0.17.0
 mypy==2.4.0
 pytest==9.1.1
